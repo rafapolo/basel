@@ -12,6 +12,24 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { cotaPonta } from './chao.js';
+
+// Mittlere Brücke: eixo do OSM e vãos (trecho molhado dividido em N arcos). agua.js usa os mesmos pilares para a
+// espuma e para não pôr os pilares genéricos dele (a cada ~32 m, fora do lugar) dentro dos arcos desta ponte.
+// larg: 20 m de parapeito a parapeito; as calçadas do OSM correm a +7,5 e −6,6 m do eixo e os postes a ±10 m (no parapeito)
+export const MITTLERE = { A: [-49.7, -148.3], B: [95.1, -255.6], N: 6, larg: 20, pilar: 3.2 };
+export function vaosMittlere(altura, nivelReno = 2.3) {
+  const { A, B, N } = MITTLERE;
+  const L = Math.hypot(B[0] - A[0], B[1] - A[1]), ang = Math.atan2(B[1] - A[1], B[0] - A[0]), c = Math.cos(ang), s_ = Math.sin(ang);
+  // trecho de água: onde o relevo fica abaixo do nível do Reno
+  let sA = 0, sB = L;
+  for (let s = 0; s <= L; s += 1) if (altura(A[0] + c * s, A[1] + s_ * s) < nivelReno) { sA = s; break; }
+  for (let s = L; s >= 0; s -= 1) if (altura(A[0] + c * s, A[1] + s_ * s) < nivelReno) { sB = s; break; }
+  const passo = (sB - sA) / N;
+  const pilares = [];
+  for (let i = 1; i < N; i++) { const s = sA + i * passo; pilares.push({ s, x: A[0] + c * s, z: A[1] + s_ * s }); }
+  return { L, ang, sA, sB, passo, pilares };
+}
 
 const SRGB = THREE.SRGBColorSpace;
 const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -255,6 +273,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     relogio: new THREE.MeshStandardMaterial({ map: texRelogio(), roughness: 0.4, metalness: 0.2, envMap: ENV, envMapIntensity: 0.5 }),
   };
   for (const k of ['rathaus', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
+  let cotaMittlere = null;
   const raiz = new THREE.Group();
   raiz.name = 'marcos';
   cena.add(raiz);
@@ -401,21 +420,20 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
   // Mittlere Brücke: arcos de pedra extrudados ao longo do eixo da ponte do OSM, parapeitos e Käppelijoch
   // =====================================================================================================
   {
-    const A = [-49.7, -148.3], B = [95.1, -255.6];
-    const L = Math.hypot(B[0] - A[0], B[1] - A[1]), ang = Math.atan2(B[1] - A[1], B[0] - A[0]);
+    const { A, B, N, larg, pilar } = MITTLERE;
+    const { L, ang, sA, sB, passo } = vaosMittlere(altura, nivelReno);
     const q = quadro(A[0], A[1], ang);
     const mk = new Marco(q);
-    const hA = altura(...A), hB = altura(...B);
+    // pontas do eixo: a mesma regra das faixas de rua, dos trilhos e da gente (chao.js), para o tabuleiro casar com elas
+    const hA = cotaPonta(altura, ...A, A[0] + Math.cos(ang), A[1] + Math.sin(ang)), hB = cotaPonta(altura, ...B, B[0] - Math.cos(ang), B[1] - Math.sin(ang));
     const yConv = (s) => hA + (hB - hA) * (s / L) + 0.42; // tabuleiro logo abaixo da faixa de rua (0,6 m)
-    // trecho de água: onde o relevo fica abaixo do nível do Reno
-    let sA = 0, sB = L;
-    for (let s = 0; s <= L; s += 1) { const w = altura(A[0] + Math.cos(ang) * s, A[1] + Math.sin(ang) * s) < nivelReno; if (w) { sA = s; break; } }
-    for (let s = L; s >= 0; s -= 1) { const w = altura(A[0] + Math.cos(ang) * s, A[1] + Math.sin(ang) * s) < nivelReno; if (w) { sB = s; break; } }
-    const N = 6, passo = (sB - sA) / N, larg = 12, pilar = 3.2;
-    // perfil lateral (s, y): bloco de pedra com furos em arco de segmento; tabuleiro inclinado entre as cotas das pontas
-    const yFundo = 0.8, yTop0 = yConv(0), yTop1 = yConv(L);
+    // perfil lateral (s, y): bloco de pedra com furos em arco de segmento; tabuleiro inclinado entre as cotas das pontas.
+    // O pé fica bem abaixo da água (o Reno está a 0,8 m): com o pé a 0,8 m, a laje de 10 cm sob os furos boiava
+    // rente à superfície e parecia um piso de tábuas embaixo dos arcos
+    const yFundo = nivelReno - 4.5, yTop0 = yConv(0), yTop1 = yConv(L);
     const sh = new THREE.Shape();
-    sh.moveTo(0, yFundo); sh.lineTo(L, yFundo); sh.lineTo(L, yTop1 - 0.9); sh.lineTo(0, yTop0 - 0.9); sh.closePath();
+    // o topo do bloco é o tabuleiro (18 cm sob as faixas de rua e calçada de cidade.js): sem vala entre a pista e o parapeito
+    sh.moveTo(0, yFundo); sh.lineTo(L, yFundo); sh.lineTo(L, yTop1 - 0.05); sh.lineTo(0, yTop0 - 0.05); sh.closePath();
     for (let i = 0; i < N; i++) {
       const s0 = sA + i * passo + pilar / 2, s1 = sA + (i + 1) * passo - pilar / 2, mid = (s0 + s1) / 2, vao = (s1 - s0) / 2;
       const mola = nivelReno + 1.6, flecha = Math.min(vao * 0.55, yConv(mid) - 0.9 - mola - 0.8);
@@ -442,7 +460,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     for (let i = 1; i < N; i++) {
       const s = sA + i * passo;
       for (const d of [-1, 1]) {
-        const gt = new THREE.CylinderGeometry(0.01, 1.6, yConv(s) - 0.9 - 0.8, 3, 1).rotateY(Math.PI / 2 * (d > 0 ? 1 : -1) + Math.PI / 6 * 0).translate(s, (yConv(s) - 0.9 + 0.8) / 2, d * (larg / 2 + 0.2));
+        const gt = new THREE.CylinderGeometry(0.01, 1.6, yConv(s) - 0.9 - yFundo, 3, 1).rotateY(Math.PI / 2 * (d > 0 ? 1 : -1)).translate(s, (yConv(s) - 0.9 + yFundo) / 2, d * (larg / 2 + 0.2));
         gt.scale(1, 1, 1);
         mk.add('ponte', gt, { sx: 4, sy: 4 });
       }
@@ -458,6 +476,12 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
       // corbéis sob a capela
       mk.tronco('pedraL', s, b0 + 1.8, 2.4, 0.9, y - 3.2, y - 1.2, 4, Math.PI / 4, { sx: 2, sy: 2 });
     }
+    // cota do tabuleiro para quem põe coisas na ponte (postes de detalhes.js): null fora dela
+    cotaMittlere = (x, z) => {
+      const dx = x - A[0], dz = z - A[1], sx = dx * Math.cos(ang) + dz * Math.sin(ang), bx = -dx * Math.sin(ang) + dz * Math.cos(ang);
+      if (sx < 0 || sx > L || Math.abs(bx) > larg / 2 + 0.5) return null;
+      return yConv(sx) + (Math.abs(bx) > larg / 2 - 0.6 ? 0.9 : 0.18); // no parapeito ou no piso
+    };
     const m = novo(); empurra(m, mk);
     const gr = fecha(m, 'Mittlere Brücke', -1);
     lista.at(-1).ano = null; // sem ano no predios.json: sempre de pé
@@ -493,5 +517,5 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     const hs = raio.intersectObjects(raiz.children.filter((g) => g.visible), true).filter((h) => h.object.userData.pid >= 0);
     return hs[0] ? { pid: hs[0].object.userData.pid, distance: hs[0].distance } : null;
   }
-  return { grupo: raiz, esconde, atualiza, acerta, lista, ENV, mats };
+  return { grupo: raiz, esconde, atualiza, acerta, lista, ENV, mats, cotaPonte: (x, z) => cotaMittlere?.(x, z) ?? null };
 }

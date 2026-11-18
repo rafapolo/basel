@@ -9,6 +9,8 @@
 // A densidade segue ceu.estado() (hora e data) e o ano da máquina do tempo. O relógio dos bondes parte da hora do céu e
 // corre em tempo real; com prefers-reduced-motion nada anda (tudo parado, mas presente). Modo leve (ceu.leve): bem menos
 // gente, sem sombras. Ganchos de som: window.ambiente (docs/ambiente-som.js).
+import { cotaPonta } from './chao.js';
+
 const TAU = Math.PI * 2;
 const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 const suave = (a, b, v) => { const t = lim((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -129,7 +131,7 @@ uniform float uVidaT; uniform float uAnima;`)
         for (let k = 0; k < n; k++) pts.push([c[i] + ((c[i + 2] - c[i]) * k) / n, c[i + 1] + ((c[i + 3] - c[i + 1]) * k) / n]);
       }
       pts.push([c[c.length - 2], c[c.length - 1]]);
-      const hA = altura(pts[0][0], pts[0][1]), hB = altura(...pts.at(-1));
+      const hA = cotaPonta(altura, ...pts[0], ...pts[1]), hB = cotaPonta(altura, ...pts.at(-1), ...pts.at(-2));
       const ids = pts.map(([x, z], i) => {
         if (FORA(x, z)) return -1;
         const v = vid(x, z);
@@ -369,9 +371,9 @@ uniform float uVidaT; uniform float uAnima;`)
     for (let i = 0; i < n;) {
       if (!ponte[i]) { i++; continue; }
       let j = i; while (j + 1 < n && ponte[j + 1]) j++;
-      const hA = altura(X[i], Z[i]), hB = altura(X[j], Z[j]);
+      const hA = j > i ? cotaPonta(altura, X[i], Z[i], X[i + 1], Z[i + 1]) : altura(X[i], Z[i]), hB = j > i ? cotaPonta(altura, X[j], Z[j], X[j - 1], Z[j - 1]) : hA;
       let L = 0; const acL = [0]; for (let k = i + 1; k <= j; k++) { L += Math.hypot(X[k] - X[k - 1], Z[k] - Z[k - 1]); acL.push(L); }
-      for (let k = i; k <= j; k++) Yv[k] = hA + (hB - hA) * (L ? acL[k - i] / L : 0) + 0.45;
+      for (let k = i; k <= j; k++) Yv[k] = hA + (hB - hA) * (L ? acL[k - i] / L : 0) + 0.6; // como os trilhos de chao.js
       i = j + 1;
     }
     // reamostra a cada DS m

@@ -7,7 +7,7 @@
 // criarDetalhes({ THREE, cena, renderer, camera, U, altura, ceu, P, nivelAgua, leve, base }) -> { grupo, estat, ... }
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, nivelAgua, leve = false, base = 'data/' }) {
+export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, nivelAgua, cotaPonte = () => null, leve = false, base = 'data/' }) {
   const D = await fetch(base + 'detalhes.json').then((r) => r.json());
   const grupo = new THREE.Group(); grupo.name = 'detalhes';
   cena.add(grupo);
@@ -83,7 +83,8 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     grupo.add(im); estat.instancias += itens.length; estat.malhas++;
     return im;
   }
-  const noChao = (x, z, y) => (y ?? altura(x, z));
+  // na Mittlere Brücke o chão é o tabuleiro (marcos.js), não o leito do rio: os postes do parapeito ficavam na água
+  const noChao = (x, z, y) => (y ?? cotaPonte(x, z) ?? altura(x, z));
 
   // ---------- postes de luz ----------
   const FERRO = 0x2d3532, VIDRO = 0xf3e6c0;

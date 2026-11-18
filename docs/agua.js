@@ -4,6 +4,8 @@
 // Uso em cidade.js: `const AGUA = await criaAgua({...})`; AGUA.relevo(pos, cores) ajusta o relevo antes das normais;
 // AGUA.iniciar({leve}) cria a água depois do céu; AGUA.atualizar(agora) a cada quadro.
 import { ceu, corDoCeu } from './ceu.js';
+import { MITTLERE, vaosMittlere } from './marcos.js';
+import { cotaPonta } from './chao.js';
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -54,7 +56,15 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
   for (let i = 0; i < W * H; i++) { dentro[i] = px[i * 4] > 127 ? 1 : 0; fora[i] = dentro[i] ? 0 : 1; }
   // pilares entram como "terra" para a espuma cercá-los
   const terraPil = Uint8Array.from(fora);
-  const pil = reno.pilares;
+  // pilares: os de reno.json são genéricos (um a cada ~32 m do trecho molhado). Na Mittlere Brücke os arcos de
+  // marcos.js têm pilares próprios; os genéricos caíam no meio dos vãos e o topo furava o tabuleiro (a "bolha branca").
+  // Lá eles dão lugar aos pilares de marcos.js, só para a espuma (sem geometria: `marco`)
+  const pil = (() => {
+    const { A, B, larg, pilar } = MITTLERE, L = Math.hypot(B[0] - A[0], B[1] - A[1]), ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L;
+    const naPonte = (p) => { const s = (p.x - A[0]) * ux + (p.z - A[1]) * uz, b = -(p.x - A[0]) * uz + (p.z - A[1]) * ux; return Math.abs(b) < larg / 2 && s > 0 && s < L; };
+    const outros = reno.pilares.filter((p) => !naPonte(p));
+    return outros.concat(vaosMittlere(altura).pilares.map((p) => ({ x: p.x, z: p.z, w: pilar, l: larg + 3, marco: true })));
+  })();
   for (const p of pil) {
     const r = Math.ceil(Math.max(p.w, p.l) / 2) + 1;
     for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
@@ -173,10 +183,13 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
   {
     // pilares: octógonos alongados no sentido da corrente, do leito até a pista da ponte (mesma fórmula de cidade.js)
     const geo = new THREE.CylinderGeometry(0.5, 0.5, 1, 8, 1, false).translate(0, 0.5, 0);
-    const im = new THREE.InstancedMesh(geo, pedra, pil.length);
+    const pg = pil.filter((c) => !c.marco);
+    const im = new THREE.InstancedMesh(geo, pedra, pg.length);
     const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), p = new THREE.Vector3();
-    pil.forEach((c, i) => {
-      const hA = altura(c.a[0], c.a[1]), hB = altura(c.b[0], c.b[1]);
+    pg.forEach((c, i) => {
+      // pontas como as faixas da ponte (cotaPonta), para o topo ficar sob a pista
+      const ux = c.b[0] - c.a[0], uz = c.b[1] - c.a[1];
+      const hA = cotaPonta(altura, c.a[0], c.a[1], c.a[0] + ux * 0.01, c.a[1] + uz * 0.01), hB = cotaPonta(altura, c.b[0], c.b[1], c.b[0] - ux * 0.01, c.b[1] - uz * 0.01);
       const topo = hA + (hB - hA) * c.f + 0.35;
       const fundo = NIVEL - 2.5;
       e.set(0, -Math.atan2(FLUXO[1], FLUXO[0]) + Math.PI / 2, 0);

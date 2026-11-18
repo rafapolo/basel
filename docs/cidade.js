@@ -9,7 +9,7 @@ import { criarFachadas } from './fachadas.js';
 import { criarMarcos } from './marcos.js';
 import { criaAgua } from './agua.js';
 import { criarArvores } from './arvores.js';
-import { criarChao } from './chao.js';
+import { criarChao, cotaPonta } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
 import { decodifica } from './compacta.js';
 
@@ -96,7 +96,7 @@ const ruasObj = new THREE.Group();
       for (let k = 0; k < n; k++) pts.push([x0 + ((x1 - x0) * k) / n, z0 + ((z1 - z0) * k) / n]);
     }
     pts.push([c[c.length - 2], c[c.length - 1]]);
-    const hA = altura(pts[0][0], pts[0][1]), hB = altura(pts.at(-1)[0], pts.at(-1)[1]);
+    const hA = cotaPonta(altura, ...pts[0], ...pts[1]), hB = cotaPonta(altura, ...pts.at(-1), ...pts.at(-2));
     for (let i = 0; i < pts.length - 1; i++) {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
       const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1;
@@ -294,7 +294,7 @@ MARC.esconde(geo);
 
 AGUA.iniciar({ leve }); // superfície do Reno, depois do céu (usa o sol e a névoa dele)
 // detalhes de rua (tarefa 17): fontes, postes, bancos, toldos, bandeiras, balsas e navios; antes do 1º render, para a sombra em cascata pegar
-if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel });
+if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel, cotaPonte: MARC.cotaPonte });
 
 // prédios demolidos que o GWR registra: pinos vermelhos enquanto existiam
 const pinos = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 0.2, 9, 8).translate(0, 4.5, 0),

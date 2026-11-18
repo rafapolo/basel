@@ -6,6 +6,14 @@
 // criarChao(THREE, { meta, ruas, orto, nivelReno }) -> { malha, altura, grupo, ruas(on) }
 import { decodifica } from './compacta.js';
 
+// cota da ponta de uma ponte do OSM: a ponta costuma cair na beira do cais, onde o relevo já despenca para o rio
+// (a calçada de montante da Mittlere Brücke começava a 2,2 m, rente à água). Vale o maior entre a ponta e o chão
+// 2 m para fora, na direção do caminho. (x, z) = ponta; (xi, zi) = o ponto vizinho, para dentro da ponte.
+export function cotaPonta(altura, x, z, xi, zi) {
+  const dx = x - xi, dz = z - zi, L = Math.hypot(dx, dz) || 1;
+  return Math.max(altura(x, z), altura(x + (dx / L) * 2, z + (dz / L) * 2));
+}
+
 export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, base = 'data/' }) {
   const T = meta.terreno;
   // terreno.v2.bin (script/compacta.py): mesmos vértices e triângulos do terreno.bin.gz, em ~55% dos bytes
@@ -192,8 +200,9 @@ float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }`)
         for (let k = 0; k < n; k++) pts.push([c[i] + ((c[i + 2] - c[i]) * k) / n, c[i + 1] + ((c[i + 3] - c[i + 1]) * k) / n]);
       }
       pts.push([c[c.length - 2], c[c.length - 1]]);
-      const hA = altura(pts[0][0], pts[0][1]), hB = altura(...pts.at(-1));
-      const y = (i) => (l.ponte ? hA + (hB - hA) * (i / (pts.length - 1)) + 0.45 : altura(pts[i][0], pts[i][1]) + 0.06);
+      const hA = cotaPonta(altura, ...pts[0], ...pts[1]), hB = cotaPonta(altura, ...pts.at(-1), ...pts.at(-2));
+      const y = (i) => (l.ponte ? hA + (hB - hA) * (i / (pts.length - 1)) + 0.6 : // ponte: trilho rente à faixa da pista (0,6 m), não enterrado nela
+        altura(pts[i][0], pts[i][1]) + 0.06);
       for (const lado of [-0.5, 0.5]) {
         const f = pts.map(([x, z], i) => {
           const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
