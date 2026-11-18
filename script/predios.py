@@ -6,14 +6,17 @@ muralha e fontanários do OpenStreetMap. Gera em docs/data/:
 
   predios.bin    triângulos de todos os prédios: Int16 x,y,z (escala 1/50 m) + Uint16 id do prédio
   predios.json   atributos por prédio (id = posição na lista) e metadados
-  relevo.bin     grade de altitudes Uint16 (cm acima da base) do recorte
+  relevo.bin     grade de altitudes Uint16 (cm acima da base) do recorte, a 5 m (legado; o desenho usa terreno.bin.gz)
   ruas.json      linhas do OSM em coordenadas locais
+  terreno.bin.gz malha adaptativa do swissALTI3D 0,5 m (tarefa 15, ver script/chao.py)
+  ruas_a.png, ruas_b.png  ruas como áreas (cobertura de asfalto, paralelepípedo, calçada, marcas, leito do bonde, oclusão)
 
 Formato de predios.bin e relevo.bin: inalterado. Em predios.json, cada prédio ganhou (tarefa 12, fachadas):
   mat  material da fachada: 0 reboco, 1 arenito vermelho (igrejas, museus, prédios públicos antigos), 2 concreto e vidro (a partir de 1950)
   lj   loja/comércio no térreo: 2 = OSM shop=*/amenity de comércio dentro da pegada, 1 = só pela classe do GWR
        (comércio, restaurante, hotel, moradia com outro uso)
 As lojas do OSM vêm de data/12-fachadas/lojas.json (Overpass, `out center`); sem o arquivo só vale a classe do GWR.
+Tarefa 15: dz (m) = quanto a base do sólido flutua acima do chão ao redor; o cliente desce a base dessa altura (só quando > 5 cm).
 UV de parede, andares e beiral são calculados no cliente (docs/fachadas.js) a partir do triângulo.
 
 Coordenadas locais: x = leste, y = altura, z = −norte, em metros, a partir de ORIGEM (LV95)
@@ -30,6 +33,7 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+import chao
 from pyproj import Transformer
 from shapely import STRtree, points
 from shapely.geometry import MultiPolygon, Polygon
@@ -161,6 +165,15 @@ def main():
         tris = [t for t in tris if t.is_valid and t.area > 0.01]
         pegadas.append(unary_union(tris) if tris else MultiPolygon())
     arvore = STRtree(pegadas)
+    # relevo fino (tarefa 15): malha adaptativa do swissALTI3D 0,5 m e prédios que flutuam sobre ele
+    bases = [min((z for t in predios[u][1] for _, _, z in t), default=None) for u in uuids]
+    dem, dem_e0, dem_n1 = chao.carrega_dem(ORIGEM_E, ORIGEM_N)
+    dz_predio, folga = chao.pes_dos_predios(dem, dem_e0, dem_n1, pegadas, bases)
+    print(f"base acima do chão ao redor: {(folga > 0.05).sum()} prédios (> 5 cm), {(folga > 0.5).sum()} (> 0,5 m), "
+          f"{(folga > 2).sum()} (> 2 m); mediana {np.median(folga):.2f} m (o sólido desce ~3 m abaixo do chão)")
+    terreno_meta = chao.grava_terreno(dem, SAIDA, 0.25, ORIGEM_E, ORIGEM_N, (E1 - E0) / 2, (N1 - N0) / 2)
+    print(f"terreno: {terreno_meta['nv']} vértices, {terreno_meta['nt']} triângulos, "
+          f"{(SAIDA / 'terreno.bin.gz').stat().st_size / 1e6:.2f} MB")
     pts = points(vivos["gkode"].to_numpy(), vivos["gkodn"].to_numpy())
     idx_pt, idx_pred = arvore.query(pts, predicate="within")
     linhas_vivos = list(vivos.iter_rows(named=True))
@@ -212,6 +225,8 @@ def main():
             }
             if principal["gschutzr_decoded"] == "Ja":
                 a["prot"] = 1
+        if dz_predio[i]:
+            a["dz"] = dz_predio[i]
         a["mat"] = material(ano, nome, a.get("cls"), a.get("prot"))
         if i in com_loja:
             a["lj"] = 2
@@ -260,7 +275,9 @@ def main():
         if tg.get("historic") == "citywalls":
             muralha.append(coords)
         elif tg.get("railway") == "tram":
-            linhas.append({"t": "tram", "c": coords})
+            if tg.get("tunnel"):
+                continue
+            linhas.append({"t": "tram", "c": coords, **({"ponte": 1} if tg.get("bridge") else {})})
         elif tg.get("highway"):
             if tg.get("layer", "0").startswith("-") or tg.get("tunnel"):
                 continue
@@ -274,7 +291,10 @@ def main():
             "ano": r["gbauj"], "fim": int(r["gabbj"]), **({"end": r["endereco"]} if r["endereco"] else {}),
         })
 
+    meio_fio, est_ruas = chao.mascaras(osm, pegadas, ORIGEM_E, ORIGEM_N, E0, N0, E1, N1, SAIDA)
+    print("ruas como áreas:", est_ruas)
     meta = {
+        "terreno": terreno_meta,
         "origem_lv95": [ORIGEM_E, ORIGEM_N], "base_z": BASE_Z, "escala": ESCALA,
         "recorte_lv95": [E0, N0, E1, N1],
         "relevo": {"nx": 220, "ny": 230, "passo": 5, "x0": E0 - ORIGEM_E, "z0": -(N1 - ORIGEM_N)},
@@ -284,7 +304,7 @@ def main():
     }
     (SAIDA / "predios.json").write_text(json.dumps(meta, ensure_ascii=False, separators=(",", ":")))
     (SAIDA / "ruas.json").write_text(
-        json.dumps({"linhas": linhas, "fontes": fontes, "muralha": muralha}, ensure_ascii=False, separators=(",", ":"))
+        json.dumps({"linhas": linhas, "fontes": fontes, "muralha": muralha, "meio_fio": meio_fio}, ensure_ascii=False, separators=(",", ":"))
     )
 
     n = len(uuids)
