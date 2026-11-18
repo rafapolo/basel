@@ -4,7 +4,7 @@
 //
 // Custo: 1 InstancedMesh por classe (gênero) e por LOD, matrizes refeitas só quando a câmera anda. A sombra no CSM sai da
 // mesma malha (customDepthMaterial com o mesmo balanço e a mesma queda de folhas). Modo leve (ceu.leve): sem LOD 0, sem balanço.
-export async function criarArvores({ THREE, cena, camera, altura, ceu, nivelRio = 2.4 }) {
+export async function criarArvores({ THREE, cena, camera, altura, dentro = () => true, ceu, nivelRio = 2.4 }) {
   const [meta, bin] = await Promise.all([fetch('data/arvores.json').then((r) => r.json()), fetch('data/arvores.bin').then((r) => r.arrayBuffer())]);
   const leve = ceu.leve;
   const N = meta.n;
@@ -274,6 +274,8 @@ void main() {
     const sub = (a, b, c, k, depth) => { // subdivide até as arestas ficarem abaixo de 4 m, para seguir o relevo de 0,5 m (tarefa 15)
       const e = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), Math.hypot(c[0] - b[0], c[1] - b[1]), Math.hypot(a[0] - c[0], a[1] - c[1]));
       if (e < 4 || depth > 6) {
+        // fora do relevo (gramados do OSM além do recorte) a altura cai a 0 e a mancha boiava no céu, atrás da cidade
+        if (![a, b, c].every((p) => dentro(p[0], p[1]))) return;
         for (const p of [a, b, c]) {
           pos.push(p[0], altura(p[0], p[1]) + 0.3 + k * 0.01, p[1]);
           const v = 0.85 + 0.3 * hash(Math.round(p[0] * 3) * 131 + Math.round(p[1] * 3));

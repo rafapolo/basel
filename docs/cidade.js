@@ -288,7 +288,7 @@ cena.add(predios);
 const leve = q.get('leve') === '1' || (q.get('leve') !== '0' && (matchMedia('(pointer:coarse)').matches || innerWidth < 700 || (navigator.deviceMemory || 8) <= 4));
 let arvores; // árvores (arvores.js): o G-buffer do GTAO precisa do recorte de folhas delas
 const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f.replace('void main() {', 'varying float vEstado;\nvoid main() {\n  if (vEstado > 1.5) discard;'); arvores?.patchNormal(s); } });
-arvores = q.get('arvores') === '0' ? null : await criarArvores({ THREE, cena, camera, altura, ceu }); // cadastro de árvores e gramados (tarefa 16)
+arvores = q.get('arvores') === '0' ? null : await criarArvores({ THREE, cena, camera, altura, dentro: CH.dentro, ceu }); // cadastro de árvores e gramados (tarefa 16)
 // marcos em alta definição (docs/marcos.js): substituem o sólido LOD2 pelo mesmo EGID
 const MARC = criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, nivelReno: NIVEL_RENO, U });
 MARC.esconde(geo);

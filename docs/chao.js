@@ -246,5 +246,7 @@ float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }`)
       im.castShadow = true; im.name = 'postes'; grupo.add(im);
     }
   }
-  return { malha, altura, grupo, ruas: (on) => { U.uRuasOn.value = on ? 1 : 0; grupo.visible = on; }, estat: { nv, nt } };
+  // dentro(x, z): o relevo cobre o ponto? (fora do recorte a grade fica vazia e altura() devolve 0)
+  const dentro = (x, z) => { const i = Math.round((x - X0) / P1), j = Math.round((z - Z0) / P1); return i >= 0 && j >= 0 && i < GN && j < GN && grade[j * GN + i] === grade[j * GN + i]; };
+  return { malha, altura, dentro, grupo, ruas: (on) => { U.uRuasOn.value = on ? 1 : 0; grupo.visible = on; }, estat: { nv, nt } };
 }
