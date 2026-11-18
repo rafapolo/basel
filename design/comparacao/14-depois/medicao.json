@@ -1,0 +1,93 @@
+{
+  "base": "http://localhost:3014",
+  "viewport": [
+    1280,
+    720
+  ],
+  "data": "2026-11-18",
+  "navegador": "159.0.8154.6",
+  "tempo_ate_cidade_s": 1.4,
+  "peso_abertura_descomprimido_mb": 10.44,
+  "peso_abertura_transferido_mb": 6.53,
+  "peso_por_arquivo_mb": {
+    "localhost:3014/data/predios.bin": 1.614,
+    "localhost:3014/data/terreno.bin.gz": 1.315,
+    "localhost:3014/data/ruas_b.png": 0.578,
+    "cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js": 0.207,
+    "localhost:3014/data/ruas_a.png": 0.207,
+    "localhost:3014/data/ortofoto/t_1_2.webp": 0.159,
+    "localhost:3014/data/ortofoto/t_0_3.webp": 0.159,
+    "localhost:3014/data/ortofoto/t_3_1.webp": 0.157,
+    "localhost:3014/data/ortofoto/t_0_1.webp": 0.154,
+    "localhost:3014/data/ortofoto/t_3_0.webp": 0.153,
+    "localhost:3014/data/ortofoto/t_0_2.webp": 0.153,
+    "localhost:3014/data/ortofoto/t_3_3.webp": 0.146,
+    "localhost:3014/data/ortofoto/t_2_0.webp": 0.145,
+    "localhost:3014/data/ortofoto/t_1_3.webp": 0.142,
+    "localhost:3014/data/ortofoto/t_0_0.webp": 0.136,
+    "localhost:3014/data/ortofoto/t_2_3.webp": 0.133,
+    "localhost:3014/data/ortofoto/t_1_1.webp": 0.128,
+    "localhost:3014/data/ortofoto/t_2_2.webp": 0.119,
+    "localhost:3014/data/ortofoto/geral.webp": 0.068,
+    "localhost:3014/data/ortofoto/t_2_1.webp": 0.068,
+    "localhost:3014/data/relevo.bin": 0.065,
+    "localhost:3014/data/ortofoto/t_3_2.webp": 0.062,
+    "fonts.gstatic.com/s/imfellenglish/v14/Ktk1ALSLW8zDe0rthJysWrnLsAzHEKOYd4xI5g.woff2": 0.06,
+    "localhost:3014/data/ortofoto/t_1_0.webp": 0.059,
+    "fonts.gstatic.com/s/imfellenglish/v14/Ktk3ALSLW8zDe0rthJysWrnLsAzHFZOafYtq5Mzh.woff2": 0.058,
+    "fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2": 0.049,
+    "localhost:3014/data/ruas.json": 0.049,
+    "localhost:3014/data/predios.json": 0.036
+  },
+  "fps_parado_pfalz": {
+    "fps": 37,
+    "pior_quadro_ms": 50
+  },
+  "fps_girando_pfalz": 38.6,
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+  "solidos_3d": 1892,
+  "cameras": {
+    "pfalz": {
+      "fps": {
+        "fps": 39.8,
+        "pior_quadro_ms": 33.4
+      },
+      "fps_sem_vsync": 50
+    },
+    "munster": {
+      "fps": {
+        "fps": 39.7,
+        "pior_quadro_ms": 33.4
+      },
+      "fps_sem_vsync": 38.8
+    },
+    "reno": {
+      "fps": {
+        "fps": 36.8,
+        "pior_quadro_ms": 50
+      },
+      "fps_sem_vsync": 44.8
+    },
+    "rathaus": {
+      "fps": {
+        "fps": 37.5,
+        "pior_quadro_ms": 33.5
+      },
+      "fps_sem_vsync": 66.8
+    },
+    "marktplatz": {
+      "fps": {
+        "fps": 46.3,
+        "pior_quadro_ms": 33.4
+      },
+      "fps_sem_vsync": 67.5
+    },
+    "rheinsprung": {
+      "fps": {
+        "fps": 56.5,
+        "pior_quadro_ms": 33.4
+      },
+      "fps_sem_vsync": 66.9
+    }
+  }
+}
