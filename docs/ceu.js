@@ -286,4 +286,4 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
   atualizarUI(estado());
   return ceu;
 }
-export { ceu, posicaoSol };
+export { ceu, posicaoSol, corDoCeu };
