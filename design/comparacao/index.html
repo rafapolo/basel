@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basel · comparação com a cidade real</title>
+<style>
+  :root { --fundo: #f4efe4; --tinta: #231f18; --suave: #6e6554; --linha: #d8cfbb; }
+  @media (prefers-color-scheme: dark) { :root { --fundo: #1b1914; --tinta: #eee6d4; --suave: #a79d86; --linha: #3a352b; } }
+  body { margin: 0; background: var(--fundo); color: var(--tinta); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; } h2 { font-size: 1.1rem; margin: 0 0 8px; }
+  p, label { color: var(--suave); } select { font: inherit; }
+  section { border-top: 1px solid var(--linha); padding: 20px 0; }
+  .par { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+  figure { margin: 0; } img { width: 100%; height: auto; display: block; border-radius: 4px; background: var(--linha); }
+  .refs img { max-height: 560px; object-fit: contain; }
+  figcaption { font-size: 13px; color: var(--suave); margin-top: 6px; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Basel em 3D × Basel de verdade</h1>
+  <p>As seis câmeras fixas de <code>docs/cameras.js</code> ao lado de fotos e gravuras de licença aberta.
+     Abra por um servidor na pasta <code>design/</code> (<code>bunx serve design</code>), não por <code>file://</code>.</p>
+  <label>Rodada: <select id="datas"></select></label>
+  <div id="lista"></div>
+</main>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const CAMS = ['pfalz', 'munster', 'reno', 'rathaus', 'marktplatz', 'rheinsprung'];
+const [refs, datas] = await Promise.all([fetch('refs.json').then((r) => r.json()), fetch('datas.json').then((r) => r.json())]);
+const q = new URLSearchParams(location.search);
+$('datas').innerHTML = datas.map((d) => `<option>${esc(d)}</option>`).join('');
+$('datas').value = q.get('d') && datas.includes(q.get('d')) ? q.get('d') : datas.at(-1);
+function desenhar() {
+  const d = $('datas').value;
+  $('lista').innerHTML = CAMS.map((c) => `<section><h2>${c}</h2><div class="par">
+    <figure><img src="${esc(d)}/${c}.png" alt="captura ${c} em ${esc(d)}" loading="lazy"><figcaption>Cidade 3D, ${esc(d)}, <code>?cam=${c}</code></figcaption></figure>
+    <div class="refs">${(refs[c] || []).map((r) => `<figure><img src="${esc(r.arquivo)}" alt="${esc(r.titulo)}" loading="lazy">
+      <figcaption>${esc(r.titulo)}. ${esc(r.autor)}, ${esc(r.licenca)}. <a href="${esc(r.fonte)}">fonte</a>. ${esc(r.obs)}</figcaption></figure>`).join('')}</div>
+  </div></section>`).join('');
+}
+$('datas').onchange = desenhar; desenhar();
+</script>
+</body>
+</html>
