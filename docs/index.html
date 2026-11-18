@@ -45,6 +45,14 @@
   .chaves { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .chave { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; padding: 5px 8px; border: 1px solid var(--linha); border-radius: 6px; user-select: none; }
   .chave input { accent-color: var(--tinta); margin: 0; }
+  #sol-ctl { margin: 0 0 10px; font-size: 12px; color: var(--suave); }
+  #sol-ctl label { display: flex; justify-content: space-between; }
+  #sol-ctl output { font-variant-numeric: tabular-nums; color: var(--tinta); font-weight: 600; }
+  #c-hora { width: 100%; margin: 4px 0; accent-color: var(--ouro); }
+  .sol-linha { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  #c-data { font: 12px Inter, sans-serif; color: inherit; background: transparent; border: 1px solid var(--linha); border-radius: 6px; padding: 3px 6px; }
+  #sol-info { font-variant-numeric: tabular-nums; }
+  body.noite #sol-ctl, body.noite #sol-ctl output { color: #c9c0ac; }
   #legenda { display: none; margin-top: 10px; font-size: 11px; }
   #legenda.on { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 8px; }
   #legenda span { display: flex; align-items: center; gap: 5px; }
@@ -129,11 +137,17 @@
   <input id="regua" type="range" min="0" max="1000" value="1000" aria-label="Ano" data-i18n-aria="aria-ano">
   <div class="marcas"><span>1100</span><span>1500</span><span>1800</span><span>1900</span><span>2026</span></div>
   <div id="contagem"></div>
+  <div id="sol-ctl">
+    <label for="c-hora"><span data-i18n="hora">hora</span> <output id="hora-txt">15:00</output></label>
+    <input id="c-hora" type="range" min="0" max="24" step="0.05" value="15" aria-label="Hora do dia" data-i18n-aria="aria-hora">
+    <div class="sol-linha"><input id="c-data" type="date" value="2026-06-21" aria-label="Data" data-i18n-aria="aria-data"><span id="sol-info" title="altura do sol · nascer → poente"></span></div>
+  </div>
   <div class="chaves">
     <label class="chave"><input type="checkbox" id="c-epoca"> <span data-i18n="epoca">cor por época</span></label>
     <label class="chave"><input type="checkbox" id="c-noite"> <span data-i18n="noite">noite</span></label>
     <label class="chave"><input type="checkbox" id="c-palidos" checked> <span data-i18n="palidos">lotes pálidos</span></label>
     <label class="chave"><input type="checkbox" id="c-ruas" checked> <span data-i18n="ruas">ruas e bondes</span></label>
+    <label class="chave"><input type="checkbox" id="c-leve"> <span data-i18n="leve">modo leve</span></label>
   </div>
   <div id="legenda"></div>
   <p class="nota" data-i18n="nota">Pálido: o prédio de hoje é mais novo que o ano escolhido; ali podia haver outro antes. Prédios demolidos não estão no modelo 3D; os {d} que o registro federal lista como demolidos aparecem como pinos vermelhos enquanto existiam. O ano é o do registro (GWR), que às vezes é o de uma reconstrução.</p>

@@ -3,6 +3,7 @@
 // noite com janelas acesas e ficha do prédio ao clicar. Dados gerados por script/predios.py.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { iniciarCeu } from './ceu.js';
 import { criaOrtofoto } from './ortofoto.js';
 import { criarFachadas } from './fachadas.js';
 import { criarChao } from './chao.js';
@@ -268,6 +269,9 @@ predios.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.
 predios.customDepthMaterial.onBeforeCompile = (s) => injetar(s, false);
 predios.frustumCulled = false;
 cena.add(predios);
+// luz e céu (sol real, CSM, GTAO, bloom): ver ceu.js. Modo leve: ?leve=1, ou automático em celular
+const leve = q.get('leve') === '1' || (q.get('leve') !== '0' && (matchMedia('(pointer:coarse)').matches || innerWidth < 700 || (navigator.deviceMemory || 8) <= 4));
+const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f.replace('void main() {', 'varying float vEstado;\nvoid main() {\n  if (vEstado > 1.5) discard;'); } });
 
 // prédios demolidos que o GWR registra: pinos vermelhos enquanto existiam
 const pinos = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 0.2, 9, 8).translate(0, 4.5, 0),
@@ -337,7 +341,7 @@ $('c-epoca').addEventListener('change', (e) => definirModo(e.target.checked ? 'e
 $('c-palidos').addEventListener('change', (e) => { U.uPalido.value = e.target.checked ? 1 : 0; });
 $('c-ruas').addEventListener('change', (e) => { ruasObj.visible = e.target.checked; CH.ruas(e.target.checked); });
 let noiteAlvo = 0;
-function definirNoite(on) { noiteAlvo = on ? 1 : 0; $('c-noite').checked = on; document.body.classList.toggle('noite', on); }
+function definirNoite(on) { noiteAlvo = on ? 1 : 0; ceu.noite(on); $('c-noite').checked = on; document.body.classList.toggle('noite', on); }
 $('c-noite').addEventListener('change', (e) => definirNoite(e.target.checked));
 
 // ---------- ficha do prédio ----------
@@ -422,6 +426,7 @@ function redimensionar() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
+  ceu.redimensionar?.(w, h);
 }
 addEventListener('resize', redimensionar);
 redimensionar();
@@ -456,7 +461,8 @@ function quadro(agora) {
   }
   ant = { ...c, t: agora };
   Object.assign(camSom, { dist: c.dist, polar: c.polar, az: c.az });
-  renderer.render(cena, camera);
+  ceu.atualizar(agora);
+  ceu.render();
 }
 const ini = +(q.get('ano') || 2026);
 definirAno(ini);
@@ -495,7 +501,7 @@ function centro(nome) {
 
 window.cidade = {
   THREE, FACH, U, camera, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
-  ano: () => U.uAno.value, modo: () => modo, noite: () => noiteAlvo === 1, estat, VISTA_PFALZ, altura,
+  ano: () => U.uAno.value, modo: () => modo, noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura,
   temPalidos: () => U.uPalido.value > 0.5,
   palidos: (on) => { U.uPalido.value = on ? 1 : 0; $('c-palidos').checked = on; },
 };

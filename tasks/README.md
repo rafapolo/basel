@@ -6,7 +6,7 @@ Rodada 2: deixar a cidade mais real. As tarefas 01–10 estão em [`done/`](done
 |---|---|---|---|
 | 11 | [Ortofoto no chão e nos telhados](done/11-ortofoto.md) | — | feita em 2026-11-18 (`script/ortofoto.py`, `docs/ortofoto.js`) |
 | 12 | [Fachadas: janelas, andares, pedra e reboco](done/12-fachadas.md) | — | feita em 2026-11-18 (`docs/fachadas.js`) |
-| 13 | [Luz, céu e câmera](13-luz-e-ceu.md) | — | aberta |
+| 13 | [Luz, céu e câmera](done/13-luz-e-ceu.md) | — | feita em 2026-11-18 (`docs/ceu.js`, `?hora=`, `?leve=1`) |
 | 14 | [O Reno de verdade](14-reno.md) | 13 | aberta |
 | 15 | [Relevo fino, ruas e calçadas](15-chao-e-ruas.md) | 11 | aberta |
 | 16 | [Árvores e verde](16-arvores.md) | 13 | aberta |
