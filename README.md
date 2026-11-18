@@ -36,6 +36,8 @@ mechanics are our own. It is not a copy of his interface.
   sky, ACES tone mapping with slow auto-exposure, cascaded shadow maps (3 cascades), ambient occlusion (GTAO, half resolution) and bloom
   at night only. The "night" switch slides to 22:30 and back. **Light mode** (`?leve=1`, automatic on phones): no CSM, GTAO or bloom.
 
+- **Trees and green** (`docs/arvores.js`, data from `script/arvores.py`): 1,195 trees of the Basel tree register (data.bs.ch 100052, CC BY 4.0) plus 193 OSM-only trees, instanced per genus class with 3 LODs, wind sway, autumn colours and leaf fall driven by `ceu.estado().data`, bare branches in winter; OSM lawns and gardens draped on the terrain. Height comes from age and genus (the register has no height); crowns are calibrated against the 2024 canopy cover (100357). `?arvores=0` turns it off.
+
 ### Time and sun API (for the Rhine, trees, etc.)
 
 ```js

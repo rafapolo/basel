@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { iniciarCeu } from './ceu.js';
 import { criaOrtofoto } from './ortofoto.js';
 import { criarFachadas } from './fachadas.js';
+import { criarArvores } from './arvores.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -280,7 +281,9 @@ predios.frustumCulled = false;
 cena.add(predios);
 // luz e céu (sol real, CSM, GTAO, bloom): ver ceu.js. Modo leve: ?leve=1, ou automático em celular
 const leve = q.get('leve') === '1' || (q.get('leve') !== '0' && (matchMedia('(pointer:coarse)').matches || innerWidth < 700 || (navigator.deviceMemory || 8) <= 4));
-const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f.replace('void main() {', 'varying float vEstado;\nvoid main() {\n  if (vEstado > 1.5) discard;'); } });
+let arvores; // árvores (arvores.js): o G-buffer do GTAO precisa do recorte de folhas delas
+const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f.replace('void main() {', 'varying float vEstado;\nvoid main() {\n  if (vEstado > 1.5) discard;'); arvores?.patchNormal(s); } });
+arvores = q.get('arvores') === '0' ? null : await criarArvores({ THREE, cena, camera, altura, ceu }); // cadastro de árvores e gramados (tarefa 16)
 
 // prédios demolidos que o GWR registra: pinos vermelhos enquanto existiam
 const pinos = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 0.2, 9, 8).translate(0, 4.5, 0),
@@ -509,7 +512,7 @@ function centro(nome) {
 }
 
 window.cidade = {
-  THREE, FACH, U, camera, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
+  THREE, FACH, U, camera, arvores, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
   ano: () => U.uAno.value, modo: () => modo, noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura,
   temPalidos: () => U.uPalido.value > 0.5,
   palidos: (on) => { U.uPalido.value = on ? 1 : 0; $('c-palidos').checked = on; },
