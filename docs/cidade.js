@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { criaOrtofoto } from './ortofoto.js';
 import { criarFachadas } from './fachadas.js';
+import { criarMarcos } from './marcos.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -277,6 +278,9 @@ predios.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.
 predios.customDepthMaterial.onBeforeCompile = (s) => injetar(s, false);
 predios.frustumCulled = false;
 cena.add(predios);
+// marcos em alta definição (docs/marcos.js): substituem o sólido LOD2 pelo mesmo EGID
+const MARC = criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, nivelReno: NIVEL_RENO, U });
+MARC.esconde(geo);
 
 // prédios demolidos que o GWR registra: pinos vermelhos enquanto existiam
 const pinos = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 0.2, 9, 8).translate(0, 4.5, 0),
@@ -404,7 +408,9 @@ canvas.addEventListener('pointerup', (e) => {
   const hits = raio.intersectObject(predios, false);
   // o raio vê a geometria inteira; ignora prédios escondidos pela máquina do tempo
   const hit = hits.find((h) => { const p = P[ids16[h.face.a]]; return (p.ano ? p.ano <= anoAtual : anoAtual >= 2026) || U.uPalido.value > 0.5; });
-  if (hit) abrirFicha(ids16[hit.face.a]); else fecharFicha();
+  const hm = MARC.acerta(raio);
+  if (hm && (!hit || hm.distance < hit.distance)) abrirFicha(hm.pid);
+  else if (hit) abrirFicha(ids16[hit.face.a]); else fecharFicha();
 });
 
 // ---------- câmera: posição por alvo, distância, rumo (az) e inclinação (polar) ----------
@@ -465,6 +471,7 @@ function quadro(agora) {
   }
   ant = { ...c, t: agora };
   Object.assign(camSom, { dist: c.dist, polar: c.polar, az: c.az });
+  MARC.atualiza(U.uAno.value, U.uSel.value);
   renderer.render(cena, camera);
 }
 const ini = +(q.get('ano') || 2026);
@@ -503,7 +510,7 @@ function centro(nome) {
 }
 
 window.cidade = {
-  THREE, FACH, U, camera, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
+  THREE, FACH, MARC, U, camera, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
   ano: () => U.uAno.value, modo: () => modo, noite: () => noiteAlvo === 1, estat, VISTA_PFALZ, altura,
   temPalidos: () => U.uPalido.value > 0.5,
   palidos: (on) => { U.uPalido.value = on ? 1 : 0; $('c-palidos').checked = on; },
