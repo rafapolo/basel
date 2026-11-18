@@ -86,7 +86,8 @@ const LARGURA = { secondary: 8, secondary_link: 6, tertiary: 7, unclassified: 6,
 const ruasObj = new THREE.Group();
 {
   const pos = [], cor = [];
-  const cRua = new THREE.Color('#c6b48c'), cPe = new THREE.Color('#d2c39f'), cBonde = new THREE.Color('#2f6b3f');
+  // pista de asfalto e calçada de lajes de granito (eram faixas creme, cor de papel, que denunciavam a ponte)
+  const cRua = new THREE.Color('#57534e'), cPe = new THREE.Color('#9a948a'), cBonde = new THREE.Color('#2f6b3f');
   const faixa = (c, larg, cc, eleva, ponte) => {
     // subdivide a cada 4 m para seguir o relevo; ponte: reta entre as cotas das pontas
     const pts = [];
@@ -118,7 +119,7 @@ const ruasObj = new THREE.Group();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(cor, 3));
   g.computeVertexNormals();
-  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   m.receiveShadow = true;
   ruasObj.add(m);
   // muralha (OSM historic=citywalls): faixa vertical de 5 m
