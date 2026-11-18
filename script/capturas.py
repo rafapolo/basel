@@ -27,9 +27,12 @@ def abrir(b, url, w, h):
     return ctx, pg, erros
 
 
+ESPERA_MS = 2500
+
+
 def esperar(pg):
     pg.wait_for_selector("#carregando.fora", state="attached", timeout=120000)
-    pg.wait_for_timeout(2500)  # damping, sombras e fog assentam
+    pg.wait_for_timeout(ESPERA_MS)  # damping, sombras e fog assentam
 
 
 def fps(pg, ms):
@@ -47,8 +50,11 @@ def main():
     ap.add_argument("--sem-medir", action="store_true", help="não mede fps nem peso")
     ap.add_argument("--largura", type=int, default=1280)
     ap.add_argument("--altura", type=int, default=720)
+    ap.add_argument("--espera", type=int, default=2500, help="ms depois de carregar (a ortofoto leva ~10 s: use 10000)")
     ap.add_argument("--query", default="", help="parâmetros extras, ex.: 'ano=1900'")
     a = ap.parse_args()
+    global ESPERA_MS
+    ESPERA_MS = a.espera
     out = Path(a.saida); out.mkdir(parents=True, exist_ok=True)
     base = a.base.rstrip("/")
     extra = ("&" + a.query) if a.query else ""
@@ -73,7 +79,7 @@ def main():
                 t0 = time.time()
                 pg.goto(f"{base}/?cam=pfalz{extra}", wait_until="load")
                 esperar(pg)
-                med["tempo_ate_cidade_s"] = round(time.time() - t0 - 2.5, 1)
+                med["tempo_ate_cidade_s"] = round(time.time() - t0 - ESPERA_MS / 1000, 1)
                 total = sum(tam.values())
                 cdp.detach()
                 med["peso_abertura_descomprimido_mb"] = round(bruto[0] / 1e6, 2)

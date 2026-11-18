@@ -39,6 +39,12 @@ mechanics are our own. It is not a copy of his interface.
 
 - **Trees and green** (`docs/arvores.js`, data from `script/arvores.py`): 1,195 trees of the Basel tree register (data.bs.ch 100052, CC BY 4.0) plus 193 OSM-only trees, instanced per genus class with 3 LODs, wind sway, autumn colours and leaf fall driven by `ceu.estado().data`, bare branches in winter; OSM lawns and gardens draped on the terrain. Height comes from age and genus (the register has no height); crowns are calibrated against the 2024 canopy cover (100357). `?arvores=0` turns it off.
 
+- **Street details** (`docs/detalhes.js`, positions in `docs/data/detalhes.json` from `script/detalhes.py`): fountains with water and jets,
+  street lamps that light up at night (glow in the bloom plus a light pool on the ground), benches, bins, bike racks, café awnings,
+  tables with parasols (20 April to 10 October, from the date of `ceu.estado()`), generic shop signs, Basel flags on public buildings,
+  the Rhine cable ferries and ships. All instanced, hidden by the time machine according to era or the building's year; `?detalhes=0` turns it off.
+  Sources: OpenStreetMap (ODbL), data.bs.ch 100008 (fountains, IWB, free use with attribution) and 100241 (bike racks, CC BY 4.0).
+
 ### Time and sun API (for the Rhine, trees, etc.)
 
 ```js

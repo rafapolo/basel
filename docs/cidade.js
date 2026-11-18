@@ -10,6 +10,7 @@ import { criarMarcos } from './marcos.js';
 import { criaAgua } from './agua.js';
 import { criarArvores } from './arvores.js';
 import { criarChao } from './chao.js';
+import { criarDetalhes } from './detalhes.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -275,6 +276,8 @@ const MARC = criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, nivelR
 MARC.esconde(geo);
 
 AGUA.iniciar({ leve }); // superfície do Reno, depois do céu (usa o sol e a névoa dele)
+// detalhes de rua (tarefa 17): fontes, postes, bancos, toldos, bandeiras, balsas e navios; antes do 1º render, para a sombra em cascata pegar
+if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel });
 
 // prédios demolidos que o GWR registra: pinos vermelhos enquanto existiam
 const pinos = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 0.2, 9, 8).translate(0, 4.5, 0),
