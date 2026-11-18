@@ -53,6 +53,7 @@ ceu.solEm('2026-12-21', 12)      // pure state, does not touch the scene
 ceu.leve                         // is light mode on?
 ```
 
+- **People and motion** (`docs/vida.js`, `docs/ambiente-som.js`, data by `script/vida.py` → `docs/data/vida.json`): BVB (green) and BLT (yellow) trams run on the OSM rails by the Swiss static GTFS timetable (opentransportdata.swiss; weekday/Saturday/Sunday reference days), instanced pedestrians (leg and arm swing in the shader) on streets and squares, denser near the data.bs.ch 100013 counters and following their hourly/weekly/monthly profile, bicycles, a few cars outside the pedestrian zone, gulls over the Rhine, and Wickelfisch swimmers in summer (zones 100270). Density follows `ceu.estado()` and the time-machine year (no trams before 1895, bikes 1890, cars 1910). Ambient sound (water, crowd, trams, hourly church bells, gulls; Web Audio, no files) has its own switch; `?vida=0` hides everything. Respects `ceu.leve` and `prefers-reduced-motion`.
 - **Three languages:** PT, EN and DE, from the selector at the top or `?lang=en|de`.
 
 ## How to reproduce

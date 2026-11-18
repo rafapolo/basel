@@ -342,11 +342,11 @@ uniform float uVidaT; uniform float uAnima;`)
   const matG = matGente();
   const matC = matGente(0.45);
   const NPED = leve ? 300 : 1300, NBIKE = leve ? 20 : 70, NCARRO = leve ? 10 : 36;
-  const ped = populacao({ n: NPED, grafo: gPed, geo: geoGente(), mat: matG, vel: [0.95, 1.65], livres: Math.round(NPED * 0.34),
+  const ped = populacao({ n: NPED, grafo: gPed, geo: geoGente(), mat: matG, sombra: false, vel: [0.95, 1.65], livres: Math.round(NPED * 0.34),
     desloc: (i, r) => (r() < 0.5 ? -1 : 1) * (0.2 + r() * 0.9),
     offTipo: (t, o) => (VIA_CARRO.has(t) ? Math.sign(o) * (LARG[t] / 2 + 1.1) : o) });
   // pedestres em ruas de carro andam na calçada: afasta do eixo conforme a largura (sorteado uma vez, no vértice)
-  const bici = populacao({ n: NBIKE, grafo: gBike, geo: geoBici(), mat: matC, vel: [3.2, 5.6], respawnLonge: true, desloc: (i, r) => 1.1 + r() * 0.5 });
+  const bici = populacao({ n: NBIKE, grafo: gBike, geo: geoBici(), mat: matC, sombra: false, vel: [3.2, 5.6], respawnLonge: true, desloc: (i, r) => 1.1 + r() * 0.5 });
   const carro = populacao({ n: NCARRO, grafo: gCarro, geo: geoCarro(), mat: matC, vel: [4.5, 9], respawnLonge: true, desloc: (i, r) => 1.7 + r() * 0.3 });
   function pintar() {
     const tor = TORSO[S.estacao];
@@ -537,13 +537,8 @@ uniform float uVidaT; uniform float uAnima;`)
     o.x = corrente[(fj * FNX + fi) * 2]; o.z = corrente[(fj * FNX + fi) * 2 + 1];
     if (!o.x && !o.z) { o.x = -0.6; o.z = -0.8; }
   };
-  // cota do espelho d'água: o plano 'rio' é transladado na geometria, então a cota vem da caixa dele (se outro agente trocar o rio, segue junto)
-  let rioMalha = null, rioY = nivelRio;
-  const nivelAgua = () => {
-    if (!rioMalha) { rioMalha = cena.getObjectByName('rio') || false; if (rioMalha?.geometry && !rioMalha.geometry.boundingBox) rioMalha.geometry.computeBoundingBox(); }
-    if (rioMalha?.geometry?.boundingBox) rioY = rioMalha.geometry.boundingBox.max.y + rioMalha.position.y;
-    return rioY;
-  };
+  // cota do espelho d'água: vem de agua.js (AGUA.nivel), passada por cidade.js
+  const nivelAgua = () => nivelRio;
   // gaivotas
   const NAVE = leve ? 10 : 26;
   const geoAve = (() => {

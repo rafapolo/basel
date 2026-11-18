@@ -473,7 +473,7 @@ function quadro(agora) {
   ceu.render();
 }
 // gente e movimento (tarefa 19, docs/vida.js): bondes pelo horário do GTFS, pedestres, bicicletas, carros, gaivotas e nadadores
-const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, ano: () => U.uAno.value, nivelReno: NIVEL_RENO, nivelRio: NIVEL_RENO - 0.35, leve });
+const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, ano: () => U.uAno.value, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve });
 $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
 if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
 const ini = +(q.get('ano') || 2026);
