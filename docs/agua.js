@@ -303,7 +303,10 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
       vec2 uvd = (p - uDim.xy) / uDim.zw;
       vec2 dd = texture2D(uDist, uvd).rg * 51.0; // x: m até a terra ou pilar; y: m até a margem
       float dPil = dd.x, dMargem = dd.y;
-      float px = max(0.05, length(vMundo - cameraPosition) * 0.0016);
+      // tamanho do pixel no chão: o maior entre a distância e a derivada de tela (rasante, o pixel se estica ao longo
+      // da vista e as ondas curtas viravam anéis e moiré regulares); onda menor que ~3 px some
+      vec2 fw = fwidth(p);
+      float px = max(0.05, max(length(vMundo - cameraPosition) * 0.0016, max(fw.x, fw.y) * 0.9));
       vec2 g = onda(p, uTempo, px);
       // ondas menores perto da margem/pilar (água abrigada) e mais agitadas ao meio
       g *= mix(0.5, 1.0, smoothstep(0.0, 14.0, dPil));
