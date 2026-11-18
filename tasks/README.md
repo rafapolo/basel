@@ -14,7 +14,7 @@ Rodada 2: deixar a cidade mais real. As tarefas 01–10 estão em [`done/`](done
 | 18 | [Marcos em alta definição](18-marcos.md) | 12 | aberta |
 | 19 | [Gente e movimento](19-vida.md) | 15 | aberta |
 | 20 | [Cidade inteira e peso](20-escala-e-peso.md) | 11, 12 | aberta |
-| 21 | [Comparar com a cidade real](21-referencia-visual.md) | — | aberta (fazer primeiro, para medir o antes) |
+| 21 | [Comparar com a cidade real](done/21-referencia-visual.md) | — | feita em 2026-11-18 (`?cam=`, `script/capturas.py`, `design/comparacao/`) |
 
 Sugestão de ordem: 21 (capturas do "antes") → 13 → 11 → 12 → 14 → 15 → 16 → 18 → 17 → 19 → 20.
 
