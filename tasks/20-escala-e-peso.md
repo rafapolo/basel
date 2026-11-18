@@ -22,8 +22,13 @@ O realismo das tarefas 11–19 só cabe se o carregamento for por partes.
 - **Prisma no Reno**: era o sólido 949 do swissBUILDINGS3D, a Käppelijoch (sem registro no GWR); o pé `dz` do relevo
   fino o afundava 9,35 m, porque o chão sob a ponte é o leito do rio. Agora `marcos.js` o esconde e a capela própria
   dele fica na posição do sólido (meio da ponte, s = 89,5 m).
-- **Monte no Marktplatz**: é a encosta real do Münsterhügel atrás da Rathaus (o relevo sobe de 9 para 25 m), com a
-  ortofoto dos telhados por cima; aparecia pelas arcadas da Rathaus do LOD2. A Rathaus da tarefa 18 a cobre; conferido
-  do alto e do nível da rua.
+- **Monte no Marktplatz**: não é bug do relevo. Ali o relevo real sobe de 9 para 25 m (encosta do Münsterhügel atrás da
+  Rathaus), com a ortofoto dos telhados por cima. Hipótese, não verificada: aparecia pelas arcadas da Rathaus do LOD2.
+  Hoje a Rathaus da tarefa 18 o cobre; conferido do alto e do nível da rua.
+- **Peso medido no Pages ao vivo** (2026-11-18, carga fria): abertura 2,69 MB (antes ~3,9 MB), mais 1,97 MB das 16 tiles
+  da ortofoto em segundo plano; total 4,67 MB (antes 6,01 MB). Sem erros nem 404.
+
+Achados novos na ponte (vistos de perto, não corrigidos): sob os arcos aparece um piso que parece de tábuas e uma faixa
+creme na altura da água; há uma bolha branca no tabuleiro.
 
 Pendente: Basel-Stadt inteiro em tiles, KTX2, service worker, metas de fps.
