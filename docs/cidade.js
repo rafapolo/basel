@@ -3,6 +3,7 @@
 // noite com janelas acesas e ficha do prédio ao clicar. Dados gerados por script/predios.py.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { criaOrtofoto } from './ortofoto.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -38,6 +39,7 @@ controls.maxPolarAngle = THREE.MathUtils.degToRad(86);
 controls.minDistance = 25;
 controls.maxDistance = 2600;
 controls.screenSpacePanning = false;
+const orto = criaOrtofoto(THREE, renderer, controls); // foto aérea no chão e nos telhados (docs/ortofoto.js)
 
 const hemi = new THREE.HemisphereLight(0xfff6e4, 0xb9a785, 1.7);
 cena.add(hemi);
@@ -77,6 +79,7 @@ const altura = (x, z) => {
   g.computeVertexNormals();
   const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
   m.receiveShadow = true;
+  orto.chao(m);
   cena.add(m);
   // espelho d'água do Reno: um plano liso no nível do rio, um pouco brilhante
   const rio = new THREE.Mesh(
@@ -262,6 +265,7 @@ function injetar(shader, cheio) {
 }
 const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 material.onBeforeCompile = (s) => injetar(s, true);
+orto.telhados(material);
 const predios = new THREE.Mesh(geo, material);
 predios.castShadow = predios.receiveShadow = true;
 predios.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
@@ -327,7 +331,7 @@ document.querySelector('.nota').innerHTML = document.querySelector('.nota').inne
 
 // ---------- chaves ----------
 function definirModo(m) {
-  modo = m; $('c-epoca').checked = m === 'epoca'; colorir();
+  modo = m; orto.modo(m); $('c-epoca').checked = m === 'epoca'; colorir();
   const leg = $('legenda');
   leg.classList.toggle('on', m === 'epoca');
   leg.innerHTML = EPOCAS.map((e) => `<span><i style="background:${e.cor}"></i>${e.nome}</span>`).join('') + `<span><i style="background:${SEM_ANO}"></i>${t('sem ano', 'no year', 'ohne Jahr')}</span>`;
@@ -460,6 +464,7 @@ definirAno(ini);
 definirModo(q.get('epoca') ? 'epoca' : 'gravura');
 if (q.get('noite')) definirNoite(true);
 requestAnimationFrame(quadro);
+orto.carrega(); // tiles chegam depois da abertura
 $('carregando').classList.add('fora');
 
 // ---------- estatística para o tour (contada dos dados) ----------
