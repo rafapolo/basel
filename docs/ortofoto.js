@@ -46,7 +46,20 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
   {
     vec3 nO = normalize(cross(dFdx(vMundo), dFdy(vMundo)));
     float teto = step(0.4, abs(nO.y)) * uOrtoTelhado;
-    diffuseColor.rgb = mix(diffuseColor.rgb, ${amostra('vMundo.xz')}, teto);
+    if (teto > 0.0) {
+      // a foto não é ortho verdadeira: no telhado inclinado entram a sombra azulada do vizinho e o pátio ao lado.
+      // Sombra da foto sem o azul; água inclinada puxada para a cor de telha do vértice (mantendo a luz da foto);
+      // telhado plano fica com a foto (cascalho, claraboias, painéis)
+      vec3 foto = ${amostra('vMundo.xz')};
+      float lum = dot(foto, vec3(0.299, 0.587, 0.114));
+      foto = mix(foto, vec3(lum) * vec3(1.06, 0.98, 0.9), (1.0 - smoothstep(0.08, 0.3, lum)) * 0.7);
+      // copa de árvore vizinha que a foto deita sobre o telhado: verde vira cinza quente
+      foto = mix(foto, vec3(lum) * vec3(1.04, 1.0, 0.94), smoothstep(0.015, 0.08, foto.g - max(foto.r, foto.b)) * 0.8);
+      float inclinado = 1.0 - smoothstep(0.93, 0.98, abs(nO.y));
+      vec3 telha = diffuseColor.rgb * clamp(0.55 + 1.5 * lum, 0.6, 1.35);
+      foto = mix(foto, telha, inclinado * 0.5);
+      diffuseColor.rgb = mix(diffuseColor.rgb, foto, teto);
+    }
   }`);
       }, 'telhado');
     },
