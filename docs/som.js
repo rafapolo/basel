@@ -302,7 +302,7 @@
   function alternar() {
     ligado = !ligado;
     try { localStorage.setItem(CHAVE, ligado ? 'on' : 'off'); } catch {}
-    if (window.tour?.ativo()) {
+    if ((typeof window.tour?.ativo === "function" && window.tour.ativo())) {
       if (ligado) { iniciar(); cena(window.tour.cena?.() ?? 0); } else parar(false);
     }
     return ligado;

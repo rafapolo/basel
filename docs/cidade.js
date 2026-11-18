@@ -318,6 +318,11 @@ const unicos = [...new Map(P.map((p, i) => [p.egid ?? `s${i}`, p])).values()];
 const anosOrdenados = unicos.map((p) => p.ano).filter(Boolean).sort((a, b) => a - b);
 const existentes = (ano) => { let lo = 0, hi = anosOrdenados.length; while (lo < hi) { const m = (lo + hi) >> 1; if (anosOrdenados[m] <= ano) lo = m + 1; else hi = m; } return lo; };
 let anoAtual = 2026;
+// infraestrutura moderna some no passado: bonde elétrico desde 1895, cais de pedra do Rheinweg ~1850
+function anoDaInfra(a) {
+  for (const n of ['trilhos', 'fio', 'postes']) { const o = CH?.grupo?.getObjectByName(n); if (o) o.visible = a >= 1895; }
+  const cais = AGUA?.grupo?.getObjectByName('muros-de-cais'); if (cais) cais.visible = a >= 1850;
+}
 function definirAno(ano, deRegua = false) {
   anoAtual = Math.round(Math.max(1100, Math.min(2026, ano)));
   U.uAno.value = ano; // o shader recebe o valor contínuo, para o crescimento ficar liso no tour
@@ -328,6 +333,7 @@ function definirAno(ano, deRegua = false) {
     `${fmt(n)} of today’s ${fmt(anosOrdenados.length)} dated buildings were already standing`,
     `${fmt(n)} von ${fmt(anosOrdenados.length)} heutigen Häusern (mit Baujahr) standen schon`);
   atualizarPinos(anoAtual);
+  anoDaInfra(anoAtual);
 }
 $('regua').addEventListener('input', (e) => definirAno(reguaParaAno(+e.target.value), true));
 document.querySelector('.nota').innerHTML = document.querySelector('.nota').innerHTML.replace('{d}', meta.demolidos.length);
@@ -390,13 +396,13 @@ function abrirFicha(id) {
 }
 function fecharFicha() { $('ficha').hidden = true; U.uSel.value = -1; }
 $('ficha').querySelector('.x').addEventListener('click', fecharFicha);
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && !window.tour?.ativo()) fecharFicha(); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && !(typeof window.tour?.ativo === "function" && window.tour.ativo())) fecharFicha(); });
 
 const raio = new THREE.Raycaster();
 let apertou = null;
 canvas.addEventListener('pointerdown', (e) => { apertou = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', (e) => {
-  if (!apertou || Math.hypot(e.clientX - apertou[0], e.clientY - apertou[1]) > 5 || window.tour?.ativo()) return;
+  if (!apertou || Math.hypot(e.clientX - apertou[0], e.clientY - apertou[1]) > 5 || (typeof window.tour?.ativo === "function" && window.tour.ativo())) return;
   const r = canvas.getBoundingClientRect();
   raio.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
   const hits = raio.intersectObject(predios, false);
@@ -444,7 +450,7 @@ const cDia = { hemi: new THREE.Color(0xfff6e4), hemiChao: new THREE.Color(0xb9a7
 const cNoite = { hemi: new THREE.Color(0x4a5a86), hemiChao: new THREE.Color(0x1d1a22), sol: new THREE.Color(0x9fb3e8) };
 function quadro(agora) {
   requestAnimationFrame(quadro);
-  if (!window.tour?.ativo()) controls.update();
+  if (!(typeof window.tour?.ativo === "function" && window.tour.ativo())) controls.update();
   // noite que cai devagar
   const n = U.uNoite.value + (noiteAlvo - U.uNoite.value) * 0.04;
   U.uNoite.value = n;
