@@ -26,6 +26,25 @@ o visual e as mecânicas são nossos. Não é uma cópia da interface dele.
   pinos vermelhos para os demolidos que o registro conhece. Cor por época e noite com janelas acesas.
 - **Tour de 1 minuto** com música gerada no navegador (pífaro, tambor de Basel e sinos): botão no topo ou `?tour=1`
   (`?tour=en`, `?tour=de`). Roteiro, legendas e som em [design/tour.md](design/tour.md).
+- **Luz e céu** (`docs/ceu.js`): sol real de Basel (47,557 N, 7,59 E; fórmulas do SunCalc, horário de verão da Europa) com controle de
+  hora e data no painel (`?hora=15.5&data=2026-06-21`, padrão 21/06 às 15h); céu físico (Preetham) com a névoa tirada do mesmo céu,
+  ACES com exposição automática suave, sombras em cascata (CSM, 3 cascatas), oclusão de ambiente (GTAO, meia resolução) e bloom só de noite.
+  O botão "noite" vai para 22h30 e volta. **Modo leve** (`?leve=1`, automático em celular): sem CSM, GTAO nem bloom.
+
+### API de hora e sol (para Reno, árvores etc.)
+
+```js
+import { ceu } from './ceu.js';            // ou window.ceu
+ceu.estado()   // { data, hora, altitude (rad), altitudeGraus, azimute (rad, do norte, horário), dir: Vector3 (do chão ao sol; x leste, y cima, z −norte),
+               //   noite (0..1), dia (0..1), luz:{cor, intensidade}, nascer, poente (hora local) }
+ceu.definirHora(h, { animar })   // hora local 0–24; animar = desliza em 3 s
+ceu.definirData('2026-06-21')
+ceu.noite(true|false)
+ceu.aoMudar((estado) => {...})   // devolve função que desliga; também dispara o evento 'ceu:mudou' na window
+ceu.solEm('2026-12-21', 12)      // estado puro, sem mexer na cena
+ceu.leve                         // modo leve ligado?
+```
+
 - **Três línguas:** PT, EN e DE, pelo seletor do topo ou `?lang=en|de`.
 - **Foto aérea** no chão e nos telhados (`docs/ortofoto.js`): abre com uma visão geral de 68 KB e baixa os 16 tiles
   em segundo plano, os mais próximos da câmera primeiro.

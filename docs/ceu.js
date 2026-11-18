@@ -47,7 +47,7 @@ function paraMs(data, hora) {
 const hhmm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 
 // ---------- céu Preetham em JS (o mesmo cálculo do shader do Sky, para a névoa) ----------
-const PARAM = { turbidez: 4, rayleigh: 1.6, mie: 0.005, g: 0.8 };
+const PARAM = { turbidez: 4, rayleigh: 2, mie: 0.005, g: 0.8 };
 function corDoCeu(dir, sol, noite) {
   const TR = [5.804542996261093e-6, 1.3562911419845635e-5, 3.0265902468824876e-5];
   const MC = [1.8399918514433978e14, 2.7798023919660528e14, 4.0790479543861094e14];
@@ -82,7 +82,7 @@ function solEm(data, hora) {
   const alt = p.altitude / rad;
   const noite = 1 - smooth(-10, 3, alt), dia = smooth(-2, 12, alt);
   const cor = new THREE.Color().setRGB(1, 0.5, 0.2).lerp(new THREE.Color().setRGB(1, 0.93, 0.82), smooth(0, 28, alt));
-  return { data, hora, altitude: p.altitude, azimute: p.azimute, altitudeGraus: alt, dir, noite, dia, luz: { cor, intensidade: 3.2 * dia } };
+  return { data, hora, altitude: p.altitude, azimute: p.azimute, altitudeGraus: alt, dir, noite, dia, luz: { cor, intensidade: 3.6 * dia } };
 }
 function nascerPoente(data) {
   if (S.nascerChave === data) return S.nascerPoente;
@@ -151,6 +151,7 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
 
   const dirLuz = new THREE.Vector3(), lua = new THREE.Vector3(-0.35, 0.8, 0.45).normalize(), luaCor = new THREE.Color(0x8fa6e6);
   const hemiDia = { c: new THREE.Color(0xfff6e4), g: new THREE.Color(0xb9a785) }, hemiNoite = { c: new THREE.Color(0x4a5a86), g: new THREE.Color(0x1d1a22) };
+  const contra = new THREE.DirectionalLight(0xffffff, 0), corContra = new THREE.Color(0xffd9a8); cena.add(contra);
   let luzes = [sol], csm = null, composer = null, gtao = null, bloom = null, expo = 1, fundoOculto = false, csmPronto = false;
 
   if (leve) {
@@ -174,20 +175,24 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
     const passeCena = new RenderPass(cena, camera);
     passeCena.clear = false; passeCena.clearDepth = true;
     gtao = new GTAOPass(cena, camera, w, h);
-    gtao.updateGtaoMaterial({ radius: 6, distanceExponent: 1.5, thickness: 6, scale: 1.1, samples: 12, distanceFallOff: 1, screenSpaceRadius: false });
-    gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 12 });
+    gtao.updateGtaoMaterial({ radius: 6, distanceExponent: 1.5, thickness: 6, scale: 1.1, samples: 8, distanceFallOff: 1, screenSpaceRadius: false });
+    gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 8 });
     gtao.blendIntensity = 0.9;
+    if (q.get('dbg') === 'ao') gtao.output = GTAOPass.OUTPUT.AO; if (q.get('dbg') === 'normal') gtao.output = GTAOPass.OUTPUT.Normal;
     // o G-buffer do GTAO também precisa da máquina do tempo (prédios que sobem), senão o AO erra com o ano < 2026
+    gtao.normalMaterial.flatShading = true; // os prédios não têm atributo normal (o material deles usa flatShading)
     if (patchNormal) { gtao.normalMaterial.onBeforeCompile = patchNormal; gtao.normalMaterial.customProgramCacheKey = () => 'gtao-ano'; }
     bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0, 0.55, 0.9);
-    composer.addPass(passeCeu); composer.addPass(passeCena); composer.addPass(gtao); composer.addPass(bloom); composer.addPass(new OutputPass());
+    composer.addPass(passeCeu); composer.addPass(passeCena); if (q.get('dbg') !== 'nogtao') composer.addPass(gtao); composer.addPass(bloom); composer.addPass(new OutputPass());
+    ceu.aoMeia = () => { const sz = composer.renderTarget1; gtao.setSize(Math.round(sz.width / 2), Math.round(sz.height / 2)); };
+    ceu.aoMeia();
     csm.update();
   }
 
   // todo material da cena recebe a sombra em cascata; encadeia o onBeforeCompile que já existia (a máquina do tempo)
   function ligarCSM() {
     csmPronto = true;
-    if (!csm) return;
+    if (!csm || q.get('dbg') === 'nocsm') return;
     const vistos = new Set();
     cena.traverse((o) => {
       for (const m of [].concat(o.material || [])) {
@@ -228,7 +233,10 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
     if (csm) { csm.lightDirection.copy(dirLuz).negate(); luzes.forEach((l) => { l.color.copy(cor); l.intensity = intens; }); csm.update(); }
     else { sol.position.copy(sol.target.position).addScaledVector(dirLuz, 900); sol.color.copy(cor); sol.intensity = intens; }
     hemi.color.copy(hemiDia.c).lerp(hemiNoite.c, n); hemi.groundColor.copy(hemiDia.g).lerp(hemiNoite.g, n);
-    hemi.intensity = 0.45 + 1.1 * e.dia + 0.2 * n;
+    hemi.intensity = 0.35 + 0.8 * e.dia + 0.2 * n;
+    // contraluz fraca do lado oposto ao sol (separa telhados e paredes na sombra), como na sim do tocador
+    contra.position.set(-dirLuz.x, 0.45, -dirLuz.z).normalize().multiplyScalar(800);
+    contra.color.copy(hemiNoite.c).lerp(corContra, e.dia); contra.intensity = 0.5 * e.dia + 0.15 * n;
 
     // céu e névoa
     su.sunPosition.value.copy(e.dir).multiplyScalar(400000);
@@ -265,7 +273,7 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
 
   ceu.atualizar = atualizar;
   ceu.redimensionar = (w, h) => {
-    if (composer) { composer.setPixelRatio(Math.min(renderer.getPixelRatio(), pixelMax)); composer.setSize(w, h); csm.updateFrustums(); }
+    if (composer) { composer.setPixelRatio(Math.min(renderer.getPixelRatio(), pixelMax)); composer.setSize(w, h); ceu.aoMeia(); csm.updateFrustums(); }
   };
   ceu.render = () => {
     if (!csmPronto) ligarCSM();
