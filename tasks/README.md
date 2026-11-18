@@ -10,9 +10,9 @@ Rodada 2: deixar a cidade mais real. As tarefas 01–10 estão em [`done/`](done
 | 14 | [O Reno de verdade](done/14-reno.md) | 13 | feita em 2026-11-18 (`docs/agua.js`, `script/reno.py`; pilares deduzidos, não medidos) |
 | 15 | [Relevo fino, ruas e calçadas](done/15-chao-e-ruas.md) | 11 | feita em 2026-11-18 (`docs/chao.js`, `script/chao.py`; sem `area:highway` nem swissTLM3D, Overpass fora do ar) |
 | 16 | [Árvores e verde](done/16-arvores.md) | 13 | feita em 2026-11-18 (`docs/arvores.js`, `script/arvores.py`; altura e copa estimadas por gênero e idade) |
-| 17 | [Detalhes de rua](17-detalhes-urbanos.md) | 15 | aberta |
+| 17 | [Detalhes de rua](done/17-detalhes-urbanos.md) | 15 | feita em 2026-11-18 (`docs/detalhes.js`; Wilde Maa e Ueli fora do recorte) |
 | 18 | [Marcos em alta definição](done/18-marcos.md) | 12 | feita em 2026-11-18 (`docs/marcos.js`, procedural; arcos da ponte aproximados) |
-| 19 | [Gente e movimento](19-vida.md) | 15 | aberta |
+| 19 | [Gente e movimento](done/19-vida.md) | 15 | feita em 2026-11-18 (`docs/vida.js`, `docs/ambiente-som.js`, GTFS estático) |
 | 20 | [Cidade inteira e peso](20-escala-e-peso.md) | 11, 12 | aberta |
 | 21 | [Comparar com a cidade real](done/21-referencia-visual.md) | — | feita em 2026-11-18 (`?cam=`, `script/capturas.py`, `design/comparacao/`) |
 

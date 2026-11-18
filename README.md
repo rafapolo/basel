@@ -36,14 +36,14 @@ mechanics are our own. It is not a copy of his interface.
   controls in the panel (`?hora=15.5&data=2026-06-21`, default 21 June 15:00); physical sky (Preetham) with the fog taken from the same
   sky, ACES tone mapping with slow auto-exposure, cascaded shadow maps (3 cascades), ambient occlusion (GTAO, half resolution) and bloom
   at night only. The "night" switch slides to 22:30 and back. **Light mode** (`?leve=1`, automatic on phones): no CSM, GTAO or bloom.
-
 - **Trees and green** (`docs/arvores.js`, data from `script/arvores.py`): 1,195 trees of the Basel tree register (data.bs.ch 100052, CC BY 4.0) plus 193 OSM-only trees, instanced per genus class with 3 LODs, wind sway, autumn colours and leaf fall driven by `ceu.estado().data`, bare branches in winter; OSM lawns and gardens draped on the terrain. Height comes from age and genus (the register has no height); crowns are calibrated against the 2024 canopy cover (100357). `?arvores=0` turns it off.
-
 - **Street details** (`docs/detalhes.js`, positions in `docs/data/detalhes.json` from `script/detalhes.py`): fountains with water and jets,
   street lamps that light up at night (glow in the bloom plus a light pool on the ground), benches, bins, bike racks, café awnings,
   tables with parasols (20 April to 10 October, from the date of `ceu.estado()`), generic shop signs, Basel flags on public buildings,
   the Rhine cable ferries and ships. All instanced, hidden by the time machine according to era or the building's year; `?detalhes=0` turns it off.
   Sources: OpenStreetMap (ODbL), data.bs.ch 100008 (fountains, IWB, free use with attribution) and 100241 (bike racks, CC BY 4.0).
+- **People and motion** (`docs/vida.js`, `docs/ambiente-som.js`, data by `script/vida.py` → `docs/data/vida.json`): BVB (green) and BLT (yellow) trams run on the OSM rails by the Swiss static GTFS timetable (opentransportdata.swiss; weekday/Saturday/Sunday reference days), instanced pedestrians (leg and arm swing in the shader) on streets and squares, denser near the data.bs.ch 100013 counters and following their hourly/weekly/monthly profile, bicycles, a few cars outside the pedestrian zone, gulls over the Rhine, and Wickelfisch swimmers in summer (zones 100270). Density follows `ceu.estado()` and the time-machine year (no trams before 1895, bikes 1890, cars 1910). Ambient sound (water, crowd, trams, hourly church bells, gulls; Web Audio, no files) has its own switch; `?vida=0` hides everything. Respects `ceu.leve` and `prefers-reduced-motion`.
+- **Three languages:** PT, EN and DE, from the selector at the top or `?lang=en|de`.
 
 ### Time and sun API (for the Rhine, trees, etc.)
 
@@ -58,9 +58,6 @@ ceu.aoMudar((estado) => {...})   // returns an unsubscribe fn; also fires the 'c
 ceu.solEm('2026-12-21', 12)      // pure state, does not touch the scene
 ceu.leve                         // is light mode on?
 ```
-
-- **People and motion** (`docs/vida.js`, `docs/ambiente-som.js`, data by `script/vida.py` → `docs/data/vida.json`): BVB (green) and BLT (yellow) trams run on the OSM rails by the Swiss static GTFS timetable (opentransportdata.swiss; weekday/Saturday/Sunday reference days), instanced pedestrians (leg and arm swing in the shader) on streets and squares, denser near the data.bs.ch 100013 counters and following their hourly/weekly/monthly profile, bicycles, a few cars outside the pedestrian zone, gulls over the Rhine, and Wickelfisch swimmers in summer (zones 100270). Density follows `ceu.estado()` and the time-machine year (no trams before 1895, bikes 1890, cars 1910). Ambient sound (water, crowd, trams, hourly church bells, gulls; Web Audio, no files) has its own switch; `?vida=0` hides everything. Respects `ceu.leve` and `prefers-reduced-motion`.
-- **Three languages:** PT, EN and DE, from the selector at the top or `?lang=en|de`.
 
 ## How to reproduce
 
