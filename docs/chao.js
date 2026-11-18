@@ -85,13 +85,14 @@ float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 *
   return mix(mix(hsh(i), hsh(i + vec2(1, 0)), f.x), mix(hsh(i + vec2(0, 1)), hsh(i + vec2(1, 1)), f.x), f.y); }
 float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-  {
+  if (uRuasOn > 0.5) {
     vec2 uvR = (vChaoP - uRuasRet.xy) * uRuasRet.zw;
     vec4 ra = texture2D(uRuasA, uvR), rb = texture2D(uRuasB, uvR);
     float dist = length(vViewPosition);
     float perto = (1.0 - smoothstep(35.0, 170.0, dist)) * uRuasOn;
     float asf = ra.r, pav = ra.g, cal = ra.b, ao = rb.g;
     float cobre = clamp(asf + pav + cal, 0.0, 1.0) * uRuasOn;
+    if (cobre > 0.003 || rb.b + rb.r > 0.003) {
     float ruido = fbm(vChaoP * 0.9), mancha = fbm(vChaoP * 0.18 + 3.1);
     vec3 foto = diffuseColor.rgb;
     // asfalto: cinza quente, grão fino e manchas largas; rugosidade com ruído
@@ -124,6 +125,8 @@ float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }`)
     diffuseColor.rgb *= mix(1.0, 0.62, ao * uRuasOn * cobre);
     // rugosidade: asfalto e calçada gastos ficam mais lisos no meio (mancha), pedra áspera
     roughnessFactor = clamp(0.95 - 0.28 * mancha * (asf + cal) - 0.06 * ruido + 0.05 * pav, 0.4, 1.0);
+    }
+    diffuseColor.rgb *= mix(1.0, 0.62, ao * uRuasOn * 0.35 * (1.0 - cobre));
   }`);
   };
   const malha = new THREE.Mesh(g, mat);
@@ -180,6 +183,7 @@ float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }`)
     for (const l of ruas.linhas) {
       if (l.t !== 'tram') continue;
       const c = l.c, pts = [];
+      if (c.some((v, i) => (i % 2 ? Math.abs(v) > 570 : Math.abs(v) > 545))) continue; // fora da malha do relevo
       for (let i = 0; i < c.length - 2; i += 2) {
         const n = Math.max(1, Math.ceil(Math.hypot(c[i + 2] - c[i], c[i + 3] - c[i + 1]) / 2));
         for (let k = 0; k < n; k++) pts.push([c[i] + ((c[i + 2] - c[i]) * k) / n, c[i + 1] + ((c[i + 3] - c[i + 1]) * k) / n]);
