@@ -36,6 +36,10 @@
     'som-titulo': ['Som do tour (liga/desliga)', 'Tour sound (on/off)', 'Ton der Tour (ein/aus)'],
     'aria-ano': ['Ano', 'Year', 'Jahr'],
     'aria-painel': ['Máquina do tempo', 'Time machine', 'Zeitmaschine'],
+    hora: ['hora do dia', 'time of day', 'Tageszeit'],
+    leve: ['modo leve', 'light mode', 'Leichtmodus'],
+    'aria-hora': ['Hora do dia', 'Time of day', 'Tageszeit'],
+    'aria-data': ['Data', 'Date', 'Datum'],
     fechar: ['Fechar', 'Close', 'Schliessen'],
   };
   window.T = (k) => t(...T[k]);
