@@ -193,10 +193,10 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
       for (const m of [].concat(o.material || [])) {
         if (vistos.has(m) || !m.isMeshLambertMaterial && !m.isMeshPhongMaterial && !m.isMeshStandardMaterial) continue;
         vistos.add(m);
-        const antes = m.onBeforeCompile, chave = antes && antes.toString();
+        const antes = m.onBeforeCompile, chave = m.customProgramCacheKey();
         csm.setupMaterial(m);
         const dele = m.onBeforeCompile;
-        m.onBeforeCompile = function (s, r) { if (chave) antes.call(this, s, r); dele.call(this, s, r); };
+        m.onBeforeCompile = function (s, r) { antes.call(this, s, r); dele.call(this, s, r); };
         m.customProgramCacheKey = () => `csm|${chave || ''}`;
         m.needsUpdate = true;
       }

@@ -4,8 +4,8 @@ Rodada 2: deixar a cidade mais real. As tarefas 01–10 estão em [`done/`](done
 
 | # | Tarefa | Depende de | Estado |
 |---|---|---|---|
-| 11 | [Ortofoto no chão e nos telhados](11-ortofoto.md) | — | aberta |
-| 12 | [Fachadas: janelas, andares, pedra e reboco](12-fachadas.md) | — | aberta |
+| 11 | [Ortofoto no chão e nos telhados](done/11-ortofoto.md) | — | feita em 2026-11-18 (`script/ortofoto.py`, `docs/ortofoto.js`) |
+| 12 | [Fachadas: janelas, andares, pedra e reboco](done/12-fachadas.md) | — | feita em 2026-11-18 (`docs/fachadas.js`) |
 | 13 | [Luz, céu e câmera](13-luz-e-ceu.md) | — | aberta |
 | 14 | [O Reno de verdade](14-reno.md) | 13 | aberta |
 | 15 | [Relevo fino, ruas e calçadas](15-chao-e-ruas.md) | 11 | aberta |
@@ -14,7 +14,7 @@ Rodada 2: deixar a cidade mais real. As tarefas 01–10 estão em [`done/`](done
 | 18 | [Marcos em alta definição](18-marcos.md) | 12 | aberta |
 | 19 | [Gente e movimento](19-vida.md) | 15 | aberta |
 | 20 | [Cidade inteira e peso](20-escala-e-peso.md) | 11, 12 | aberta |
-| 21 | [Comparar com a cidade real](21-referencia-visual.md) | — | aberta (fazer primeiro, para medir o antes) |
+| 21 | [Comparar com a cidade real](done/21-referencia-visual.md) | — | feita em 2026-11-18 (`?cam=`, `script/capturas.py`, `design/comparacao/`) |
 
 Sugestão de ordem: 21 (capturas do "antes") → 13 → 11 → 12 → 14 → 15 → 16 → 18 → 17 → 19 → 20.
 

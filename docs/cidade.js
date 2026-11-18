@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { iniciarCeu } from './ceu.js';
+import { criaOrtofoto } from './ortofoto.js';
+import { criarFachadas } from './fachadas.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -39,6 +41,7 @@ controls.maxPolarAngle = THREE.MathUtils.degToRad(86);
 controls.minDistance = 25;
 controls.maxDistance = 2600;
 controls.screenSpacePanning = false;
+const orto = criaOrtofoto(THREE, renderer, controls); // foto aérea no chão e nos telhados (docs/ortofoto.js)
 
 const hemi = new THREE.HemisphereLight(0xfff6e4, 0xb9a785, 1.7);
 cena.add(hemi);
@@ -78,6 +81,7 @@ const altura = (x, z) => {
   g.computeVertexNormals();
   const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
   m.receiveShadow = true;
+  orto.chao(m);
   cena.add(m);
   // espelho d'água do Reno: um plano liso no nível do rio, um pouco brilhante
   const rio = new THREE.Mesh(
@@ -216,6 +220,9 @@ colorir();
 const U = {
   uAno: { value: 2026 }, uPalido: { value: 1 }, uSel: { value: -1 }, uNoite: { value: 0 },
 };
+const FACH = criarFachadas({ cena, meta, posicoes, ids16, U });
+geo.setAttribute('fa', FACH.atributos.fa);
+geo.setAttribute('fb', FACH.atributos.fb);
 const VERT_DECL = `
 attribute float ano; attribute float base; attribute float pid;
 uniform float uAno; uniform float uPalido; uniform float uSel;
@@ -262,7 +269,9 @@ function injetar(shader, cheio) {
   }`);
 }
 const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-material.onBeforeCompile = (s) => injetar(s, true);
+material.onBeforeCompile = (s) => { injetar(s, true); FACH.injetar(s); };
+// a ortofoto encadeia depois das fachadas: a foto entra logo após <color_fragment> e vira a base da telha
+orto.telhados(material);
 const predios = new THREE.Mesh(geo, material);
 predios.castShadow = predios.receiveShadow = true;
 predios.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
@@ -331,7 +340,8 @@ document.querySelector('.nota').innerHTML = document.querySelector('.nota').inne
 
 // ---------- chaves ----------
 function definirModo(m) {
-  modo = m; $('c-epoca').checked = m === 'epoca'; colorir();
+  modo = m; orto.modo(m); $('c-epoca').checked = m === 'epoca';
+  U.uFachada.value = U.uFotoTelhado.value = m === 'epoca' ? 0 : 1; colorir();
   const leg = $('legenda');
   leg.classList.toggle('on', m === 'epoca');
   leg.innerHTML = EPOCAS.map((e) => `<span><i style="background:${e.cor}"></i>${e.nome}</span>`).join('') + `<span><i style="background:${SEM_ANO}"></i>${t('sem ano', 'no year', 'ohne Jahr')}</span>`;
@@ -474,6 +484,7 @@ if (CAM) {
   controls.update();
 }
 requestAnimationFrame(quadro);
+orto.carrega(); // tiles chegam depois da abertura
 $('carregando').classList.add('fora');
 
 // ---------- estatística para o tour (contada dos dados) ----------
@@ -498,7 +509,7 @@ function centro(nome) {
 }
 
 window.cidade = {
-  THREE, camera, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
+  THREE, FACH, U, camera, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
   ano: () => U.uAno.value, modo: () => modo, noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura,
   temPalidos: () => U.uPalido.value > 0.5,
   palidos: (on) => { U.uPalido.value = on ? 1 : 0; $('c-palidos').checked = on; },
