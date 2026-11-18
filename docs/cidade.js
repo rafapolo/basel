@@ -201,7 +201,9 @@ const SEM_ANO = '#b9b2a4';
 const hash = (i) => { let x = Math.imul(i ^ 0x9e3779b9, 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
 let modo = 'gravura';
 function colorir() {
-  const parede = ['#f6efe0', '#f1e6cf', '#faf4e8', '#eee0c2', '#e9dfcc', '#f7ead2', '#e6d4cf', '#dfe0d2'].map((c) => new THREE.Color(c));
+  // reboco de Basel: ocres, rosados, cinzas e areias, alguns tons mais fortes; a paleta antiga era quase toda branca
+  // (#f6efe0, #faf4e8…) e, com o sol do ACES, as fachadas viravam papel branco
+  const parede = ['#e6d6b8', '#dcc59c', '#e8dccb', '#d7c7a6', '#d2c8b6', '#e2c7a2', '#d9b9a6', '#c9ccbb', '#d8b07e', '#c99f93', '#b9c1b2', '#ece3d2'].map((c) => new THREE.Color(c));
   const telhas = ['#9c4f35', '#8e4a33', '#a85d3d', '#7f4636', '#6e5a4e'].map((c) => new THREE.Color(c));
   const epocas = EPOCAS.map((e) => new THREE.Color(e.cor)), sem = new THREE.Color(SEM_ANO);
   const c = new THREE.Color();
