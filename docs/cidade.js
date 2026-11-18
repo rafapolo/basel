@@ -6,6 +6,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { iniciarCeu } from './ceu.js';
 import { criaOrtofoto } from './ortofoto.js';
 import { criarFachadas } from './fachadas.js';
+import { criarMarcos } from './marcos.js';
+import { criaAgua } from './agua.js';
+import { criarArvores } from './arvores.js';
 import { criarChao } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
 
@@ -68,19 +71,12 @@ const altura0 = (x, z) => {
   const h = (a, b) => alturas[b * R.nx + a] / 100;
   return (h(i, j) * (1 - u) + h(i + 1, j) * u) * (1 - v) + (h(i, j + 1) * (1 - u) + h(i + 1, j + 1) * u) * v;
 };
+const AGUA = await criaAgua({ THREE, cena, renderer, camera, meta, altura, ruas, q });
 {
   const larg = (R.nx - 1) * R.passo, prof = (R.ny - 1) * R.passo;
   // relevo fino e ruas como áreas: docs/chao.js (tarefa 15); o relevo de 5 m (relevo.bin) fica só como reserva
-  CH = await criarChao(THREE, { meta, ruas, orto, nivelReno: NIVEL_RENO });
+  CH = await criarChao(THREE, { meta, ruas, orto, nivelReno: NIVEL_RENO, ajuste: AGUA.relevo }); // ajuste: leito e margem do Reno (agua.js)
   cena.add(CH.malha);
-  // espelho d'água do Reno: um plano liso no nível do rio, um pouco brilhante
-  const rio = new THREE.Mesh(
-    new THREE.PlaneGeometry(larg, prof).rotateX(-Math.PI / 2).translate(R.x0 + larg / 2, NIVEL_RENO - 0.35, R.z0 + prof / 2),
-    new THREE.MeshPhongMaterial({ color: 0x6f8e99, shininess: 60, specular: 0x9fb7c0, transparent: true, opacity: 0.85 }),
-  );
-  rio.receiveShadow = true;
-  rio.name = 'rio';
-  cena.add(rio);
 }
 
 // ---------- ruas, bondes e muralha (faixas sobre o relevo) ----------
@@ -272,7 +268,14 @@ predios.frustumCulled = false;
 cena.add(predios);
 // luz e céu (sol real, CSM, GTAO, bloom): ver ceu.js. Modo leve: ?leve=1, ou automático em celular
 const leve = q.get('leve') === '1' || (q.get('leve') !== '0' && (matchMedia('(pointer:coarse)').matches || innerWidth < 700 || (navigator.deviceMemory || 8) <= 4));
-const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f.replace('void main() {', 'varying float vEstado;\nvoid main() {\n  if (vEstado > 1.5) discard;'); } });
+let arvores; // árvores (arvores.js): o G-buffer do GTAO precisa do recorte de folhas delas
+const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f.replace('void main() {', 'varying float vEstado;\nvoid main() {\n  if (vEstado > 1.5) discard;'); arvores?.patchNormal(s); } });
+arvores = q.get('arvores') === '0' ? null : await criarArvores({ THREE, cena, camera, altura, ceu }); // cadastro de árvores e gramados (tarefa 16)
+// marcos em alta definição (docs/marcos.js): substituem o sólido LOD2 pelo mesmo EGID
+const MARC = criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, nivelReno: NIVEL_RENO, U });
+MARC.esconde(geo);
+
+AGUA.iniciar({ leve }); // superfície do Reno, depois do céu (usa o sol e a névoa dele)
 // detalhes de rua (tarefa 17): fontes, postes, bancos, toldos, bandeiras, balsas e navios; antes do 1º render, para a sombra em cascata pegar
 await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => NIVEL_RENO - 0.35 });
 
@@ -402,7 +405,9 @@ canvas.addEventListener('pointerup', (e) => {
   const hits = raio.intersectObject(predios, false);
   // o raio vê a geometria inteira; ignora prédios escondidos pela máquina do tempo
   const hit = hits.find((h) => { const p = P[ids16[h.face.a]]; return (p.ano ? p.ano <= anoAtual : anoAtual >= 2026) || U.uPalido.value > 0.5; });
-  if (hit) abrirFicha(ids16[hit.face.a]); else fecharFicha();
+  const hm = MARC.acerta(raio);
+  if (hm && (!hit || hm.distance < hit.distance)) abrirFicha(hm.pid);
+  else if (hit) abrirFicha(ids16[hit.face.a]); else fecharFicha();
 });
 
 // ---------- câmera: posição por alvo, distância, rumo (az) e inclinação (polar) ----------
@@ -464,7 +469,9 @@ function quadro(agora) {
   }
   ant = { ...c, t: agora };
   Object.assign(camSom, { dist: c.dist, polar: c.polar, az: c.az });
+  MARC.atualiza(U.uAno.value, U.uSel.value);
   ceu.atualizar(agora);
+  AGUA.atualizar(agora);
   ceu.render();
 }
 const ini = +(q.get('ano') || 2026);
@@ -503,7 +510,7 @@ function centro(nome) {
 }
 
 window.cidade = {
-  THREE, FACH, U, camera, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
+  THREE, FACH, MARC, U, camera, arvores, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
   ano: () => U.uAno.value, modo: () => modo, noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura,
   temPalidos: () => U.uPalido.value > 0.5,
   palidos: (on) => { U.uPalido.value = on ? 1 : 0; $('c-palidos').checked = on; },

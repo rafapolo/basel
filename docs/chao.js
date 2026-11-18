@@ -4,7 +4,7 @@
 // procedural (rugosidade com ruído, como na simulação do atlas do tocador, design/realismo-tocador-sim.md).
 // Também: meio-fio em relevo, trilhos de bonde (bitola de 1 m), fio aéreo e postes.
 // criarChao(THREE, { meta, ruas, orto, nivelReno }) -> { malha, altura, grupo, ruas(on) }
-export async function criarChao(THREE, { meta, ruas, orto, nivelReno, base = 'data/' }) {
+export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, base = 'data/' }) {
   const T = meta.terreno;
   const buf = await new Response((await fetch(base + 'terreno.bin.gz')).body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
   const nv = T.nv, nt = T.nt;
@@ -18,6 +18,7 @@ export async function criarChao(THREE, { meta, ruas, orto, nivelReno, base = 'da
     if (y < nivelReno) c.copy(cAgua); else c.copy(cChao).lerp(cMargem, Math.max(0, 1 - (y - nivelReno) / 3));
     c.toArray(cores, k * 3);
   }
+  if (ajuste) ajuste({ count: nv, getX: (k) => pos[k * 3], getY: (k) => pos[k * 3 + 1], getZ: (k) => pos[k * 3 + 2], setX: (k, v) => { pos[k * 3] = v; }, setY: (k, v) => { pos[k * 3 + 1] = v; }, setZ: (k, v) => { pos[k * 3 + 2] = v; } }, cores); // ganchos do Reno (agua.js)
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(cores, 3));

@@ -7,11 +7,11 @@ Rodada 2: deixar a cidade mais real. As tarefas 01–10 estão em [`done/`](done
 | 11 | [Ortofoto no chão e nos telhados](done/11-ortofoto.md) | — | feita em 2026-11-18 (`script/ortofoto.py`, `docs/ortofoto.js`) |
 | 12 | [Fachadas: janelas, andares, pedra e reboco](done/12-fachadas.md) | — | feita em 2026-11-18 (`docs/fachadas.js`) |
 | 13 | [Luz, céu e câmera](done/13-luz-e-ceu.md) | — | feita em 2026-11-18 (`docs/ceu.js`, `?hora=`, `?leve=1`) |
-| 14 | [O Reno de verdade](14-reno.md) | 13 | aberta |
+| 14 | [O Reno de verdade](done/14-reno.md) | 13 | feita em 2026-11-18 (`docs/agua.js`, `script/reno.py`; pilares deduzidos, não medidos) |
 | 15 | [Relevo fino, ruas e calçadas](done/15-chao-e-ruas.md) | 11 | feita em 2026-11-18 (`docs/chao.js`, `script/chao.py`; sem `area:highway` nem swissTLM3D, Overpass fora do ar) |
-| 16 | [Árvores e verde](16-arvores.md) | 13 | aberta |
+| 16 | [Árvores e verde](done/16-arvores.md) | 13 | feita em 2026-11-18 (`docs/arvores.js`, `script/arvores.py`; altura e copa estimadas por gênero e idade) |
 | 17 | [Detalhes de rua](17-detalhes-urbanos.md) | 15 | aberta |
-| 18 | [Marcos em alta definição](18-marcos.md) | 12 | aberta |
+| 18 | [Marcos em alta definição](done/18-marcos.md) | 12 | feita em 2026-11-18 (`docs/marcos.js`, procedural; arcos da ponte aproximados) |
 | 19 | [Gente e movimento](19-vida.md) | 15 | aberta |
 | 20 | [Cidade inteira e peso](20-escala-e-peso.md) | 11, 12 | aberta |
 | 21 | [Comparar com a cidade real](done/21-referencia-visual.md) | — | feita em 2026-11-18 (`?cam=`, `script/capturas.py`, `design/comparacao/`) |
