@@ -19,17 +19,6 @@ mechanics are our own. It is not a copy of his interface.
 
 ## What is there
 
-- **Altstadt em 3D** (`docs/`): 1.739 prédios (1.892 sólidos do swissBUILDINGS3D), 94,1% com o ano exato do GWR, relevo, Reno, ruas e bondes.
-  Clique num prédio para ver endereço, ano, andares, apartamentos e uso.
-- **Máquina do tempo** de 1100 a 2026: cada prédio sobe no seu ano; lotes pálidos onde o prédio de hoje ainda não existia;
-  pinos vermelhos para os demolidos que o registro conhece. Cor por época e noite com janelas acesas.
-- **Tour de 1 minuto** com música gerada no navegador (pífaro, tambor de Basel e sinos): botão no topo ou `?tour=1`
-  (`?tour=en`, `?tour=de`). Roteiro, legendas e som em [design/tour.md](design/tour.md).
-- **Três línguas:** PT, EN e DE, pelo seletor do topo ou `?lang=en|de`.
-- **Foto aérea** no chão e nos telhados (`docs/ortofoto.js`): abre com uma visão geral de 68 KB e baixa os 16 tiles
-  em segundo plano, os mais próximos da câmera primeiro.
-- **Câmeras fixas** para comparar com a cidade real: `?cam=pfalz|munster|reno|rathaus|marktplatz|rheinsprung`.
-  A comparação lado a lado com fotos de licença aberta fica em [design/comparacao/](design/comparacao/).
 - **The Altstadt in 3D** (`docs/`): 1,739 buildings (1,892 swissBUILDINGS3D solids), 94.1% with the exact GWR year,
   terrain, the Rhine, streets and trams. Click a building to see its address, year, floors, flats and use.
 - **Time machine** from 1100 to 2026: each building rises in its year; pale lots where today's building did not exist
