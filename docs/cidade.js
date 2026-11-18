@@ -144,7 +144,19 @@ const nVert = meta.n_tris * 3;
 const q16 = new Int16Array(nVert * 3), ids16 = new Uint16Array(nVert);
 {
   const { cols: [cx, cy, cz, cid], idx } = decodifica(bin, 4, 2);
-  for (let v = 0; v < nVert; v++) { const k = idx[v]; q16[v * 3] = cx[k]; q16[v * 3 + 1] = cy[k]; q16[v * 3 + 2] = cz[k]; ids16[v] = cid[k]; }
+  // giro dos triângulos: o swissBUILDINGS3D chega com quase todo sólido do avesso (1.889 de 1.892: volume assinado
+  // negativo, porque z = −norte espelha o LV95). Com FrontSide o three cortava as faces de fora: o telhado (visto de
+  // cima) sumia e só se viam as paredes de dentro do lado oposto, "de papel". Aqui cada sólido do avesso é desvirado.
+  const vol = new Float64Array(P.length);
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+    vol[cid[a]] += cx[a] * (cy[b] * cz[c] - cz[b] * cy[c]) - cy[a] * (cx[b] * cz[c] - cz[b] * cx[c]) + cz[a] * (cx[b] * cy[c] - cy[b] * cx[c]);
+  }
+  for (let v = 0; v < nVert; v++) {
+    const r = v % 3, k0 = idx[v - r];
+    const k = vol[cid[k0]] < 0 && r ? idx[v - r + 3 - r] : idx[v]; // do avesso: troca o 2º e o 3º vértice
+    q16[v * 3] = cx[k]; q16[v * 3 + 1] = cy[k]; q16[v * 3 + 2] = cz[k]; ids16[v] = cid[k];
+  }
 }
 const posicoes = new Float32Array(nVert * 3);
 for (let i = 0; i < q16.length; i++) posicoes[i] = q16[i] / meta.escala;
