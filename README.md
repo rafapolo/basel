@@ -31,6 +31,7 @@ mechanics are our own. It is not a copy of his interface.
   `?tour=1` (`?tour=en`, `?tour=de`). Script, captions and sound in [design/tour.md](design/tour.md) (Portuguese).
 - **Fixed cameras** to compare with the real city: `?cam=pfalz|munster|reno|rathaus|marktplatz|rheinsprung`.
   The side-by-side comparison with openly licensed photos is in [design/comparacao/](design/comparacao/).
+- **The Rhine** (`docs/agua.js`, data from `script/reno.py` -> `docs/data/reno.json`): OSM river polygon (way 1467859273, ODbL) instead of a height threshold, planar reflection of the buildings plus Preetham sky colours (off in light mode), waves travelling north-west (downstream), foam along the banks and around the bridge piers, water colour from the live data.bs.ch temperature (100046, CC BY 4.0) and turbidity (100323, CC0) with an offline snapshot, sandstone quay walls, bridge piers and bank stairs as geometry.
 - **Light and sky** (`docs/ceu.js`): the real sun for Basel (47.557 N, 7.59 E; SunCalc formulas, EU daylight saving) with time and date
   controls in the panel (`?hora=15.5&data=2026-06-21`, default 21 June 15:00); physical sky (Preetham) with the fog taken from the same
   sky, ACES tone mapping with slow auto-exposure, cascaded shadow maps (3 cascades), ambient occlusion (GTAO, half resolution) and bloom
