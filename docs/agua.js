@@ -129,16 +129,33 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
   // ---- geometria: muros de cais, pilares e escadas (construída em iniciar(), depois do relevo) ----
   const grupo = new THREE.Group(); grupo.name = 'agua-estruturas';
   function estruturas() {
-  // arenito de cais: blocos de ~1,2 × 0,5 m pintados num canvas (u pelo comprimento do muro, v pela altura)
-  const tc = document.createElement('canvas'); tc.width = tc.height = 128;
-  { const c = tc.getContext('2d'); c.fillStyle = '#8f8470'; c.fillRect(0, 0, 128, 128);
-    for (let r = 0; r < 4; r++) for (let b = 0; b < 2; b++) {
-      const x = b * 64 + (r % 2) * 32, g = 185 + Math.floor(Math.random() * 25), y = r * 32;
-      c.fillStyle = `rgb(${g + 8},${g},${g - 14})`; c.fillRect(x + 1, y + 1, 62, 30);
-      for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(80,65,45,${Math.random() * 0.12})`; c.fillRect(x + Math.random() * 60, y + Math.random() * 28, 2 + Math.random() * 4, 1 + Math.random() * 2); }
+  // arenito de cais: blocos de ~2,5 × 0,5 m pintados num canvas (u pelo comprimento do muro, v pela altura).
+  // Arenito vermelho-acinzentado do Reno (Buntsandstein), com tom por bloco e junta escura; sorteio com semente
+  // (antes era Math.random e um creme claro e uniforme, uma grade regular que denunciava o muro ao longo do rio inteiro)
+  let sem = 0x5eed; const rnd = () => { sem = (sem + 0x6d2b79f5) | 0; let t = Math.imul(sem ^ (sem >>> 15), 1 | sem); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const tc = document.createElement('canvas'); tc.width = tc.height = 256;
+  { const c = tc.getContext('2d'); c.fillStyle = '#5f5650'; c.fillRect(0, 0, 256, 256);
+    for (let r = 0; r < 8; r++) for (let b = -1; b < 4; b++) {
+      const x = b * 64 + (r % 2) * 32 + Math.round((rnd() - 0.5) * 10), y = r * 32;
+      const k = rnd(), cinza = rnd() < 0.35 ? 1 : 0; // alguns blocos mais cinzentos (pedra trocada)
+      const R = cinza ? 132 + k * 22 : 146 + k * 26, G = cinza ? 124 + k * 20 : 116 + k * 22, B = cinza ? 114 + k * 18 : 102 + k * 18;
+      c.fillStyle = `rgb(${R | 0},${G | 0},${B | 0})`; c.fillRect(x + 2, y + 2, 60, 28);
+      for (let i = 0; i < 70; i++) { c.fillStyle = `rgba(${rnd() < 0.5 ? '40,30,25' : '220,200,180'},${rnd() * 0.1})`; c.fillRect(x + 2 + rnd() * 56, y + 2 + rnd() * 25, 1 + rnd() * 5, 1 + rnd() * 3); }
     } }
   const texPedra = new THREE.CanvasTexture(tc); texPedra.wrapS = texPedra.wrapT = THREE.RepeatWrapping; texPedra.colorSpace = THREE.SRGBColorSpace; texPedra.anisotropy = 4;
+  texPedra.repeat.set(0.5, 0.5); // o canvas tem 4 × 8 blocos: mesma escala de antes (2,5 × 0,5 m), menos repetição
   const pedra = new THREE.MeshLambertMaterial({ map: texPedra, color: 0xffffff, side: THREE.DoubleSide });
+  // faixa molhada e lodo junto à linha d'água (pela altura no mundo), mais escura e esverdeada
+  pedra.onBeforeCompile = (sh) => {
+    sh.uniforms.uNivelCais = { value: NIVEL };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vCaisY;')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n  { vec4 wp = vec4(transformed, 1.0);\n  #ifdef USE_INSTANCING\n  wp = instanceMatrix * wp;\n  #endif\n  vCaisY = (modelMatrix * wp).y; }');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vCaisY; uniform float uNivelCais;')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+  { float molhado = 1.0 - smoothstep(uNivelCais + 0.35, uNivelCais + 1.1, vCaisY);
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.5, 0.54, 0.47), molhado * 0.8); }`);
+  };
+  pedra.customProgramCacheKey = () => 'cais-molhado';
   {
     const pos = [], idx = [], uvs = [];
     const area = anel.reduce((s, _, i) => (i % 2 ? s : s + anel[i] * anel[(i + 3) % anel.length] - anel[(i + 2) % anel.length] * anel[i + 1]), 0);
