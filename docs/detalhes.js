@@ -303,8 +303,8 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     for (let k = 0; k < 5; k++) { const a = -0.15 + k * 0.38; g.beginPath(); g.arc(103 + Math.cos(a) * 36, 62 - Math.sin(a) * 36, 6.5, 0, 6.3); g.fill(); } // "Krabben"
     g.lineWidth = 9; g.beginPath(); g.moveTo(112, 128); g.lineTo(144, 128); g.stroke();
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-    // pano: plano no plano (z, y) do suporte, com onda que cresce para a ponta livre
-    const pano = new THREE.PlaneGeometry(1.6, 1.05, 14, 2).rotateY(Math.PI / 2).translate(0, -0.22, 1.25);
+    // pano: plano paralelo à fachada, preso ao fim do mastro, com onda que cresce para a ponta livre
+    const pano = new THREE.PlaneGeometry(1.5, 1.0, 14, 2).translate(0.8, -0.18, 1.95); // pende do fim do mastro, paralela à fachada
     // a bandeira pende do mastro: topo em y=0; o mastro está em juntar() abaixo
     const sup = juntar([{ g: cil(0.03, 0.03, 2.1, 6), c: 0x2b2b2b, m: T(0, 0.36, 0.99, 0, Math.PI / 2 - 0.35) }, { g: caixa(0.12, 0.12, 0.06), c: 0x2b2b2b, m: T(0, 0, 0.03) }]);
     const mat = material('mastro', { luz: false });
@@ -315,8 +315,8 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
       Object.assign(s.uniforms, UL);
       s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float iAno; uniform float uAno; uniform float uTempo;')
         .replace('#include <begin_vertex>', `#include <begin_vertex>
-  float onda = clamp((position.z - 0.45) / 1.6, 0.0, 1.0);
-  transformed.x += sin(position.z * 5.0 - uTempo * 4.5 + instanceMatrix[3].x) * 0.1 * onda;
+  float onda = clamp((position.x - 0.05) / 1.5, 0.0, 1.0);
+  transformed.z += sin(position.x * 5.0 - uTempo * 4.5 + instanceMatrix[3].x) * 0.12 * onda;
   transformed.y -= 0.12 * onda * onda;
   if (uAno < iAno) transformed *= 0.0;`);
     };

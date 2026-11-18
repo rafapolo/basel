@@ -1,0 +1,17 @@
+{
+  "base": "http://localhost:3017",
+  "viewport": [
+    1280,
+    720
+  ],
+  "data": "2026-11-18",
+  "navegador": "159.0.8154.6",
+  "cameras": {
+    "pfalz": {},
+    "munster": {},
+    "reno": {},
+    "rathaus": {},
+    "marktplatz": {},
+    "rheinsprung": {}
+  }
+}

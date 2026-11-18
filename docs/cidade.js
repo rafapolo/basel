@@ -277,7 +277,7 @@ MARC.esconde(geo);
 
 AGUA.iniciar({ leve }); // superfície do Reno, depois do céu (usa o sol e a névoa dele)
 // detalhes de rua (tarefa 17): fontes, postes, bancos, toldos, bandeiras, balsas e navios; antes do 1º render, para a sombra em cascata pegar
-await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => NIVEL_RENO - 0.35 });
+if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel });
 
 // prédios demolidos que o GWR registra: pinos vermelhos enquanto existiam
 const pinos = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 0.2, 9, 8).translate(0, 4.5, 0),
