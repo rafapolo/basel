@@ -1,0 +1,677 @@
+// Gente e movimento (tarefa 19). Tudo instanciado, sem arquivo de modelo:
+//  - bondes BVB (verdes) e BLT (amarelos) nos trilhos do OSM, saídas e tempos do GTFS estático suíço (data/vida.json,
+//    gerado por script/vida.py): cada viagem acelera, para na parada e sai pelo horário; 3 módulos que seguem a curva
+//  - pedestres com pinta de gente (como os bonecos da sim do atlas do tocador): pernas e braços que balançam no shader,
+//    sapato, calça, casaco por estação, cabelo, pele. Andam pelas ruas e vielas do OSM e vagam pelas praças e zonas de
+//    pedestres; mais densos onde a contagem 100013 (data.bs.ch) indica, no ritmo da hora, do dia da semana e do mês
+//  - bicicletas e alguns carros (fora da zona de pedestres, mão direita), gaivotas sobre o Reno, nadadores com a boia
+//    "Wickelfisch" no verão (zonas 100270), arrastados pela corrente
+// A densidade segue ceu.estado() (hora e data) e o ano da máquina do tempo. O relógio dos bondes parte da hora do céu e
+// corre em tempo real; com prefers-reduced-motion nada anda (tudo parado, mas presente). Modo leve (ceu.leve): bem menos
+// gente, sem sombras. Ganchos de som: window.ambiente (docs/ambiente-som.js).
+const TAU = Math.PI * 2;
+const lim = (v, a, b) => Math.max(a, Math.min(b, v));
+const suave = (a, b, v) => { const t = lim((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const mulberry = (s) => () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, ano = () => 2026, nivelRio = 1.95, nivelReno = 2.3, leve = false, base = 'data/' }) {
+  const V = await fetch(base + 'vida.json').then((r) => r.json());
+  const rnd = mulberry(1912);
+  const parado = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const grupo = new THREE.Group(); grupo.name = 'vida';
+  cena.add(grupo);
+  const UV = { uVidaT: { value: 0 }, uVidaNoite: { value: 0 }, uAnima: { value: parado ? 0 : 1 } };
+  const cor = (h) => new THREE.Color(h);
+
+  // ---------- estado do tempo: dia da semana, hora, mês ----------
+  const T0 = performance.now() / 1000;
+  const S = { simT: 15 * 3600, base: 15 * 3600, ref: 0, dia: 'util', mes: 5, estacao: 'verao', noite: 0, dia01: 1, relogio: 0, sol: 1 };
+  function lerCeu() {
+    const e = ceu.estado();
+    S.base = e.hora * 3600; S.ref = performance.now() / 1000 - T0;
+    const [y, m, d] = e.data.split('-').map(Number);
+    const sem = new Date(y, m - 1, d).getDay();
+    S.dia = sem === 0 ? 'dom' : sem === 6 ? 'sab' : 'util';
+    S.mes = m - 1; S.diaAno = m * 31 + d;
+    S.estacao = m >= 11 || m <= 2 ? 'inverno' : m >= 5 && m <= 9 ? 'verao' : 'meia';
+    S.noite = e.noite; S.dia01 = e.dia; S.alt = e.altitudeGraus;
+  }
+  lerCeu();
+  let estAnt = S.estacao;
+  ceu.aoMudar(() => { lerCeu(); if (S.estacao !== estAnt) { estAnt = S.estacao; recolorir = true; } });
+  let recolorir = false;
+  // perfil horário (0..1), interpolado entre as horas (a contagem é "hora cheia"; o centro da hora é h + 0,5)
+  const perfil = (arr, h) => { const x = (h - 0.5 + 24) % 24, i = Math.floor(x), f = x - i; return arr[i] * (1 - f) + arr[(i + 1) % 24] * f; };
+  const hora = () => (S.simT / 3600) % 24;
+
+  // ---------- material comum de gente, bicicleta, carro e nadador ----------
+  // partes por vértice: 0 pele, 1 tronco/manga/carroceria, 2 calça, 3 sapato/escuro, 4 cabelo/touca; lado ±1 balança
+  function unir(partes) {
+    const P = [], N = [], A = [];
+    for (const { g, parte, lado = 0 } of partes) {
+      const ng = g.index ? g.toNonIndexed() : g;
+      P.push(...ng.attributes.position.array); N.push(...ng.attributes.normal.array);
+      for (let i = 0; i < ng.attributes.position.count; i++) A.push(parte, lado);
+    }
+    const r = new THREE.BufferGeometry();
+    r.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    r.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+    r.setAttribute('aPL', new THREE.Float32BufferAttribute(A, 2));
+    return r;
+  }
+  const mat4 = (g, x, y, z, sx = 1, sy = 1, sz = 1) => g.scale(sx, sy, sz).translate(x, y, z);
+  const matGente = (rugo = 0.82) => {
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rugo, metalness: 0.02 });
+    m.onBeforeCompile = (s) => {
+      Object.assign(s.uniforms, UV);
+      s.vertexShader = s.vertexShader
+        .replace('#include <common>', `#include <common>
+attribute vec2 aPL; attribute vec3 aTorso; attribute vec3 aCalca; attribute vec3 aPele; attribute vec3 aCabelo; attribute vec2 aAnim;
+uniform float uVidaT; uniform float uAnima;`)
+        .replace('#include <color_vertex>', `
+  { float parte = aPL.x;
+    vColor = parte < 0.5 ? aPele : parte < 1.5 ? aTorso : parte < 2.5 ? aCalca : parte < 3.5 ? vec3(0.025) : aCabelo; }`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+  if (uAnima > 0.5 && aPL.y != 0.0 && aAnim.y > 0.05) {
+    float braco = aPL.x < 1.5 ? 1.0 : 0.0;
+    float a = sin(uVidaT * aAnim.y * 4.6 + aAnim.x) * min(0.62, aAnim.y * 0.44) * aPL.y * (braco > 0.5 ? -0.8 : 1.0);
+    float piv = braco > 0.5 ? 1.48 : 0.9;
+    float yy = transformed.y - piv, zz = transformed.z;
+    transformed.y = piv + yy * cos(a) - zz * sin(a);
+    transformed.z = yy * sin(a) + zz * cos(a);
+  }`);
+    };
+    m.customProgramCacheKey = () => 'vida-gente';
+    return m;
+  };
+  // atributos por instância
+  const atr = (n, tam) => new THREE.InstancedBufferAttribute(new Float32Array(n * tam), tam);
+  function malhaInst(geo, mat, n, sombra) {
+    geo.setAttribute('aTorso', atr(n, 3)); geo.setAttribute('aCalca', atr(n, 3)); geo.setAttribute('aPele', atr(n, 3));
+    geo.setAttribute('aCabelo', atr(n, 3)); geo.setAttribute('aAnim', atr(n, 2));
+    const im = new THREE.InstancedMesh(geo, mat, n);
+    im.frustumCulled = false; im.castShadow = sombra && !leve; im.receiveShadow = true;
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const z = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < n; i++) im.setMatrixAt(i, z);
+    grupo.add(im);
+    return im;
+  }
+  const PELE = ['#f1c9a5', '#e0ac82', '#c68863', '#8d5a3c', '#5a3a28', '#f6d9bd'].map(cor);
+  const CABELO = ['#1b1410', '#3a2a1c', '#6b4a2a', '#a67c3d', '#c9b27a', '#8a8a88', '#2a2a2a'].map(cor);
+  const TORSO = {
+    verao: ['#e8e4da', '#d8493f', '#3d6fb3', '#e2b542', '#4c9a6a', '#f0f0f0', '#2b2b30', '#c77ab0', '#8dbfd6', '#e98a3a', '#a1b34a', '#7e5fa8'].map(cor),
+    inverno: ['#26262b', '#3b3f4a', '#5a2f2a', '#2f4a3a', '#6b6258', '#1c2a46', '#8a1f2d', '#a39a8e', '#4a3b2e', '#d6cdbd', '#314d6e', '#d8493f'].map(cor),
+  };
+  TORSO.meia = [...TORSO.verao.slice(0, 6), ...TORSO.inverno.slice(0, 6)];
+  const CALCA = ['#2a2f3a', '#1f2430', '#3d4a63', '#5b4e3a', '#262626', '#6a6f78', '#8a7a5a', '#c9bfa8', '#43506b'].map(cor);
+  const CARRO = ['#e9e9e6', '#1c1d20', '#7d8288', '#a31f24', '#27406b', '#c9ccd0', '#3a3f44', '#b9a77a', '#e9e9e6', '#4d6a54'].map(cor);
+  const sorteia = (a, r = rnd) => a[Math.floor(r() * a.length)];
+  const poe3 = (at, i, c) => at.setXYZ(i, c.r, c.g, c.b);
+
+  // ---------- grafos de ruas (do que ruas.json já carrega) ----------
+  const FORA = (x, z) => Math.abs(x) > 560 || Math.abs(z) > 585;
+  function criarGrafo(tipos, pesoTipo, dens) {
+    const chave = new Map(), X = [], Z = [], Y = [], viz = [], tp = [], el = [];
+    const vid = (x, z) => {
+      const k = Math.round(x * 4) + ',' + Math.round(z * 4);
+      let v = chave.get(k);
+      if (v === undefined) { v = X.length; chave.set(k, v); X.push(x); Z.push(z); Y.push(altura(x, z) + 0.02); viz.push([]); tp.push([]); el.push([]); }
+      return v;
+    };
+    for (const l of ruas.linhas) {
+      if (!tipos.has(l.t)) continue;
+      const c = l.c;
+      if (FORA(c[0], c[1]) && FORA(c[c.length - 2], c[c.length - 1])) continue;
+      const pts = [];
+      for (let i = 0; i < c.length - 2; i += 2) {
+        const n = Math.max(1, Math.ceil(Math.hypot(c[i + 2] - c[i], c[i + 3] - c[i + 1]) / 4));
+        for (let k = 0; k < n; k++) pts.push([c[i] + ((c[i + 2] - c[i]) * k) / n, c[i + 1] + ((c[i + 3] - c[i + 1]) * k) / n]);
+      }
+      pts.push([c[c.length - 2], c[c.length - 1]]);
+      const hA = altura(pts[0][0], pts[0][1]), hB = altura(...pts.at(-1));
+      const ids = pts.map(([x, z], i) => {
+        if (FORA(x, z)) return -1;
+        const v = vid(x, z);
+        if (l.ponte) Y[v] = hA + (hB - hA) * (i / (pts.length - 1)) + 0.62;
+        return v;
+      });
+      for (let i = 0; i < ids.length - 1; i++) {
+        const a = ids[i], b = ids[i + 1];
+        if (a < 0 || b < 0 || a === b || viz[a].includes(b)) continue;
+        const L = Math.hypot(X[a] - X[b], Z[a] - Z[b]);
+        viz[a].push(b); tp[a].push(l.t); el[a].push(L); viz[b].push(a); tp[b].push(l.t); el[b].push(L);
+      }
+    }
+    const n = X.length, W = new Float64Array(n), acum = new Float64Array(n);
+    for (let v = 0; v < n; v++) {
+      let w = 0;
+      viz[v].forEach((u, j) => { w += el[v][j] * (pesoTipo[tp[v][j]] ?? 0); });
+      W[v] = w * dens(X[v], Z[v]); acum[v] = (v ? acum[v - 1] : 0) + W[v];
+    }
+    return { X, Z, Y, viz, tp, el, W, acum, n, total: acum[n - 1] || 1 };
+  }
+  const sorteiaVertice = (g, r = rnd) => {
+    const x = r() * g.total; let lo = 0, hi = g.n - 1;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (g.acum[m] < x) lo = m + 1; else hi = m; }
+    return lo;
+  };
+  // densidade pelas estações de contagem (data.bs.ch 100013): gaussiana de 260 m em volta de cada uma
+  const sitios = (t) => V.contagem.sitios.filter((s) => s.t === t);
+  const mk = (t, base0, ganho) => {
+    const S2 = sitios(t), mx = Math.max(...S2.map((s) => s.m), 1);
+    return (x, z) => { let a = 0; for (const s of S2) a += (s.m / mx) * Math.exp(-((x - s.x) ** 2 + (z - s.z) ** 2) / (2 * 260 * 260)); return base0 + ganho * Math.min(1.4, a); };
+  };
+  const densP = mk('p', 0.3, 2.2), densV = mk('v', 0.4, 1.6);
+
+  const PESO_PED = { pedestrian: 3, living_street: 2.4, footway: 2, path: 1, steps: 0.5, residential: 1.2, service: 0.35, tertiary: 1, secondary: 1, unclassified: 1, platform: 1.5, cycleway: 0.3 };
+  const LARG = { secondary: 8, secondary_link: 6, tertiary: 7, unclassified: 6, residential: 6, living_street: 5, pedestrian: 6, service: 3.5, footway: 2, path: 1.6, steps: 2, cycleway: 2, platform: 3 };
+  const gPed = criarGrafo(new Set(Object.keys(PESO_PED)), PESO_PED, densP);
+  const PESO_BIKE = { cycleway: 1.5, residential: 1.4, tertiary: 1.3, secondary: 1.3, unclassified: 1, living_street: 0.8, secondary_link: 0.7, pedestrian: 0.25, service: 0.3 };
+  const gBike = criarGrafo(new Set(Object.keys(PESO_BIKE)), PESO_BIKE, densV);
+  // carros: fora da zona de pedestres (polígonos da data.bs.ch) e sem pontes (a Mittlere Brücke só tem bonde, bicicleta e gente)
+  const zonas = V.zonas.map((z) => { const p = []; for (let i = 0; i < z.length; i += 2) p.push([z[i] / 10, z[i + 1] / 10]); return p; });
+  const dentro = (x, z, p) => { let d = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) if ((p[i][1] > z) !== (p[j][1] > z) && x < ((p[j][0] - p[i][0]) * (z - p[i][1])) / (p[j][1] - p[i][1]) + p[i][0]) d = !d; return d; };
+  const naZonaPed = (x, z) => zonas.some((p) => dentro(x, z, p));
+  const PESO_CARRO = { secondary: 1.5, tertiary: 1.2, residential: 1, unclassified: 0.8, secondary_link: 0.8 };
+  const gCarro = criarGrafo(new Set(Object.keys(PESO_CARRO)), PESO_CARRO, densV);
+  for (let v = 0; v < gCarro.n; v++) if (naZonaPed(gCarro.X[v], gCarro.Z[v]) || gCarro.Y[v] > altura(gCarro.X[v], gCarro.Z[v]) + 0.3) { gCarro.W[v] = 0; }
+  { let a = 0; for (let v = 0; v < gCarro.n; v++) { a += gCarro.W[v]; gCarro.acum[v] = a; } gCarro.total = a || 1; }
+
+  // ---------- população em grafo (pedestres, bicicletas, carros) ----------
+  const LIVRES = V.livres;
+  const matriz = (im, i, x, y, z, hx, hz, sx, sy, sz) => {
+    const L = Math.hypot(hx, hz) || 1, s = hx / L, c = hz / L, a = im.instanceMatrix.array, o = i * 16;
+    a[o] = c * sx; a[o + 1] = 0; a[o + 2] = -s * sx; a[o + 3] = 0;
+    a[o + 4] = 0; a[o + 5] = sy; a[o + 6] = 0; a[o + 7] = 0;
+    a[o + 8] = s * sz; a[o + 9] = 0; a[o + 10] = c * sz; a[o + 11] = 0;
+    a[o + 12] = x; a[o + 13] = y; a[o + 14] = z; a[o + 15] = 1;
+  };
+  function populacao({ n, grafo, geo, mat, vel, desloc, offTipo, livres = 0, sombra = true, respawnLonge = false }) {
+    const im = malhaInst(geo, mat, n, sombra);
+    const x = new Float32Array(n), z = new Float32Array(n), y = new Float32Array(n), hx = new Float32Array(n), hz = new Float32Array(n);
+    const alvo = new Int32Array(n), ant = new Int32Array(n), spd = new Float32Array(n), off = new Float32Array(n), esc = new Float32Array(n);
+    const modo = new Uint8Array(n), seg = new Int32Array(n), sentido = new Uint8Array(n), pausa = new Float32Array(n), tx = new Float32Array(n), tz = new Float32Array(n);
+    const offA = new Float32Array(n), tipoA = new Array(n), alt = new Float32Array(n), prog = new Float32Array(n), elen = new Float32Array(n), escI = new Float32Array(n).fill(1);
+    const g = grafo;
+    const escolhe = (i) => {
+      const v = alvo[i], nb = g.viz[v];
+      if (!nb.length) return -1;
+      if (nb.length === 1) return nb[0];
+      let tot = 0; const w = escolhe.w || (escolhe.w = new Float64Array(16));
+      for (let k = 0; k < nb.length && k < 16; k++) {
+        const u = nb[k];
+        let p;
+        if (u === ant[i]) p = 0.03;
+        else { const dx = g.X[u] - g.X[v], dz = g.Z[u] - g.Z[v], L = Math.hypot(dx, dz) || 1; p = (0.35 + 0.65 * Math.max(0, (dx * hx[i] + dz * hz[i]) / L)) * (g.W[u] + 0.01); }
+        w[k] = p; tot += p;
+      }
+      let r = rnd() * tot, k = 0;
+      while (k < nb.length - 1 && r > w[k]) { r -= w[k]; k++; }
+      return nb[k];
+    };
+    const irPara = (i, u) => { // próximo vértice u: posição de partida = vértice atual
+      ant[i] = alvo[i]; alvo[i] = u; tx[i] = g.X[u]; tz[i] = g.Z[u];
+      const v = ant[i]; tipoA[i] = g.tp[v][g.viz[v].indexOf(u)];
+      elen[i] = Math.hypot(tx[i] - g.X[v], tz[i] - g.Z[v]) || 1; prog[i] = 0;
+      const dx = tx[i] - g.X[v], dz = tz[i] - g.Z[v], L = Math.hypot(dx, dz) || 1;
+      if (hx[i] === 0 && hz[i] === 0) { hx[i] = dx / L; hz[i] = dz / L; }
+    };
+    const semear = (i, longe) => {
+      let v = sorteiaVertice(g);
+      if (longe && controls) for (let t = 0; t < 8 && Math.hypot(g.X[v] - controls.target.x, g.Z[v] - controls.target.z) < 140; t++) v = sorteiaVertice(g);
+      modo[i] = 0; alvo[i] = v; ant[i] = v; x[i] = g.X[v]; z[i] = g.Z[v]; y[i] = g.Y[v]; hx[i] = hz[i] = 0;
+      const u = escolhe(i);
+      if (u < 0) { alvo[i] = v; tx[i] = x[i]; tz[i] = z[i]; return; }
+      irPara(i, u);
+      x[i] = g.X[v]; z[i] = g.Z[v];
+    };
+    const semearLivre = (i) => {
+      modo[i] = 1; seg[i] = Math.floor(rnd() * LIVRES.length); sentido[i] = rnd() < 0.5 ? 0 : 1;
+      const s = LIVRES[seg[i]], k = sentido[i] ? 2 : 0, t = rnd();
+      x[i] = s[k] + (s[2 - k] - s[k]) * t; z[i] = s[k + 1] + (s[3 - k] - s[k + 1]) * t;
+      tx[i] = s[2 - k]; tz[i] = s[3 - k]; hx[i] = tx[i] - x[i]; hz[i] = tz[i] - z[i]; pausa[i] = 0; y[i] = altura(x[i], z[i]) + 0.02;
+    };
+    const proximoLivre = (i) => {
+      // outro trajeto da praça com uma ponta a até 16 m da ponta de chegada; senão, volta
+      const px = tx[i], pz = tz[i], ini = Math.floor(rnd() * LIVRES.length);
+      for (let q = 0; q < 40; q++) {
+        const j = (ini + q * 7) % LIVRES.length, s = LIVRES[j];
+        for (const k of [0, 2]) if (Math.hypot(s[k] - px, s[k + 1] - pz) < 16 && j !== seg[i]) { seg[i] = j; sentido[i] = k ? 1 : 0; tx[i] = s[2 - k]; tz[i] = s[3 - k]; return; }
+      }
+      const s = LIVRES[seg[i]], k = sentido[i] ? 0 : 2; sentido[i] ^= 1; tx[i] = s[2 - k]; tz[i] = s[3 - k];
+    };
+    for (let i = 0; i < n; i++) {
+      if (i < livres) semearLivre(i); else semear(i, false);
+      spd[i] = vel[0] + (vel[1] - vel[0]) * rnd(); off[i] = desloc(i, rnd); offA[i] = off[i]; esc[i] = 0;
+      im.geometry.attributes.aAnim.setXY(i, rnd() * TAU, spd[i]);
+      alt[i] = 0.94 + rnd() * 0.14;
+    }
+    let primeiro = true;
+    const pos = { perto: 0 };
+    return {
+      im, n, x, z, esc,
+      cores(fn) { for (let i = 0; i < n; i++) fn(i, im.geometry.attributes); for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo']) im.geometry.attributes[k].needsUpdate = true; },
+      atualizar(dt, ativos, alvoCam) {
+        const A = im.geometry.attributes.aAnim, a = im.instanceMatrix.array;
+        let animar = false, perto = 0;
+        for (let i = 0; i < n; i++) {
+          const quer = i < ativos ? 1 : 0;
+          if (primeiro) esc[i] = quer; else esc[i] += lim(quer - esc[i], -dt / 1.6, dt / 1.6);
+          if (esc[i] <= 0.01) { a.fill(0, i * 16, i * 16 + 16); if (!quer) esc[i] = 0; continue; }
+          let v = spd[i];
+          if (modo[i] === 1 && pausa[i] > 0) { pausa[i] -= dt; v = 0; if (pausa[i] <= 0) { proximoLivre(i); } }
+          if (dt > 0 && v > 0) {
+            const dx = tx[i] - x[i], dz = tz[i] - z[i], d = Math.hypot(dx, dz), passo = v * dt;
+            if (d <= passo + 1e-4) {
+              x[i] = tx[i]; z[i] = tz[i];
+              if (modo[i] === 0) {
+                const u = escolhe(i);
+                if (u < 0 || (g.viz[alvo[i]].length === 1 && respawnLonge)) semear(i, true); else irPara(i, u);
+                if (u >= 0 && g.viz[alvo[i]].length === 1 && !respawnLonge) { /* beco: volta */ }
+              } else { if (rnd() < 0.45) pausa[i] = 2 + rnd() * 14; else proximoLivre(i); }
+            } else { x[i] += (dx / d) * passo; z[i] += (dz / d) * passo; if (modo[i] === 0) prog[i] = 1 - d / elen[i]; }
+          }
+          // rumo suave e deslocamento lateral (mão direita: direita do rumo = (−hz, hx))
+          const dirx = tx[i] - x[i], dirz = tz[i] - z[i], Ld = Math.hypot(dirx, dirz);
+          if (Ld > 0.05 && v > 0) { const k = Math.min(1, dt * 7); hx[i] += (dirx / Ld - hx[i]) * k; hz[i] += (dirz / Ld - hz[i]) * k; const Lh = Math.hypot(hx[i], hz[i]) || 1; hx[i] /= Lh; hz[i] /= Lh; }
+          const oAlvo = modo[i] === 0 && offTipo ? offTipo(tipoA[i], off[i]) : off[i];
+          offA[i] += lim(oAlvo - offA[i], -dt * 2.5, dt * 2.5);
+          const px = x[i] - hz[i] * offA[i], pz = z[i] + hx[i] * offA[i];
+          let py;
+          if (modo[i] === 0) { const va = ant[i], vb = alvo[i]; py = g.Y[va] + (g.Y[vb] - g.Y[va]) * lim(prog[i], 0, 1); }
+          else py = altura(px, pz) + 0.02;
+          if (py < nivelReno - 0.3) py = nivelReno - 0.3;
+          const e = esc[i];
+          matriz(im, i, px, py, pz, hx[i], hz[i], e, e * alt[i], e);
+          const vv = v > 0 ? spd[i] : 0;
+          if (A.getY(i) !== vv) { A.setY(i, vv); animar = true; }
+          if (alvoCam && Math.abs(px - alvoCam.x) < 70 && Math.abs(pz - alvoCam.z) < 70) perto++;
+        }
+        primeiro = false;
+        im.instanceMatrix.needsUpdate = true;
+        if (animar) A.needsUpdate = true;
+        pos.perto = perto;
+      },
+      perto: () => pos.perto,
+    };
+  }
+
+  // ---------- geometrias ----------
+  const cil = (r0, r1, h, s = 6) => new THREE.CylinderGeometry(r0, r1, h, s);
+  const geoGente = () => {
+    const partes = [];
+    for (const l of [-1, 1]) {
+      partes.push({ g: mat4(cil(0.075, 0.06, 0.82, 5), l * 0.085, 0.46, 0), parte: 2, lado: l });
+      partes.push({ g: mat4(new THREE.BoxGeometry(0.1, 0.07, 0.25), l * 0.085, 0.045, 0.05), parte: 3, lado: l });
+      partes.push({ g: mat4(cil(0.042, 0.036, 0.5, 5), l * 0.235, 1.21, 0), parte: 1, lado: l });
+      partes.push({ g: mat4(new THREE.SphereGeometry(0.045, 4, 3), l * 0.235, 0.9, 0), parte: 0, lado: l });
+    }
+    partes.push({ g: mat4(cil(0.17, 0.2, 0.62, 7), 0, 1.19, 0, 1.2, 1, 0.72), parte: 1 });
+    partes.push({ g: mat4(cil(0.045, 0.05, 0.08, 5), 0, 1.54, 0), parte: 0 });
+    partes.push({ g: mat4(new THREE.SphereGeometry(0.115, 7, 5), 0, 1.65, 0), parte: 0 });
+    partes.push({ g: mat4(new THREE.SphereGeometry(0.124, 7, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.66, -0.005), parte: 4 });
+    return unir(partes);
+  };
+  const geoBici = () => {
+    const rot = (g, rx, ry, rz) => g.rotateX(rx).rotateY(ry).rotateZ(rz);
+    const roda = (z0) => rot(new THREE.TorusGeometry(0.33, 0.028, 4, 10), 0, Math.PI / 2, 0).translate(0, 0.35, z0);
+    return unir([
+      { g: roda(0.55), parte: 3 }, { g: roda(-0.55), parte: 3 },
+      { g: mat4(new THREE.BoxGeometry(0.05, 0.05, 1.1), 0, 0.62, 0), parte: 3 },
+      { g: mat4(new THREE.BoxGeometry(0.05, 0.4, 0.05), 0, 0.5, -0.15), parte: 3 },
+      { g: mat4(new THREE.BoxGeometry(0.42, 0.03, 0.03), 0, 0.98, 0.4), parte: 3 },
+      { g: rot(cil(0.07, 0.06, 0.55, 5), 0.55, 0, 0).translate(0, 0.95, -0.17), parte: 1 }, // costas inclinadas
+      { g: rot(cil(0.06, 0.05, 0.5, 5), -0.75, 0, 0).translate(0.1, 0.78, 0.1), parte: 2 },
+      { g: rot(cil(0.06, 0.05, 0.5, 5), -0.75, 0, 0).translate(-0.1, 0.78, 0.1), parte: 2 },
+      { g: rot(cil(0.035, 0.03, 0.5, 4), -1.1, 0, 0).translate(0.17, 1.12, 0.22), parte: 1 },
+      { g: rot(cil(0.035, 0.03, 0.5, 4), -1.1, 0, 0).translate(-0.17, 1.12, 0.22), parte: 1 },
+      { g: mat4(new THREE.SphereGeometry(0.105, 7, 5), 0, 1.4, 0.0), parte: 0 },
+      { g: mat4(new THREE.SphereGeometry(0.115, 7, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.41, -0.005), parte: 4 },
+    ]);
+  };
+  const geoCarro = () => unir([
+    { g: mat4(new THREE.BoxGeometry(1.8, 0.62, 4.2), 0, 0.62, 0), parte: 1 },
+    { g: mat4(new THREE.BoxGeometry(1.62, 0.52, 2.2), 0, 1.18, -0.2), parte: 1 },
+    { g: mat4(new THREE.BoxGeometry(1.64, 0.38, 2.0), 0, 1.2, -0.2), parte: 3 }, // vidros
+    ...[[-1, 1.3], [1, 1.3], [-1, -1.3], [1, -1.3]].map(([a, b]) => ({ g: mat4(new THREE.CylinderGeometry(0.33, 0.33, 0.22, 8).rotateZ(Math.PI / 2), a * 0.88, 0.33, b), parte: 3 })),
+  ]);
+
+  // ---------- pedestres, bicicletas e carros ----------
+  const VIA_CARRO = new Set(['secondary', 'secondary_link', 'tertiary', 'unclassified', 'residential', 'service']);
+  const matG = matGente();
+  const matC = matGente(0.45);
+  const NPED = leve ? 300 : 1300, NBIKE = leve ? 20 : 70, NCARRO = leve ? 10 : 36;
+  const ped = populacao({ n: NPED, grafo: gPed, geo: geoGente(), mat: matG, sombra: false, vel: [0.95, 1.65], livres: Math.round(NPED * 0.34),
+    desloc: (i, r) => (r() < 0.5 ? -1 : 1) * (0.2 + r() * 0.9),
+    offTipo: (t, o) => (VIA_CARRO.has(t) ? Math.sign(o) * (LARG[t] / 2 + 1.1) : o) });
+  // pedestres em ruas de carro andam na calçada: afasta do eixo conforme a largura (sorteado uma vez, no vértice)
+  const bici = populacao({ n: NBIKE, grafo: gBike, geo: geoBici(), mat: matC, sombra: false, vel: [3.2, 5.6], respawnLonge: true, desloc: (i, r) => 1.1 + r() * 0.5 });
+  const carro = populacao({ n: NCARRO, grafo: gCarro, geo: geoCarro(), mat: matC, vel: [4.5, 9], respawnLonge: true, desloc: (i, r) => 1.7 + r() * 0.3 });
+  function pintar() {
+    const tor = TORSO[S.estacao];
+    ped.cores((i, A) => { poe3(A.aTorso, i, sorteia(tor)); poe3(A.aCalca, i, sorteia(CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); });
+    bici.cores((i, A) => { poe3(A.aTorso, i, sorteia(TORSO.verao)); poe3(A.aCalca, i, sorteia(CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); });
+    carro.cores((i, A) => { poe3(A.aTorso, i, sorteia(CARRO)); poe3(A.aCalca, i, CARRO[0]); poe3(A.aPele, i, CARRO[0]); poe3(A.aCabelo, i, CARRO[0]); });
+  }
+  pintar();
+  for (const p of [bici, carro]) { const A = p.im.geometry.attributes.aAnim; for (let i = 0; i < p.n; i++) A.setY(i, 0); A.needsUpdate = true; }
+
+  // ---------- bondes ----------
+  const padroes = V.bondes.padroes;
+  const DS = 2; // m entre pontos do caminho
+  const trilhos = padroes.map((p) => {
+    const n = p.c.length / 2, X = new Float64Array(n), Z = new Float64Array(n), Yv = new Float64Array(n), ponte = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { X[i] = p.c[i * 2] / 10; Z[i] = p.c[i * 2 + 1] / 10; }
+    for (const i of p.p) ponte[i] = 1;
+    // ponte: reta entre as cotas das pontas da sequência (como o chao.js)
+    for (let i = 0; i < n; i++) Yv[i] = altura(X[i], Z[i]) + 0.06;
+    for (let i = 0; i < n;) {
+      if (!ponte[i]) { i++; continue; }
+      let j = i; while (j + 1 < n && ponte[j + 1]) j++;
+      const hA = altura(X[i], Z[i]), hB = altura(X[j], Z[j]);
+      let L = 0; const acL = [0]; for (let k = i + 1; k <= j; k++) { L += Math.hypot(X[k] - X[k - 1], Z[k] - Z[k - 1]); acL.push(L); }
+      for (let k = i; k <= j; k++) Yv[k] = hA + (hB - hA) * (L ? acL[k - i] / L : 0) + 0.45;
+      i = j + 1;
+    }
+    // reamostra a cada DS m
+    const xs = [], ys = [], zs = []; let falta = 0;
+    for (let i = 0; i < n - 1; i++) {
+      const L = Math.hypot(X[i + 1] - X[i], Z[i + 1] - Z[i]);
+      for (let d = falta; d < L; d += DS) {
+        const f = L ? d / L : 0;
+        const ex = X[i] + (X[i + 1] - X[i]) * f, ez = Z[i] + (Z[i + 1] - Z[i]) * f;
+        xs.push(ex); zs.push(ez);
+        ys.push(ponte[i] && ponte[i + 1] ? Yv[i] + (Yv[i + 1] - Yv[i]) * f : altura(ex, ez) + 0.06);
+        falta = d + DS - L;
+      }
+      falta = Math.max(0, falta);
+    }
+    xs.push(X[n - 1]); ys.push(Yv[n - 1]); zs.push(Z[n - 1]);
+    // quadros-chave de tempo → posição (s)
+    const k = p.k, kf = [[0, 0, 0]];
+    let tp = 0; // a tabela só tem minutos: garante ao menos 14 s de parada e tempos que não voltam atrás
+    k.forEach(([s, ta, td]) => { ta = Math.max(ta, tp); td = Math.max(td, ta + 14); kf.push([ta, s, 1], [td, s, 2]); tp = td + 4; });
+    kf.push([Math.max(p.T, tp), (xs.length - 1) * DS, 3]);
+    return { xs, ys, zs, total: (xs.length - 1) * DS, kf, p };
+  });
+  function posS(tr, s, o) {
+    const f = lim(s / DS, 0, tr.xs.length - 1.001), i = Math.floor(f), u = f - i;
+    o.x = tr.xs[i] + (tr.xs[i + 1] - tr.xs[i]) * u; o.y = tr.ys[i] + (tr.ys[i + 1] - tr.ys[i]) * u; o.z = tr.zs[i] + (tr.zs[i + 1] - tr.zs[i]) * u;
+  }
+  function sDe(tr, t) {
+    const kf = tr.kf;
+    for (let j = 0; j < kf.length - 1; j++) {
+      const a = kf[j], b = kf[j + 1];
+      if (t > b[0]) continue;
+      if (b[1] === a[1] || b[0] === a[0]) return { s: a[1], vel: 0, parada: true };
+      const u = lim((t - a[0]) / (b[0] - a[0]), 0, 1);
+      const ini = a[2] === 2, fim = b[2] === 1; // acelera ao sair da parada, freia ao chegar
+      const e = ini && fim ? u * u * (3 - 2 * u) : ini ? u * u : fim ? 1 - (1 - u) * (1 - u) : u;
+      const de = ini && fim ? 6 * u * (1 - u) : ini ? 2 * u : fim ? 2 * (1 - u) : 1;
+      return { s: a[1] + (b[1] - a[1]) * e, vel: ((b[1] - a[1]) / (b[0] - a[0])) * de, parada: false };
+    }
+    return { s: kf.at(-1)[1], vel: 0, parada: true };
+  }
+  const MOD = 3, LM = 8.6, GAP = 0.45, NBOND = 40;
+  const geoBonde = () => {
+    const partes = [], P = [], C = [], J = [], I = [];
+    const caixa = (w, h, l, x, y, z, c, jan = 0) => {
+      const g = new THREE.BoxGeometry(w, h, l).translate(x, y, z).toNonIndexed();
+      P.push(...g.attributes.position.array);
+      const cc = new THREE.Color(c);
+      for (let i = 0; i < g.attributes.position.count; i++) { C.push(cc.r, cc.g, cc.b); J.push(jan); }
+    };
+    return { caixa, fim() {
+      const r = new THREE.BufferGeometry();
+      r.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); r.computeVertexNormals();
+      r.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); r.setAttribute('aJan', new THREE.Float32BufferAttribute(J, 1));
+      return r;
+    } };
+  };
+  function corpoBonde(cBase, cFaixa) {
+    const b = geoBonde();
+    b.caixa(2.4, 0.4, LM, 0, 0.55, 0, '#3a3d40');                       // saia
+    b.caixa(2.4, 2.35, LM, 0, 1.95, 0, cBase);                          // carroceria
+    b.caixa(2.42, 0.12, LM - 0.05, 0, 1.42, 0, cFaixa);                 // friso
+    for (const l of [-1, 1]) {
+      b.caixa(0.03, 0.95, LM - 1.0, l * 1.205, 2.2, 0, '#1b242b', 1);   // janelas
+      for (const z of [-2.9, 0, 2.9]) b.caixa(0.04, 1.8, 0.1, l * 1.205, 1.9, z, '#c9cdd0'); // colunas
+    }
+    b.caixa(2.2, 0.18, LM - 0.3, 0, 3.22, 0, '#b8bcc0');                // teto
+    b.caixa(1.3, 0.08, 1.2, 0, 3.36, 0, '#222');                        // equipamento do teto
+    for (const z of [-1, 1]) {
+      b.caixa(1.6, 0.35, 0.04, 0, 1.0, z * (LM / 2 + 0.01), '#e8e4d8', 1); // faróis/luz traseira
+      b.caixa(0.5, 0.2, 0.05, 0, 2.5, z * (LM / 2 + 0.01), '#f0c24a', 1);  // letreiro
+    }
+    return b.fim();
+  }
+  const matBonde = (cor0) => {
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.25 });
+    m.onBeforeCompile = (s) => {
+      Object.assign(s.uniforms, UV);
+      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float aJan; varying float vJan;').replace('#include <begin_vertex>', '#include <begin_vertex>\n  vJan = aJan;');
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vJan; uniform float uVidaNoite;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vec3(1.0, 0.82, 0.5) * vJan * uVidaNoite * 1.5;');
+    };
+    m.customProgramCacheKey = () => 'vida-bonde';
+    return m;
+  };
+  const mBVB = new THREE.InstancedMesh(corpoBonde('#2f8a56', '#e9e4d2'), matBonde(), NBOND * MOD);
+  const mBLT = new THREE.InstancedMesh(corpoBonde('#f0c21c', '#3b3b3b'), matBonde(), NBOND * MOD);
+  for (const m of [mBVB, mBLT]) {
+    m.frustumCulled = false; m.castShadow = !leve; m.receiveShadow = true; m.count = 0; m.name = 'bondes';
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); grupo.add(m);
+  }
+  const ativos = new Map(); // viagem → { estado de parada anterior }
+  const eu = new THREE.Euler(0, 0, 0, 'YXZ'), qq = new THREE.Quaternion(), m4 = new THREE.Matrix4(), v3 = new THREE.Vector3(), esc3 = new THREE.Vector3(1, 1, 1);
+  const pA = { x: 0, y: 0, z: 0 }, pB = { x: 0, y: 0, z: 0 }, pC = { x: 0, y: 0, z: 0 };
+  const lbound = (a, v) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < v) lo = m + 1; else hi = m; } return lo; };
+  const bondeInfo = { perto: 1e9, vel: 0, n: 0 };
+  function bondes(dt) {
+    let nB = 0, nL = 0; const visto = new Set();
+    bondeInfo.perto = 1e9; bondeInfo.vel = 0;
+    const alvoCam = controls?.target;
+    if (ano() < 1895) { mBVB.count = mBLT.count = 0; return; }
+    const diaCh = `i_${S.dia}`;
+    for (let pi = 0; pi < trilhos.length; pi++) {
+      const tr = trilhos[pi], ini = tr.p[diaCh];
+      for (const off of [0, 86400]) {
+        const t = S.simT + off;
+        for (let k = lbound(ini, t - tr.p.T); k < ini.length && ini[k] <= t; k++) {
+          const chave = `${pi}|${ini[k]}|${off}`;
+          const tt = t - ini[k];
+          if (tt < 0 || tt > tr.p.T) continue;
+          visto.add(chave);
+          const e = sDe(tr, tt);
+          const est = ativos.get(chave);
+          if (est && est.parada && !e.parada && window.ambiente) {
+            posS(tr, e.s, pA);
+            const d = alvoCam ? Math.hypot(pA.x - alvoCam.x, pA.z - alvoCam.z) : 999;
+            if (d < 320) window.ambiente.evento('bonde', lim(1 - d / 320, 0, 1), (pA.x - (alvoCam?.x ?? 0)) / 320);
+          }
+          ativos.set(chave, { parada: e.parada });
+          const m = tr.p.e === 'BLT' ? mBLT : mBVB, nn = tr.p.e === 'BLT' ? nL : nB;
+          if (nn >= NBOND) continue;
+          for (let q = 0; q < MOD; q++) {
+            const sc = e.s + (q - 1) * (LM + GAP);
+            posS(tr, sc, pA); posS(tr, sc - 3, pB); posS(tr, sc + 3, pC);
+            const dx = pC.x - pB.x, dz = pC.z - pB.z, dy = pC.y - pB.y, Lh = Math.hypot(dx, dz) || 1;
+            eu.set(-Math.atan2(dy, Lh), Math.atan2(dx, dz), 0);
+            qq.setFromEuler(eu);
+            m4.compose(v3.set(pA.x, pA.y, pA.z), qq, esc3);
+            m.setMatrixAt(nn * MOD + q, m4);
+          }
+          if (tr.p.e === 'BLT') nL++; else nB++;
+          if (alvoCam && !e.parada) { posS(tr, e.s, pA); const d = Math.hypot(pA.x - alvoCam.x, pA.z - alvoCam.z); if (d < bondeInfo.perto) { bondeInfo.perto = d; bondeInfo.vel = Math.abs(e.vel); } }
+        }
+      }
+    }
+    for (const k of ativos.keys()) if (!visto.has(k)) ativos.delete(k);
+    mBVB.count = nB * MOD; mBLT.count = nL * MOD;
+    mBVB.instanceMatrix.needsUpdate = mBLT.instanceMatrix.needsUpdate = true;
+    bondeInfo.n = nB + nL;
+  }
+
+  // ---------- rio: máscara de água, corrente, gaivotas e nadadores ----------
+  const RX0 = -560, RZ0 = -585, RP = 8, RNX = 141, RNZ = 147;
+  const agua = new Uint8Array(RNX * RNZ);
+  for (let j = 0; j < RNZ; j++) for (let i = 0; i < RNX; i++) agua[j * RNX + i] = altura(RX0 + i * RP, RZ0 + j * RP) < nivelReno ? 1 : 0;
+  const ehAgua = (x, z) => { const i = Math.round((x - RX0) / RP), j = Math.round((z - RZ0) / RP); return i >= 0 && j >= 0 && i < RNX && j < RNZ && agua[j * RNX + i] === 1; };
+  const celAgua = []; for (let j = 0; j < RNZ; j++) for (let i = 0; i < RNX; i++) if (agua[j * RNX + i]) celAgua.push([RX0 + i * RP, RZ0 + j * RP]);
+  // corrente: eixo principal da água num raio de 70 m, orientado para jusante (do sudeste para o noroeste: −x, −z)
+  const FP = 24, FNX = Math.ceil(1120 / FP), FNZ = Math.ceil(1170 / FP), corrente = new Float32Array(FNX * FNZ * 2);
+  for (let fj = 0; fj < FNZ; fj++) for (let fi = 0; fi < FNX; fi++) {
+    const cx = RX0 + fi * FP, cz = RZ0 + fj * FP; let n = 0, mx = 0, mz = 0, sxx = 0, szz = 0, sxz = 0;
+    for (let j = Math.max(0, Math.floor((cz - 70 - RZ0) / RP)); j <= Math.min(RNZ - 1, Math.ceil((cz + 70 - RZ0) / RP)); j++)
+      for (let i = Math.max(0, Math.floor((cx - 70 - RX0) / RP)); i <= Math.min(RNX - 1, Math.ceil((cx + 70 - RX0) / RP)); i++)
+        if (agua[j * RNX + i]) { const x = RX0 + i * RP, z = RZ0 + j * RP; n++; mx += x; mz += z; sxx += x * x; szz += z * z; sxz += x * z; }
+    if (n < 12) continue;
+    mx /= n; mz /= n; const a = sxx / n - mx * mx, b = sxz / n - mx * mz, c = szz / n - mz * mz;
+    const th = 0.5 * Math.atan2(2 * b, a - c); let dx = Math.cos(th), dz = Math.sin(th);
+    if (dx + dz > 0) { dx = -dx; dz = -dz; }
+    corrente[(fj * FNX + fi) * 2] = dx; corrente[(fj * FNX + fi) * 2 + 1] = dz;
+  }
+  const fluxo = (x, z, o) => {
+    const fi = lim(Math.round((x - RX0) / FP), 0, FNX - 1), fj = lim(Math.round((z - RZ0) / FP), 0, FNZ - 1);
+    o.x = corrente[(fj * FNX + fi) * 2]; o.z = corrente[(fj * FNX + fi) * 2 + 1];
+    if (!o.x && !o.z) { o.x = -0.6; o.z = -0.8; }
+  };
+  // cota do espelho d'água: vem de agua.js (AGUA.nivel), passada por cidade.js
+  const nivelAgua = () => nivelRio;
+  // gaivotas
+  const NAVE = leve ? 10 : 26;
+  const geoAve = (() => {
+    const P = [], C = [];
+    const tri = (a, b, c, cc) => { P.push(...a, ...b, ...c); for (let i = 0; i < 3; i++) C.push(...cc[i]); };
+    const br = [0.93, 0.93, 0.9], pt = [0.25, 0.26, 0.28], cz = [0.8, 0.8, 0.78];
+    for (const l of [-1, 1]) {
+      tri([0, 0, 0.22], [0, 0, -0.18], [l * 0.35, 0, -0.04], [br, br, br]);
+      tri([l * 0.35, 0, -0.04], [0, 0, -0.18], [l * 0.78, 0.0, -0.2], [br, br, pt]);
+      tri([l * 0.35, 0, -0.04], [0, 0, 0.22], [l * 0.78, 0.0, -0.2], [br, br, pt]);
+    }
+    tri([0, 0.05, 0.3], [0.05, -0.02, 0.0], [-0.05, -0.02, 0.0], [cz, cz, cz]);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+    g.computeVertexNormals();
+    g.setAttribute('aFase', new THREE.InstancedBufferAttribute(new Float32Array(NAVE), 1));
+    return g;
+  })();
+  const matAve = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide, emissive: 0x8a8a84 });
+  matAve.onBeforeCompile = (s) => {
+    Object.assign(s.uniforms, UV);
+    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float aFase; uniform float uVidaT; uniform float uAnima;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed.y += abs(position.x) * sin(uVidaT * 9.0 + aFase) * 0.55 * uAnima;');
+  };
+  matAve.customProgramCacheKey = () => 'vida-ave';
+  const aves = new THREE.InstancedMesh(geoAve, matAve, NAVE); aves.frustumCulled = false; aves.count = 0; aves.name = 'gaivotas';
+  grupo.add(aves);
+  const ave = Array.from({ length: NAVE }, (_, i) => {
+    const c = celAgua[Math.floor(rnd() * celAgua.length)] ?? [0, 0];
+    return { cx: c[0], cz: c[1], alvoX: c[0], alvoZ: c[1], raio: 8 + rnd() * 26, w: (rnd() < 0.5 ? -1 : 1) * (0.25 + rnd() * 0.35), ang: rnd() * TAU, h: 16 + rnd() * 26, ph: rnd() * TAU, bando: Math.floor(i / 5) };
+  });
+  const bandoPos = Array.from({ length: Math.ceil(NAVE / 5) }, () => { const c = celAgua[Math.floor(rnd() * celAgua.length)] ?? [0, 0]; return { x: c[0], z: c[1], tx: c[0], tz: c[1] }; });
+  geoAve.attributes.aFase.array.forEach((_, i) => { geoAve.attributes.aFase.array[i] = rnd() * TAU; });
+  function gaivotas(dt, n) {
+    aves.count = n;
+    for (const b of bandoPos) {
+      if (Math.hypot(b.tx - b.x, b.tz - b.z) < 20) { const c = celAgua[Math.floor(rnd() * celAgua.length)]; if (c) { b.tx = c[0]; b.tz = c[1]; } }
+      const dx = b.tx - b.x, dz = b.tz - b.z, L = Math.hypot(dx, dz) || 1; b.x += (dx / L) * 7 * dt; b.z += (dz / L) * 7 * dt;
+    }
+    for (let i = 0; i < n; i++) {
+      const v = ave[i], b = bandoPos[v.bando];
+      v.ang += v.w * dt;
+      const x = b.x + Math.cos(v.ang) * v.raio, z = b.z + Math.sin(v.ang) * v.raio, y = nivelAgua() + v.h + Math.sin(S.relogio * 0.7 + v.ph) * 2.2;
+      const hx = -Math.sin(v.ang) * Math.sign(v.w) + (b.tx - b.x) * 0.002, hz = Math.cos(v.ang) * Math.sign(v.w) + (b.tz - b.z) * 0.002;
+      matriz(aves, i, x, y, z, hx, hz, 1.9, 1.9, 1.9);
+    }
+    aves.instanceMatrix.needsUpdate = true;
+  }
+  // nadadores (Wickelfisch laranja ou amarelo, touca de cor)
+  const NNAD = leve ? 12 : 36;
+  const geoNad = unir([
+    { g: mat4(new THREE.SphereGeometry(0.1, 6, 5), 0, 0.0, 0.18), parte: 0 },
+    { g: mat4(new THREE.SphereGeometry(0.105, 6, 4, 0, TAU, 0, Math.PI * 0.55), 0, 0.01, 0.175), parte: 4 },
+    { g: mat4(new THREE.BoxGeometry(0.4, 0.14, 0.55), 0, -0.05, -0.17), parte: 0 },
+    { g: mat4(cil(0.17, 0.17, 0.62, 8).rotateX(Math.PI / 2), 0.42, 0.0, -0.1), parte: 1 }, // boia
+    { g: mat4(new THREE.BoxGeometry(0.1, 0.05, 0.45), 0.2, 0.03, 0.05), parte: 0 },
+  ]);
+  const nad = malhaInst(geoNad, matGente(0.5), NNAD, false);
+  const BOIA = ['#ff6a1a', '#ff9a1a', '#ffd21a', '#ff4a4a'].map(cor), TOUCA = ['#ffffff', '#ff5a5a', '#2f7fff', '#ffd21a', '#222'].map(cor);
+  for (let i = 0; i < NNAD; i++) { poe3(nad.geometry.attributes.aTorso, i, sorteia(BOIA)); poe3(nad.geometry.attributes.aPele, i, sorteia(PELE)); poe3(nad.geometry.attributes.aCabelo, i, sorteia(TOUCA)); poe3(nad.geometry.attributes.aCalca, i, CALCA[0]); nad.geometry.attributes.aAnim.setXY(i, 0, 0); }
+  const zonasNado = V.nado.map((p) => p.map(([x, z]) => [x, z]));
+  const noNado = (x, z) => zonasNado.some((p) => dentro(x, z, p));
+  const nd = Array.from({ length: NNAD }, () => ({ x: 0, z: 0, vida: 0, ph: rnd() * TAU, v: 1 + rnd() * 0.5, esc: 0 }));
+  const fl = { x: 0, z: 0 };
+  function lancar(s) {
+    for (let t = 0; t < 60; t++) {
+      const c = celAgua[Math.floor(rnd() * celAgua.length)]; if (!c) return;
+      const x = c[0] + (rnd() - 0.5) * RP, z = c[1] + (rnd() - 0.5) * RP;
+      if (noNado(x, z) && ehAgua(x, z)) { s.x = x; s.z = z; s.vida = 40 + rnd() * 160; return; }
+    }
+    s.vida = 0;
+  }
+  const nadoQuer = () => {
+    if (ano() < 1950) return 0;
+    const dia = S.diaAno, verao = suave(170, 190, dia) * (1 - suave(300, 320, dia)); // meados de maio a fim de setembro (dia = mês·31 + dia)
+    return verao * suave(8, 11, hora()) * (1 - suave(19, 21.5, hora())) * suave(18, 30, S.alt ?? 40) * (S.dia === 'util' ? 0.75 : 1);
+  };
+  function nadadores(dt, quer) {
+    const n = Math.round(NNAD * quer);
+    for (let i = 0; i < NNAD; i++) {
+      const s = nd[i], a = nad.instanceMatrix.array;
+      const q = i < n ? 1 : 0;
+      s.esc += lim(q - s.esc, -dt / 2, dt / 2);
+      if (s.esc <= 0.01) { a.fill(0, i * 16, i * 16 + 16); continue; }
+      if (s.vida <= 0 || !noNado(s.x, s.z) || !ehAgua(s.x, s.z)) { lancar(s); if (s.vida <= 0) continue; }
+      fluxo(s.x, s.z, fl);
+      s.x += fl.x * (1.1 + s.v * 0.5) * dt; s.z += fl.z * (1.1 + s.v * 0.5) * dt; s.vida -= dt;
+      const y = nivelAgua() + 0.02 + Math.sin(S.relogio * 1.6 + s.ph) * 0.03;
+      matriz(nad, i, s.x, y, s.z, fl.x, fl.z, s.esc, s.esc, s.esc);
+    }
+    nad.instanceMatrix.needsUpdate = true;
+    return n;
+  }
+
+  // ---------- laço ----------
+  const info = { pessoas: 0, bicicletas: 0, carros: 0, bondes: 0, gaivotas: 0, nadadores: 0 };
+  let ultimo = null, ligado = true, tCtx = 0;
+  const alvoCam = controls?.target;
+  function atualizar(agora) {
+    if (!ligado) return;
+    const dt = ultimo == null ? 0.016 : Math.min(0.1, (agora - ultimo) / 1000); ultimo = agora;
+    const sd = parado ? 0 : dt;
+    S.relogio += sd;
+    const seg = (performance.now() / 1000 - T0) - S.ref;
+    S.simT = S.base + (parado ? 0 : seg);
+    UV.uVidaT.value = S.relogio; UV.uVidaNoite.value = S.noite; matAve.emissiveIntensity = 0.55 * (1 - S.noite);
+    if (recolorir) { recolorir = false; pintar(); }
+    const a = ano();
+    const h = hora();
+    const fp = perfil(V.contagem.ped.hora[S.dia], h) * (0.55 + 0.45 * V.contagem.ped.mes[S.mes]);
+    const fv = perfil(V.contagem.velo.hora[S.dia], h) * (0.45 + 0.55 * V.contagem.velo.mes[S.mes]) * (1 - 0.35 * S.noite);
+    const fAno = a >= 1900 ? 1 : 0.12 + 0.88 * lim((a - 1100) / 800, 0, 1);
+    const nPed = Math.round(NPED * lim(0.04 + 1.0 * fp, 0, 1) * fAno);
+    const nBici = a < 1890 ? 0 : Math.round(NBIKE * lim(0.03 + 1.1 * fv, 0, 1) * (a < 1960 ? 0.5 : 1));
+    const fc = lim(0.05 + 0.6 * fv + 0.25 * suave(6, 9, h) * (1 - suave(19, 23, h)), 0, 1) * (S.dia === 'dom' ? 0.55 : 1);
+    const nCarro = a < 1910 ? 0 : Math.round(NCARRO * fc * (a < 1970 ? 0.4 : 1));
+    ped.atualizar(sd, nPed, alvoCam); bici.atualizar(sd, nBici, alvoCam); carro.atualizar(sd, nCarro, alvoCam);
+    bondes(sd);
+    const nAve = Math.round(NAVE * suave(-4, 8, S.alt ?? 40) * (S.noite > 0.9 ? 0 : 1));
+    gaivotas(sd, nAve);
+    const nNad = nadadores(sd, nadoQuer());
+    info.pessoas = Math.round(nPed); info.bicicletas = nBici; info.carros = nCarro; info.bondes = bondeInfo.n; info.gaivotas = nAve; info.nadadores = nNad;
+    // contexto para o som ambiente (a cada ~0,4 s)
+    if (agora - tCtx > 400) {
+      tCtx = agora;
+      let na = 0, nt = 0;
+      if (alvoCam) for (let dz = -120; dz <= 120; dz += 24) for (let dx = -120; dx <= 120; dx += 24) { nt++; if (ehAgua(alvoCam.x + dx, alvoCam.z + dz)) na++; }
+      window.ambiente?.contexto({ agua: nt ? na / nt : 0, gente: lim(ped.perto() / 45, 0, 1) * lim(nPed / NPED * 2, 0, 1), bonde: bondeInfo.perto, bondeVel: bondeInfo.vel, gaivotas: nAve / NAVE, nadadores: nNad,
+        noite: S.noite, dia: S.dia01, carros: carro.perto(), hora: h, ano: a, simT: S.simT });
+    }
+  }
+  function ligar(on) { ligado = on; grupo.visible = on; if (on) ultimo = null; if (!on) window.ambiente?.contexto?.({ agua: 0, gente: 0, bonde: 1e9, bondeVel: 0, gaivotas: 0, nadadores: 0, noite: S.noite, dia: S.dia01, carros: 0, hora: hora(), ano: ano(), simT: S.simT }); }
+  const api = { grupo, atualizar, ligar, info, S, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
+  window.vida = api;
+  return api;
+}
