@@ -271,11 +271,11 @@ void main() {
   {
     const COR = [[0.36, 0.5, 0.2], [0.42, 0.5, 0.22], [0.45, 0.58, 0.25], [0.55, 0.4, 0.3], [0.2, 0.32, 0.14], [0.55, 0.53, 0.42]];
     const pos = [], cor = [];
-    const sub = (a, b, c, k, depth) => { // subdivide até as arestas ficarem abaixo de 12 m, para seguir o relevo
+    const sub = (a, b, c, k, depth) => { // subdivide até as arestas ficarem abaixo de 4 m, para seguir o relevo de 0,5 m (tarefa 15)
       const e = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), Math.hypot(c[0] - b[0], c[1] - b[1]), Math.hypot(a[0] - c[0], a[1] - c[1]));
-      if (e < 12 || depth > 4) {
+      if (e < 4 || depth > 6) {
         for (const p of [a, b, c]) {
-          pos.push(p[0], altura(p[0], p[1]) + 0.16 + k * 0.01, p[1]);
+          pos.push(p[0], altura(p[0], p[1]) + 0.3 + k * 0.01, p[1]);
           const v = 0.85 + 0.3 * hash(Math.round(p[0] * 3) * 131 + Math.round(p[1] * 3));
           cor.push(COR[k][0] * v, COR[k][1] * v, COR[k][2] * v);
         }
