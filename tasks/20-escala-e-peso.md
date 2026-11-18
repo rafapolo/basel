@@ -28,7 +28,19 @@ O realismo das tarefas 11–19 só cabe se o carregamento for por partes.
 - **Peso medido no Pages ao vivo** (2026-11-18, carga fria): abertura 2,69 MB (antes ~3,9 MB), mais 1,97 MB das 16 tiles
   da ortofoto em segundo plano; total 4,67 MB (antes 6,01 MB). Sem erros nem 404.
 
-Achados novos na ponte (vistos de perto, não corrigidos): sob os arcos aparece um piso que parece de tábuas e uma faixa
-creme na altura da água; há uma bolha branca no tabuleiro.
+Achados na ponte (vistos de perto) — **corrigidos em 2026-11-18** (rodada estética, detalhes em
+`design/comparacao/README.md`):
+- piso de tábuas sob os arcos: o pé do bloco da Mittlere Brücke (`marcos.js`) estava a 0,8 m, no nível do Reno; agora a −2,2 m;
+- faixa creme na altura da água: a calçada de montante do OSM começava na beira do cais (2,2 m); `cotaPonta()` em `chao.js`
+  sobe as pontas de toda ponte ao nível da rua (faixas, trilhos, gente, bondes, tabuleiro, pilares);
+- bolha branca no tabuleiro: topo dos pilares genéricos de `reno.json` (`agua.js`) no meio dos vãos; na Mittlere eles dão
+  lugar aos pilares de `marcos.js` (só espuma). Também: ponte com 20 m (as calçadas e os postes do OSM ficavam fora dela)
+  e postes no parapeito em vez de dentro do rio.
+
+Também na mesma rodada: 1.889 dos 1.892 sólidos (1.738 prédios) chegavam do avesso e perdiam o telhado vistos de cima
+(`cidade.js` os desvira); névoa que acompanha a câmera e céu abaixo do horizonte menos branco (vista alta lavada).
+Peso: `docs/data` igual, JS +4,2 KB em gzip. fps: em A/B intercalado, ~10% mais rápido que antes (pfalz 28,2 → 30,6 sem vsync).
+Abertos: 363 triângulos de parede (172 sólidos) com giro trocado em relação aos vizinhos; 15 sólidos-casca sem tampa
+(cobertos pelos irmãos do mesmo EGID).
 
 Pendente: Basel-Stadt inteiro em tiles, KTX2, service worker, metas de fps.

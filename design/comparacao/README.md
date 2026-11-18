@@ -80,6 +80,49 @@ e comparar com este `medicao.json`. Fontes do Google Fonts (IM Fell English, Int
 
 Referência de cor e textura mais direta: a ortofoto da tarefa 11 (swissIMAGE) pode ser aplicada ao chão e aos telhados.
 
+### Rodada estética de 2026-11-18 (`estetica-antes*/` → `estetica-depois*/`)
+
+As 6 câmeras de dia (15:00), ao poente (`hora=21`) e à noite (`noite=1`), mais `ponte.png` (Mittlere Brücke de perto: alvo
+[30, 5, −191], dist 70, az 200, polar 70), `alta1.png`/`alta3.png` (vistas altas de 800–900 m) e `cima-marktplatz.png`
+(de cima, perto da Marktplatz). O "antes" é o commit `982e29d`.
+
+Corrigido:
+
+| o que se via | causa | correção |
+|---|---|---|
+| **Prédios "de papel"**: vistos de cima, só paredes com janelas, sem telhado; chaminés e trapeiras boiando sobre a ortofoto do chão | 1.889 dos 1.892 sólidos do swissBUILDINGS3D chegam do avesso (volume assinado negativo: z = −norte espelha o LV95). Com FrontSide o three cortava as faces de fora; de cima o telhado sumia e se viam as paredes internas do lado oposto | `cidade.js` desvira cada sólido do avesso ao decodificar (troca o 2º e o 3º vértice). Afetava 1.738 dos 1.739 prédios (EGID únicos). O raio do clique agora acerta a face de fora |
+| Ponte: **piso de tábuas** sob os arcos | o pé do bloco extrudado da Mittlere Brücke ficava em 0,8 m, exatamente no nível do Reno (0,8 m): a laje de 10 cm sob os furos boiava rente à água com a textura de pedra | `marcos.js`: pé a −2,2 m, enterrado no leito; quebra-mares descem até lá |
+| Ponte: **faixa creme na altura da água** | a calçada de montante do OSM tem as pontas na beira do cais, onde o relevo já caiu para 2,2 e 3,6 m; a faixa reta entre as pontas corria rente à água (e a gente andava nela) | `chao.js` exporta `cotaPonta()`: a ponta vale o maior entre ela e o chão 2 m para fora. Usada nas faixas (`cidade.js`), trilhos (`chao.js`), gente e bondes (`vida.js`), tabuleiro (`marcos.js`) e pilares genéricos (`agua.js`) |
+| Ponte: **bolha branca no tabuleiro** | os pilares genéricos de `reno.json` (um a cada ~32 m, octógonos de `agua.js`) caíam no meio dos vãos da Mittlere Brücke e o topo deles furava a pista | na Mittlere, `agua.js` troca esses pilares pelos de `marcos.js` (só para a espuma, sem geometria); a espuma agora envolve os pilares de verdade |
+| Postes da ponte em pé dentro do rio | os postes do OSM ficam a ±10 m do eixo (no parapeito) e pegavam a altura do leito; a ponte tinha 12 m de largura e as calçadas (±7 m) ficavam fora dela | ponte com 20 m, topo do bloco no nível do tabuleiro; `detalhes.js` põe os postes no parapeito (`MARC.cotaPonte`) |
+| Pista da ponte em faixas creme cor de papel | cores `#c6b48c`/`#d2c39f` | asfalto `#57534e` e calçada de granito `#9a948a` (MeshStandard) |
+| Muros de cais: grade creme clara, perfeitamente regular, ao longo do rio inteiro | textura de 2 blocos com `Math.random` em tons 185–210 | arenito vermelho-acinzentado com tom por bloco e blocos trocados, sorteio com semente, e faixa molhada escura junto à linha d'água (shader pela altura no mundo) |
+| Telhados com a ortofoto em sombra azul-arroxeada e verde de copa vizinha | a swissIMAGE não é ortho verdadeira: o telhado inclinado pega a sombra e o pátio ao lado | `ortofoto.js`: sombra da foto sem o azul, verde de árvore vira cinza quente, águas inclinadas puxadas 50% para a cor de telha (com a luz da foto); telhado plano fica com a foto |
+| Reno com anéis e moiré regulares | as ondas curtas só sumiam pela distância; rasante o pixel se estica | as ondas somem pelo tamanho do pixel em tela (`fwidth`) |
+| Manchas cinzentas chapadas boiando no horizonte (pfalz, munster) | gramados do OSM fora do recorte do relevo, onde `altura()` devolve 0 | `arvores.js` descarta os triângulos fora do relevo (`CH.dentro`) |
+| Vista alta lavada em branco: a cidade do outro lado do recorte leitosa, fundo cinza chapado (#e8e8ea), rastro de sol na água | névoa fixa de 900–2600 m; Preetham abaixo do horizonte quase branco; brilho do sol (disco ×28 + halo) sem teto | névoa que cresce com a distância da câmera; céu abaixo do horizonte escurecido para uma bruma verde-acinzentada; brilho do sol menor e limitado, horizonte refletido a 80% |
+| Fachadas quase brancas (#f6efe0, #faf4e8…) que o ACES estourava | paleta de reboco clara demais | ocres, rosados, cinzas e areias, alguns tons mais fortes |
+
+Medição (MacBook M4, Chromium 159 headless, ANGLE/Metal, 1280×720, `http.server` sem gzip):
+- **fps**: os dois `medicao.json` desta rodada saíram em momentos diferentes da máquina (44 → 31 fps em todas as câmeras), e
+  isso é carga/temperatura, não o código: em A/B intercalado no mesmo navegador e minuto (sem vsync), antigo → novo:
+  pfalz 28,2 → 30,6; munster 29,2 → 32,0; marktplatz 27,9 → 32,0; reno 27,0 → 30,2; pfalz `leve=1` 132 → 140.
+  O novo é ~10% mais rápido (com o giro certo, o corte de faces de trás funciona). Diferença de ±3 fps é ruído.
+- **peso**: `docs/data` não mudou; os JS alterados somam +4,2 KB em gzip (79,3 → 83,6 KB). A abertura continua ~2,69 MB.
+
+Ainda denuncia o "falso" (aberto):
+- **Céu acima do horizonte quase branco**: o Preetham perto do horizonte sai neutro (234, 235, 236) e o ACES o estoura; baixar
+  turbidez ou ganho mudou pouco e mexe no poente e na noite (testado e revertido). Precisa de um céu com degradê próprio ou nuvens.
+- 363 triângulos de parede em 172 sólidos ainda têm o giro trocado em relação aos vizinhos (nenhum de telhado); o conserto por
+  propagação (BFS de arestas) custa ~80 ms na abertura e ficou de fora.
+- 15 sólidos sem tampa (cascas de parede, ex.: Kornhausgasse 18, Greifengasse 9, Webergasse 3); todos têm irmãos do mesmo
+  EGID e, vistos de cima, não abrem buraco.
+- A ortofoto continua deitada nos telhados (o vizinho e o pátio aparecem no telhado); só a cor foi corrigida.
+- Muro de cais de perto ainda parece tijolo (blocos de 2,5 × 0,5 m com junta escura); falta o coroamento de pedra.
+- Paredes de reboco ainda lisas de perto (`rheinsprung`); telha em relevo ainda risca em listras na média distância.
+- A largura e o número de arcos da Mittlere Brücke (20 m, 6 arcos) são estimativa pelo OSM; não conferi na planta.
+
+
 ## Referências usadas
 
 Licenças abertas, com autor e link em [`refs.json`](refs.json); cópias reduzidas (≤ 1280 px) em `ref/` e originais baixados em `data/21-referencia/` (fora do git).

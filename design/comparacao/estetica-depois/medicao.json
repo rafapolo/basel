@@ -1,0 +1,104 @@
+{
+  "base": "http://localhost:8766",
+  "viewport": [
+    1280,
+    720
+  ],
+  "data": "2026-11-18",
+  "navegador": "159.0.8154.6",
+  "tempo_ate_cidade_s": 1.5,
+  "peso_abertura_descomprimido_mb": 8.58,
+  "peso_abertura_transferido_mb": 9.48,
+  "peso_por_arquivo_mb": {
+    "localhost:8766/data/terreno.v2.bin": 2.929,
+    "localhost:8766/data/predios.v2.bin": 2.48,
+    "localhost:8766/data/predios.json": 0.316,
+    "localhost:8766/data/ruas_b.webp": 0.273,
+    "cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js": 0.208,
+    "localhost:8766/data/ortofoto/t_1_2.webp": 0.159,
+    "localhost:8766/data/ortofoto/t_0_3.webp": 0.159,
+    "localhost:8766/data/ortofoto/t_3_1.webp": 0.157,
+    "localhost:8766/data/ruas.json": 0.156,
+    "localhost:8766/data/ortofoto/t_0_1.webp": 0.154,
+    "localhost:8766/data/ortofoto/t_3_0.webp": 0.153,
+    "localhost:8766/data/ortofoto/t_0_2.webp": 0.153,
+    "localhost:8766/data/ortofoto/t_3_3.webp": 0.146,
+    "localhost:8766/data/ortofoto/t_2_0.webp": 0.145,
+    "localhost:8766/data/ortofoto/t_1_3.webp": 0.142,
+    "localhost:8766/data/ortofoto/t_0_0.webp": 0.136,
+    "localhost:8766/data/ortofoto/t_2_3.webp": 0.133,
+    "localhost:8766/data/ruas_a.webp": 0.13,
+    "localhost:8766/data/ortofoto/t_1_1.webp": 0.128,
+    "localhost:8766/data/ortofoto/t_2_2.webp": 0.119,
+    "localhost:8766/data/relevo.bin": 0.101,
+    "localhost:8766/data/vida.json": 0.089,
+    "localhost:8766/data/ortofoto/geral.webp": 0.068,
+    "localhost:8766/data/ortofoto/t_2_1.webp": 0.068,
+    "localhost:8766/data/ortofoto/t_3_2.webp": 0.061,
+    "fonts.gstatic.com/s/imfellenglish/v14/Ktk1ALSLW8zDe0rthJysWrnLsAzHEKOYd4xI5g.woff2": 0.06,
+    "localhost:8766/data/ortofoto/t_1_0.webp": 0.059,
+    "localhost:8766/data/detalhes.json": 0.059,
+    "fonts.gstatic.com/s/imfellenglish/v14/Ktk3ALSLW8zDe0rthJysWrnLsAzHFZOafYtq5Mzh.woff2": 0.058,
+    "fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2": 0.049,
+    "localhost:8766/vida.js": 0.044,
+    "localhost:8766/detalhes.js": 0.036,
+    "localhost:8766/cidade.js": 0.032,
+    "localhost:8766/marcos.js": 0.032,
+    "localhost:8766/data/arvores.json": 0.029,
+    "localhost:8766/agua.js": 0.026,
+    "localhost:8766/fachadas.js": 0.024,
+    "localhost:8766/data/arvores.bin": 0.021,
+    "localhost:8766/arvores.js": 0.02
+  },
+  "fps_parado_pfalz": {
+    "fps": 27.5,
+    "pior_quadro_ms": 50.1
+  },
+  "fps_girando_pfalz": 26.8,
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+  "solidos_3d": 1892,
+  "cameras": {
+    "pfalz": {
+      "fps": {
+        "fps": 31.4,
+        "pior_quadro_ms": 50
+      },
+      "fps_sem_vsync": 31
+    },
+    "munster": {
+      "fps": {
+        "fps": 33.4,
+        "pior_quadro_ms": 50
+      },
+      "fps_sem_vsync": 31.5
+    },
+    "reno": {
+      "fps": {
+        "fps": 30.3,
+        "pior_quadro_ms": 50
+      },
+      "fps_sem_vsync": 29.8
+    },
+    "rathaus": {
+      "fps": {
+        "fps": 32.3,
+        "pior_quadro_ms": 50.1
+      },
+      "fps_sem_vsync": 30.6
+    },
+    "marktplatz": {
+      "fps": {
+        "fps": 31.8,
+        "pior_quadro_ms": 50.1
+      },
+      "fps_sem_vsync": 31
+    },
+    "rheinsprung": {
+      "fps": {
+        "fps": 32.3,
+        "pior_quadro_ms": 50.1
+      },
+      "fps_sem_vsync": 30.8
+    }
+  }
+}
