@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basel, prédio por prédio</title>
+<meta name="description" content="A Altstadt de Basel em 3D, prédio por prédio, com o ano de construção do registro federal e uma máquina do tempo de 1100 a 2026.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23efe6d2'/%3E%3Cpath d='M10 27V9l6-5 6 5v18' fill='none' stroke='%231d1812' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --papel: #efe6d2; --papel2: #e4d8bd; --tinta: #1d1812; --suave: #6b5d4a; --linha: rgba(29,24,18,.18);
+    --rubro: #b3261e; --ouro: #d9a441;
+    --lb: clamp(0px, calc((100vh - 100vw / 2.39) / 2), 16vh); --ease: cubic-bezier(.4,0,.2,1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--papel); color: var(--tinta); font: 14px/1.45 Inter, system-ui, sans-serif; }
+  canvas#cena { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  button { font: inherit; color: inherit; }
+
+  #topo { position: fixed; top: 14px; left: 16px; right: 16px; display: flex; align-items: flex-start; gap: 12px; pointer-events: none; z-index: 10; }
+  #marca { pointer-events: auto; background: rgba(239,230,210,.88); border: 1px solid var(--linha); border-radius: 6px; padding: 8px 14px 9px; backdrop-filter: blur(4px); }
+  #marca h1 { margin: 0; font: 400 30px/1 'IM Fell English', Georgia, serif; letter-spacing: .01em; }
+  #marca p { margin: 3px 0 0; font-size: 12px; color: var(--suave); }
+  #topo .acoes { margin-left: auto; display: flex; gap: 8px; pointer-events: auto; }
+  .btn { border: 1px solid var(--linha); background: rgba(239,230,210,.9); border-radius: 999px; padding: 7px 14px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .btn:hover { background: var(--papel2); }
+  #tour-abrir { background: var(--tinta); color: var(--papel); border-color: var(--tinta); display: inline-flex; align-items: center; gap: 8px; }
+  #tour-abrir::before { content: ""; border-left: 8px solid var(--ouro); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+  #tour-abrir:hover { background: #000; }
+  #linguas { display: inline-flex; border: 1px solid var(--linha); border-radius: 999px; overflow: hidden; background: rgba(239,230,210,.9); }
+  #linguas button { border: 0; background: none; padding: 7px 10px; font: 600 12px Inter, sans-serif; cursor: pointer; color: var(--suave); }
+  #linguas button[aria-pressed="true"] { background: var(--tinta); color: var(--papel); }
+  body.noite #linguas { background: rgba(24,22,30,.86); border-color: rgba(232,225,208,.18); }
+  body.noite #linguas button { color: #a99f8c; }
+
+  #painel { position: fixed; right: 16px; bottom: 16px; width: 300px; z-index: 10; background: rgba(239,230,210,.92); border: 1px solid var(--linha); border-radius: 8px; padding: 14px 16px; backdrop-filter: blur(4px); }
+  #ano { font: 400 54px/1 'IM Fell English', Georgia, serif; display: flex; align-items: baseline; gap: 10px; }
+  #ano small { font: 500 12px Inter, sans-serif; color: var(--suave); }
+  #regua { width: 100%; margin: 10px 0 2px; accent-color: var(--rubro); }
+  .marcas { display: flex; justify-content: space-between; font-size: 11px; color: var(--suave); font-variant-numeric: tabular-nums; }
+  #contagem { font-size: 12px; color: var(--suave); margin: 6px 0 10px; }
+  .chaves { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .chave { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; padding: 5px 8px; border: 1px solid var(--linha); border-radius: 6px; user-select: none; }
+  .chave input { accent-color: var(--tinta); margin: 0; }
+  #legenda { display: none; margin-top: 10px; font-size: 11px; }
+  #legenda.on { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 8px; }
+  #legenda span { display: flex; align-items: center; gap: 5px; }
+  #legenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .nota { font-size: 11px; color: var(--suave); margin: 10px 0 0; border-top: 1px solid var(--linha); padding-top: 8px; }
+
+  #ficha { position: fixed; left: 16px; bottom: 44px; width: min(330px, calc(100vw - 32px)); z-index: 11; background: var(--papel); border: 1px solid var(--tinta); border-radius: 6px; padding: 12px 14px; box-shadow: 4px 4px 0 var(--tinta); }
+  #ficha[hidden] { display: none; }
+  #ficha h2 { margin: 0 20px 2px 0; font: 400 22px/1.15 'IM Fell English', Georgia, serif; }
+  #ficha .end { color: var(--suave); font-size: 12px; margin-bottom: 8px; }
+  #ficha dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 13px; }
+  #ficha dt { color: var(--suave); }
+  #ficha dd { margin: 0; font-variant-numeric: tabular-nums; }
+  #ficha a { color: var(--rubro); }
+  #ficha .x { position: absolute; top: 6px; right: 8px; border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--suave); }
+
+  #creditos { position: fixed; left: 16px; bottom: 12px; z-index: 9; font-size: 11px; color: var(--suave); }
+  #creditos a { color: inherit; }
+  #carregando { position: fixed; inset: 0; display: grid; place-items: center; z-index: 50; background: var(--papel); font: italic 22px 'IM Fell English', Georgia, serif; transition: opacity .6s; }
+  #carregando.fora { opacity: 0; pointer-events: none; }
+
+  body.noite #marca, body.noite #painel { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
+  body.noite .chave { border-color: rgba(232,225,208,.18); }
+  body.noite #marca p, body.noite .marcas, body.noite #contagem, body.noite .nota, body.noite #creditos { color: #a99f8c; }
+  body.noite .btn:not(#tour-abrir) { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
+
+  /* ---------- tour: faixas de cinema 2.39:1, legenda com kicker e frase, linha de progresso ---------- */
+  body.touring #painel, body.touring #topo, body.touring #ficha, body.touring #creditos { opacity: 0; pointer-events: none; transition: opacity .5s; }
+  #tour { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+  #tour[hidden] { display: none; }
+  #tour .bar { position: absolute; left: 0; right: 0; height: var(--lb); background: #000; transform: scaleY(0); transition: transform 900ms var(--ease); }
+  #tour .bar.top { top: 0; transform-origin: top; }
+  #tour .bar.bottom { bottom: 0; transform-origin: bottom; }
+  #tour.on .bar { transform: scaleY(1); }
+  #tour-progress { position: absolute; left: 0; right: 0; bottom: var(--lb); height: 2px; background: rgba(239,230,210,.14); }
+  #tour-progress i { display: block; height: 100%; background: var(--ouro); transform: scaleX(0); transform-origin: left; }
+  #tour-left { position: absolute; right: 10px; bottom: calc(var(--lb) + 6px); font: 12px ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; color: var(--ouro); }
+  #tour-ano { position: absolute; right: 18px; top: calc(var(--lb) + 14px); font: 400 clamp(40px, 7vw, 92px)/1 'IM Fell English', Georgia, serif; color: #fff; text-shadow: 0 2px 18px rgba(0,0,0,.55); opacity: 0; transition: opacity .5s; font-variant-numeric: tabular-nums; }
+  #tour-ano.on { opacity: 1; }
+  #tour-parar, #tour-som { position: absolute; top: max(6px, calc(var(--lb) - 40px)); pointer-events: auto; padding: 5px 12px; font: 600 12px Inter, sans-serif; background: rgba(0,0,0,.6); color: var(--papel); border: 1px solid rgba(239,230,210,.25); border-radius: 999px; cursor: pointer; }
+  #tour-parar { left: 16px; }
+  #tour-som { left: 84px; color: var(--ouro); }
+  #tour-som.mudo { color: rgba(239,230,210,.45); text-decoration: line-through; }
+  #tour-progress, #tour-left, #tour-parar, #tour-som { transition: opacity 200ms; }
+  #tour.saindo #tour-progress, #tour.saindo #tour-left, #tour.saindo #tour-parar, #tour.saindo #tour-som, #tour.saindo #tour-ano { opacity: 0; pointer-events: none; }
+  #tour.saindo #tour-cap { opacity: 0; transition: opacity 200ms; }
+  #tour-cap { position: absolute; left: 0; right: 0; bottom: var(--lb); padding: 60px 8vw 30px; text-align: center; background: linear-gradient(transparent, rgba(10,8,6,.55)); opacity: 0; transform: translateY(8px); transition: opacity 600ms, transform 600ms; }
+  #tour-cap.on { opacity: 1; transform: none; }
+  #tour-kicker { display: inline-block; padding: 6px calc(12px - .18em) 6px 12px; background: rgba(20,16,12,.74); border: 1px solid rgba(239,230,210,.2); border-radius: 4px; font: 600 clamp(10px, 1vw, 13px) Inter, sans-serif; letter-spacing: .18em; text-transform: uppercase; color: var(--ouro); margin-bottom: 10px; }
+  #tour-kicker:empty { display: none; }
+  #tour-line { display: block; font: 400 clamp(20px, 2.5vw, 36px)/1.22 'IM Fell English', Georgia, serif; color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,.75), 0 0 2px rgba(0,0,0,.6); max-width: 1100px; margin: 0 auto; }
+  #tour-convite { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: rgba(15,12,8,.5); backdrop-filter: blur(2px); }
+  #tour-convite[hidden] { display: none; }
+  #tour-convite button { display: inline-flex; align-items: center; gap: 12px; font: 700 20px Inter, sans-serif; color: var(--tinta); background: var(--ouro); border: 0; border-radius: 999px; padding: 16px 30px; cursor: pointer; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+  #tour-convite button::before { content: ""; border-left: 13px solid var(--tinta); border-top: 8px solid transparent; border-bottom: 8px solid transparent; }
+  #tour-convite small { display: block; font: 500 13px Inter, sans-serif; opacity: .75; margin-top: 2px; text-align: left; }
+
+  @media (max-width: 640px) {
+    #marca h1 { font-size: 24px; } #marca p { display: none; }
+    #painel { left: 16px; right: 16px; width: auto; bottom: 12px; padding: 10px 12px; }
+    #ano { font-size: 38px; }
+    #creditos { display: none; }
+    #ficha { bottom: auto; top: 76px; }
+    .nota { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="cena"></canvas>
+<div id="carregando" data-i18n="carregando">Desenhando a cidade…</div>
+
+<header id="topo">
+  <div id="marca"><h1>Basel</h1><p data-i18n="sub">A Altstadt prédio por prédio, com o ano de cada um</p></div>
+  <div class="acoes">
+    <div id="linguas" role="group" aria-label="Idioma / Language / Sprache"><button type="button" data-lang="pt">PT</button><button type="button" data-lang="en">EN</button><button type="button" data-lang="de">DE</button></div>
+    <button id="tour-abrir" class="btn" type="button" data-i18n="tour" data-i18n-title="tour-titulo" title="Um passeio de 1 minuto, com som">Tour de 1 min</button>
+  </div>
+</header>
+
+<aside id="painel" aria-label="Máquina do tempo" data-i18n-aria="aria-painel">
+  <div id="ano"><span id="ano-num">2026</span><small data-i18n="maquina">máquina do tempo</small></div>
+  <input id="regua" type="range" min="0" max="1000" value="1000" aria-label="Ano" data-i18n-aria="aria-ano">
+  <div class="marcas"><span>1100</span><span>1500</span><span>1800</span><span>1900</span><span>2026</span></div>
+  <div id="contagem"></div>
+  <div class="chaves">
+    <label class="chave"><input type="checkbox" id="c-epoca"> <span data-i18n="epoca">cor por época</span></label>
+    <label class="chave"><input type="checkbox" id="c-noite"> <span data-i18n="noite">noite</span></label>
+    <label class="chave"><input type="checkbox" id="c-palidos" checked> <span data-i18n="palidos">lotes pálidos</span></label>
+    <label class="chave"><input type="checkbox" id="c-ruas" checked> <span data-i18n="ruas">ruas e bondes</span></label>
+  </div>
+  <div id="legenda"></div>
+  <p class="nota" data-i18n="nota">Pálido: o prédio de hoje é mais novo que o ano escolhido; ali podia haver outro antes. Prédios demolidos não estão no modelo 3D; os {d} que o registro federal lista como demolidos aparecem como pinos vermelhos enquanto existiam. O ano é o do registro (GWR), que às vezes é o de uma reconstrução.</p>
+</aside>
+
+<article id="ficha" hidden aria-live="polite">
+  <button class="x" type="button" aria-label="Fechar" data-i18n-aria="fechar">×</button>
+  <h2 id="f-nome"></h2>
+  <div class="end" id="f-end"></div>
+  <dl id="f-dl"></dl>
+</article>
+
+<div id="creditos" data-i18n-html="creditos">Prédios e relevo © <a href="https://www.swisstopo.admin.ch">swisstopo</a> · ano, andares e moradias: GWR (BFS) via <a href="https://data.bs.ch">data.bs.ch</a> · ruas © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></div>
+
+<div id="tour-convite" hidden><button type="button"><span><span data-i18n="convite">Começar o tour</span><small data-i18n="convite-sub">1 minuto, com som</small></span></button></div>
+<div id="tour" hidden>
+  <div class="bar top"></div><div class="bar bottom"></div>
+  <div id="tour-ano"></div>
+  <div id="tour-cap"><span id="tour-kicker"></span><span id="tour-line"></span></div>
+  <div id="tour-progress"><i></i></div>
+  <span id="tour-left"></span>
+  <button id="tour-parar" type="button">✕ esc</button>
+  <button id="tour-som" type="button" data-i18n-title="som-titulo" title="Som do tour (liga/desliga)" aria-label="Som do tour" aria-pressed="true">♪</button>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script src="i18n.js"></script>
+<script src="som.js"></script>
+<script type="module" src="cidade.js"></script>
+</body>
+</html>
