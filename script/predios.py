@@ -9,6 +9,13 @@ muralha e fontanários do OpenStreetMap. Gera em docs/data/:
   relevo.bin     grade de altitudes Uint16 (cm acima da base) do recorte
   ruas.json      linhas do OSM em coordenadas locais
 
+Formato de predios.bin e relevo.bin: inalterado. Em predios.json, cada prédio ganhou (tarefa 12, fachadas):
+  mat  material da fachada: 0 reboco, 1 arenito vermelho (igrejas, museus, prédios públicos antigos), 2 concreto e vidro (a partir de 1950)
+  lj   loja/comércio no térreo: 2 = OSM shop=*/amenity de comércio dentro da pegada, 1 = só pela classe do GWR
+       (comércio, restaurante, hotel, moradia com outro uso)
+As lojas do OSM vêm de data/12-fachadas/lojas.json (Overpass, `out center`); sem o arquivo só vale a classe do GWR.
+UV de parede, andares e beiral são calculados no cliente (docs/fachadas.js) a partir do triângulo.
+
 Coordenadas locais: x = leste, y = altura, z = −norte, em metros, a partir de ORIGEM (LV95)
 e da cota BASE_Z (o Reno em Basel fica perto de 245 m).
 
@@ -68,6 +75,45 @@ def le_blocos():
     return predios
 
 
+COMERCIO_GWR = {
+    "Gross-und Einzelhandelsgebäude", "Restaurants und Bars in Gebäuden ohne Wohnnutzung", "Hotelgebäude",
+    "Wohngebäude mit Nebennutzung", "Andere Gebäude für die kurzfristige Beherbergung",
+}
+PUBLICO_GWR = {
+    "Kirchen und sonstige Kultgebäude", "Museen und Bibliotheken", "Schul- und Hochschulgebäude, Forschungseinrichtungen",
+    "Krankenhäuser und Facheinrichtungen des Gesundheitswesens", "Gebäude für Kultur- und Freizeitzwecke",
+}
+NOMES_PEDRA = re.compile(r"münster|rathaus|kirche|kapelle|museum|universit|kollegium|zunft|spital|kloster|elisabeth|peter|martin|leonhard|theodor", re.I)
+
+
+def material(ano, nome, cls, protegido):
+    """0 reboco, 1 arenito vermelho, 2 concreto e vidro."""
+    if ano and ano >= 1950 and not protegido:
+        return 2
+    if nome and NOMES_PEDRA.search(nome) and (not ano or ano < 1950):
+        return 1
+    if cls in PUBLICO_GWR and (not ano or ano < 1900):
+        return 1
+    return 2 if ano and ano >= 1950 else 0
+
+
+def lojas_osm(pegadas):
+    """Índices de prédios com comércio do OSM (shop=*, amenity de comércio) dentro da pegada."""
+    arq = RAIZ / "data/12-fachadas/lojas.json"
+    if not arq.exists():
+        return set()
+    tr = Transformer.from_crs(4326, 2056, always_xy=True)
+    xs, ys = [], []
+    for e in json.loads(arq.read_text())["elements"]:
+        c = e if e["type"] == "node" else e.get("center")
+        if c:
+            x, y = tr.transform(c["lon"], c["lat"])
+            xs.append(x), ys.append(y)
+    arv = STRtree(pegadas)
+    _, idx = arv.query(points(np.array(xs), np.array(ys)), predicate="within")
+    return {int(i) for i in idx}
+
+
 def faixa_periodo(texto):
     """'Periode von 1919 bis 1945' -> (1919, 1945); 'vor 1919' -> (1300, 1918); 'nach 2015' -> (2016, 2024)."""
     if texto is None:
@@ -122,6 +168,7 @@ def main():
     for ip, ib in zip(idx_pt, idx_pred):
         dentro.setdefault(int(ib), []).append(linhas_vivos[int(ip)])
 
+    com_loja = lojas_osm(pegadas)
     atributos = []
     casados_egid = casados_ponto = com_gbauj = com_periodo = 0
     for i, u in enumerate(uuids):
@@ -165,6 +212,11 @@ def main():
             }
             if principal["gschutzr_decoded"] == "Ja":
                 a["prot"] = 1
+        a["mat"] = material(ano, nome, a.get("cls"), a.get("prot"))
+        if i in com_loja:
+            a["lj"] = 2
+        elif a.get("cls") in COMERCIO_GWR:
+            a["lj"] = 1
         atributos.append({k: v for k, v in a.items() if v is not None})
 
     # geometria
@@ -241,6 +293,8 @@ def main():
           f"sem GWR: {sem} ({sem / n:.1%})")
     print(f"ano exato (gbauj): {com_gbauj} ({com_gbauj / n:.1%}); ano sorteado na época (gbaup): {com_periodo}")
     print(f"GWR vivos no recorte: {vivos.height}, demolidos com ano: {len(dem)}")
+    from collections import Counter
+    print("material:", dict(Counter(a["mat"] for a in atributos)), "lojas:", dict(Counter(a.get("lj", 0) for a in atributos)))
     print(f"triângulos: {n_tris}; predios.bin {(SAIDA / 'predios.bin').stat().st_size / 1e6:.1f} MB")
     anos = sorted(a["ano"] for a in atributos if "ano" in a)
     print(f"ano mais antigo: {anos[0]}, mediana: {anos[len(anos) // 2]}")

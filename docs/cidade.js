@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { criaOrtofoto } from './ortofoto.js';
+import { criarFachadas } from './fachadas.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -218,6 +219,9 @@ colorir();
 const U = {
   uAno: { value: 2026 }, uPalido: { value: 1 }, uSel: { value: -1 }, uNoite: { value: 0 },
 };
+const FACH = criarFachadas({ cena, meta, posicoes, ids16, U });
+geo.setAttribute('fa', FACH.atributos.fa);
+geo.setAttribute('fb', FACH.atributos.fb);
 const VERT_DECL = `
 attribute float ano; attribute float base; attribute float pid;
 uniform float uAno; uniform float uPalido; uniform float uSel;
@@ -264,7 +268,8 @@ function injetar(shader, cheio) {
   }`);
 }
 const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-material.onBeforeCompile = (s) => injetar(s, true);
+material.onBeforeCompile = (s) => { injetar(s, true); FACH.injetar(s); };
+// a ortofoto encadeia depois das fachadas: a foto entra logo após <color_fragment> e vira a base da telha
 orto.telhados(material);
 const predios = new THREE.Mesh(geo, material);
 predios.castShadow = predios.receiveShadow = true;
@@ -331,7 +336,8 @@ document.querySelector('.nota').innerHTML = document.querySelector('.nota').inne
 
 // ---------- chaves ----------
 function definirModo(m) {
-  modo = m; orto.modo(m); $('c-epoca').checked = m === 'epoca'; colorir();
+  modo = m; orto.modo(m); $('c-epoca').checked = m === 'epoca';
+  U.uFachada.value = U.uFotoTelhado.value = m === 'epoca' ? 0 : 1; colorir();
   const leg = $('legenda');
   leg.classList.toggle('on', m === 'epoca');
   leg.innerHTML = EPOCAS.map((e) => `<span><i style="background:${e.cor}"></i>${e.nome}</span>`).join('') + `<span><i style="background:${SEM_ANO}"></i>${t('sem ano', 'no year', 'ohne Jahr')}</span>`;
@@ -497,7 +503,7 @@ function centro(nome) {
 }
 
 window.cidade = {
-  THREE, camera, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
+  THREE, FACH, U, camera, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
   ano: () => U.uAno.value, modo: () => modo, noite: () => noiteAlvo === 1, estat, VISTA_PFALZ, altura,
   temPalidos: () => U.uPalido.value > 0.5,
   palidos: (on) => { U.uPalido.value = on ? 1 : 0; $('c-palidos').checked = on; },
