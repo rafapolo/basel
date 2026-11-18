@@ -11,6 +11,7 @@ import { criaAgua } from './agua.js';
 import { criarArvores } from './arvores.js';
 import { criarChao } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
+import { decodifica } from './compacta.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -18,7 +19,7 @@ const q = new URLSearchParams(location.search);
 const [meta, ruas, bin, rel] = await Promise.all([
   fetch('data/predios.json').then((r) => r.json()),
   fetch('data/ruas.json').then((r) => r.json()),
-  fetch('data/predios.bin').then((r) => r.arrayBuffer()),
+  fetch('data/predios.v2.bin').then((r) => r.arrayBuffer()),
   fetch('data/relevo.bin').then((r) => r.arrayBuffer()),
 ]);
 const P = meta.predios;
@@ -139,8 +140,12 @@ const ruasObj = new THREE.Group();
 
 // ---------- prédios ----------
 const nVert = meta.n_tris * 3;
-const q16 = new Int16Array(bin, 0, nVert * 3);
-const ids16 = new Uint16Array(bin, nVert * 6, nVert);
+// predios.v2.bin (script/compacta.py): vértices únicos + índice; aqui volta à sopa de triângulos de sempre
+const q16 = new Int16Array(nVert * 3), ids16 = new Uint16Array(nVert);
+{
+  const { cols: [cx, cy, cz, cid], idx } = decodifica(bin, 4, 2);
+  for (let v = 0; v < nVert; v++) { const k = idx[v]; q16[v * 3] = cx[k]; q16[v * 3 + 1] = cy[k]; q16[v * 3 + 2] = cz[k]; ids16[v] = cid[k]; }
+}
 const posicoes = new Float32Array(nVert * 3);
 for (let i = 0; i < q16.length; i++) posicoes[i] = q16[i] / meta.escala;
 for (let v = 0; v < nVert; v++) { const dz = P[ids16[v]].dz; if (dz) posicoes[v * 3 + 1] -= dz; } // base flutuando sobre o relevo fino (chao.py)

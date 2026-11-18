@@ -447,9 +447,10 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
         mk.add('ponte', gt, { sx: 4, sy: 4 });
       }
     }
-    // Käppelijoch: capela de pedra sobre o pilar do lado de Kleinbasel, pendurada a jusante
+    // Käppelijoch: capela de pedra pendurada a jusante, no meio da ponte. Posição do sólido 949 do swissBUILDINGS3D
+    // (a capela real, sem registro no GWR), que esconde() tira: o pé (dz) do relevo fino o afundava 9 m no rio
     {
-      const s = sA + (N - 2) * passo, y = yConv(s), b0 = larg / 2 - 0.3;
+      const s = 89.5, y = yConv(s), b0 = larg / 2 - 0.3;
       mk.caixa('pedraL', s - 1.9, s + 1.9, b0, b0 + 3.6, y - 0.6, y + 4.8, { sx: 2, sy: 2 });
       mk.caixa('pedraL', s - 2.1, s + 2.1, b0 - 0.1, b0 + 3.8, y - 1.2, y - 0.5, { sx: 2 });
       mk.tronco('telhaI', s, b0 + 1.8, 3.1, 0.0, y + 4.8, y + 9.4, 4, Math.PI / 4, { sx: 3, sy: 3 });
@@ -465,7 +466,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
   // ---------- integração ----------
   // esconde os triângulos do LOD2 de `ids` (colapsa em um ponto; some do desenho, da sombra e do raio)
   function esconde(geo) {
-    const ocultos = new Set([1872, 1734, 1535, 1536, 504, 505, 807]);
+    const ocultos = new Set([1872, 1734, 1535, 1536, 504, 505, 807, 949]); // 949: Käppelijoch, refeita acima
     // `posicoes` fica intacta (centro(), fachadas e tour leem dela); a geometria desenhada ganha uma cópia colapsada
     const copia = new Float32Array(posicoes);
     for (let v = 0; v < ids16.length; v++) if (ocultos.has(ids16[v])) { copia[v * 3] = 0; copia[v * 3 + 1] = -50; copia[v * 3 + 2] = 0; }

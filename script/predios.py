@@ -4,14 +4,15 @@ Junta o swissBUILDINGS3D 3.0 (blocos 1047-34 e 1047-43, edição 2024) com o GWR
 (100230 prédios, 100231 entradas), o relevo swissALTI3D (2 m, reamostrado a 5 m) e ruas, trilhos,
 muralha e fontanários do OpenStreetMap. Gera em docs/data/:
 
-  predios.bin    triângulos de todos os prédios: Int16 x,y,z (escala 1/50 m) + Uint16 id do prédio
+  predios.v2.bin triângulos de todos os prédios: Int16 x,y,z (escala 1/50 m) + Uint16 id do prédio, no formato
+                 compacto de script/compacta.py (vértices únicos + índice; o cliente volta à sopa de triângulos)
   predios.json   atributos por prédio (id = posição na lista) e metadados
-  relevo.bin     grade de altitudes Uint16 (cm acima da base) do recorte, a 5 m (legado; o desenho usa terreno.bin.gz)
+  relevo.bin     grade de altitudes Uint16 (cm acima da base) do recorte, a 5 m (legado; o desenho usa terreno.v2.bin)
   ruas.json      linhas do OSM em coordenadas locais
-  terreno.bin.gz malha adaptativa do swissALTI3D 0,5 m (tarefa 15, ver script/chao.py)
-  ruas_a.png, ruas_b.png  ruas como áreas (cobertura de asfalto, paralelepípedo, calçada, marcas, leito do bonde, oclusão)
+  terreno.v2.bin malha adaptativa do swissALTI3D 0,5 m (tarefa 15, ver script/chao.py)
+  ruas_a.webp, ruas_b.webp  ruas como áreas (cobertura de asfalto, paralelepípedo, calçada, marcas, leito do bonde, oclusão)
 
-Formato de predios.bin e relevo.bin: inalterado. Em predios.json, cada prédio ganhou (tarefa 12, fachadas):
+Formato de relevo.bin: inalterado. Em predios.json, cada prédio ganhou (tarefa 12, fachadas):
   mat  material da fachada: 0 reboco, 1 arenito vermelho (igrejas, museus, prédios públicos antigos), 2 concreto e vidro (a partir de 1950)
   lj   loja/comércio no térreo: 2 = OSM shop=*/amenity de comércio dentro da pegada, 1 = só pela classe do GWR
        (comércio, restaurante, hotel, moradia com outro uso)
@@ -34,6 +35,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import chao
+import compacta
 from pyproj import Transformer
 from shapely import STRtree, points
 from shapely.geometry import MultiPolygon, Polygon
@@ -173,7 +175,7 @@ def main():
           f"{(folga > 2).sum()} (> 2 m); mediana {np.median(folga):.2f} m (o sólido desce ~3 m abaixo do chão)")
     terreno_meta = chao.grava_terreno(dem, SAIDA, 0.25, ORIGEM_E, ORIGEM_N, (E1 - E0) / 2, (N1 - N0) / 2)
     print(f"terreno: {terreno_meta['nv']} vértices, {terreno_meta['nt']} triângulos, "
-          f"{(SAIDA / 'terreno.bin.gz').stat().st_size / 1e6:.2f} MB")
+          f"{(SAIDA / 'terreno.v2.bin').stat().st_size / 1e6:.2f} MB")
     pts = points(vivos["gkode"].to_numpy(), vivos["gkodn"].to_numpy())
     idx_pt, idx_pred = arvore.query(pts, predicate="within")
     linhas_vivos = list(vivos.iter_rows(named=True))
@@ -246,9 +248,7 @@ def main():
                 ids[k] = i
                 k += 1
     q = np.round(pos * ESCALA).astype(np.int16)
-    with open(SAIDA / "predios.bin", "wb") as f:
-        f.write(q.tobytes())
-        f.write(ids.tobytes())
+    (SAIDA / "predios.v2.bin").write_bytes(compacta.predios(q, ids))
 
     # relevo 5 m
     relevo_tif = BRUTO / "alti/crop5.tif"
@@ -315,7 +315,7 @@ def main():
     print(f"GWR vivos no recorte: {vivos.height}, demolidos com ano: {len(dem)}")
     from collections import Counter
     print("material:", dict(Counter(a["mat"] for a in atributos)), "lojas:", dict(Counter(a.get("lj", 0) for a in atributos)))
-    print(f"triângulos: {n_tris}; predios.bin {(SAIDA / 'predios.bin').stat().st_size / 1e6:.1f} MB")
+    print(f"triângulos: {n_tris}; predios.v2.bin {(SAIDA / 'predios.v2.bin').stat().st_size / 1e6:.1f} MB")
     anos = sorted(a["ano"] for a in atributos if "ano" in a)
     print(f"ano mais antigo: {anos[0]}, mediana: {anos[len(anos) // 2]}")
     seculos = {}

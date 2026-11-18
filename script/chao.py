@@ -2,10 +2,10 @@
 
 Chamado por predios.py. Gera em docs/data/:
 
-  terreno.bin.gz   malha RTIN do relevo (gzip): planos u16 coluna[nv], u16 linha[nv], u16 altitude[nv] (cm, + `off` m
-                   acima de BASE_Z) e u32 índices[nt*3]. Coordenada local: x = x0 + coluna*passo, z = z0 + linha*passo.
-  ruas_a.png       RGB: R asfalto, G paralelepípedo, B calçada (cobertura 0..1, 0,5 m/px, recorte inteiro)
-  ruas_b.png       RGB: R marca de faixa, G leito do bonde, B reservado
+  terreno.v2.bin   malha RTIN do relevo: u16 coluna, u16 linha, u16 altitude (cm, + `off` m acima de BASE_Z) por
+                   vértice e os índices dos triângulos, no formato compacto de script/compacta.py. Coordenada local: x = x0 + coluna*passo, z = z0 + linha*passo.
+  ruas_a.webp      RGB (WebP sem perdas): R asfalto, G paralelepípedo, B calçada (cobertura 0..1, 0,5 m/px, recorte inteiro)
+  ruas_b.webp      RGB (WebP sem perdas): R marca de faixa, G leito do bonde, B reservado
   ruas.json        ganha "faixas" (linhas de rua com largura e tipo) e "tram" com ponte/túnel resolvidos
 
 Dados baixados em data/15-chao/ (swissALTI3D 0,5 m, zonas de pedestres 100251, OSM extra).
@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
+import compacta
 import rtin
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -77,8 +78,6 @@ def pes_dos_predios(h, e0, n1, pegadas, bases):
 
 def grava_terreno(h, saida, erro, origem_e, origem_n, metade_x, metade_z):
     """Malha RTIN recortada ao retângulo local [-metade_x, metade_x] × [-metade_z, metade_z] (+ 2 m de folga)."""
-    import gzip
-
     verts, tris = rtin.malha(h, erro)
     meio = (N - 1) * PASSO / 2
     x = -meio + verts[:, 0] * PASSO
@@ -99,9 +98,7 @@ def grava_terreno(h, saida, erro, origem_e, origem_n, metade_x, metade_z):
     area = (xs[:, 1] - xs[:, 0]) * (zs[:, 2] - zs[:, 0]) - (xs[:, 2] - xs[:, 0]) * (zs[:, 1] - zs[:, 0])
     inv = area > 0  # em x,z com y para cima, a área "z para baixo" positiva é horária visto de cima: troca
     tris[inv] = tris[inv][:, [0, 2, 1]]
-    blob = (v[:, 0].astype("<u2").tobytes() + v[:, 1].astype("<u2").tobytes() + hv.astype("<u2").tobytes()
-            + tris.astype("<u4").tobytes())
-    (saida / "terreno.bin.gz").write_bytes(gzip.compress(blob, 9, mtime=0))
+    (saida / "terreno.v2.bin").write_bytes(compacta.terreno(v[:, 0], v[:, 1], hv, tris))
     return {"nv": int(len(usados)), "nt": int(len(tris)), "passo": PASSO, "x0": -meio, "z0": -meio, "off": OFF, "erro": erro}
 
 
@@ -138,7 +135,7 @@ def _material(t, na_zona, via):
 
 
 def mascaras(osm, pegadas, origem_e, origem_n, e0, n0, e1, n1, saida, passo=0.5):
-    """Rasteriza as ruas como áreas (cobertura por material) em ruas_a.png / ruas_b.png e devolve o meio-fio e a estatística."""
+    """Rasteriza as ruas como áreas (cobertura por material) em ruas_a.webp / ruas_b.webp e devolve o meio-fio e a estatística."""
     from pyproj import Transformer
     from shapely.geometry import LineString, Polygon, box, mapping
     from shapely.ops import substring, unary_union
@@ -274,8 +271,8 @@ def mascaras(osm, pegadas, origem_e, origem_n, e0, n0, e1, n1, saida, passo=0.5)
     B = np.stack([M, ao.astype(np.float32), T], axis=-1)
 
     q8 = lambda a: np.round(a * 255).astype(np.uint8)
-    Image.fromarray(q8(A), "RGB").save(saida / "ruas_a.png", optimize=True)
-    Image.fromarray(q8(B), "RGB").save(saida / "ruas_b.png", optimize=True)
+    Image.fromarray(q8(A), "RGB").save(saida / "ruas_a.webp", lossless=True, quality=100, method=6, exact=True)
+    Image.fromarray(q8(B), "RGB").save(saida / "ruas_b.webp", lossless=True, quality=100, method=6, exact=True)
 
     # meio-fio: onde a pista de asfalto encosta na calçada
     meio_fio = []

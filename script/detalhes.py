@@ -7,7 +7,7 @@ Fontes (em data/17-detalhes/, baixadas em 2026-11-18):
                                   drinking_fountain, fountain, café/restaurante/bar/loja, route=ferry. © OpenStreetMap contributors, ODbL
   brunnen_100008.json             data.bs.ch 100008, "Bade-, Trinkwasser- und Zierbrunnen in Basel" (IWB). Freie Nutzung, fonte obrigatória
   velos_100241.json               data.bs.ch 100241, "Veloabstellplätze" (Kanton Basel-Stadt). CC BY 4.0
-Também lê docs/data/predios.{json,bin} (pegadas dos prédios) e ruas_a.png (máscara de rua e calçada, 0,5 m/px).
+Também lê docs/data/predios.json e predios.v2.bin (pegadas dos prédios) e ruas_a.webp (máscara de rua e calçada, 0,5 m/px).
 
 Coordenadas locais como no resto do projeto: x = leste, z = −norte, em metros, a partir de `origem_lv95`. Ângulos: `ang` é a
 rotação em Y (three.js) que leva o +z local à direção alvo: atan2(nx, nz). A altura sobre o relevo é calculada no navegador.
@@ -26,6 +26,8 @@ from PIL import Image
 from pyproj import Transformer
 from shapely import STRtree
 from shapely.geometry import LineString, Point
+
+import compacta
 
 RAIZ = Path(__file__).resolve().parent.parent
 BRUTO = RAIZ / "data/17-detalhes"
@@ -55,9 +57,8 @@ def ang(nx, nz):
 
 # ---------- prédios: pegadas por sólido (união dos triângulos projetados em xz) ----------
 nv = meta["n_tris"] * 3
-raw = (DOCS / "predios.bin").read_bytes()
-q = np.frombuffer(raw, dtype=np.int16, count=nv * 3).reshape(-1, 3) / meta["escala"]
-ids = np.frombuffer(raw, dtype=np.uint16, count=nv, offset=nv * 6)
+q, ids = compacta.le_predios(DOCS / "predios.v2.bin")  # formato em script/compacta.py
+q = q / meta["escala"]
 tris = q[:, [0, 2]].reshape(-1, 3, 2)
 tid = ids[::3]
 d1, d2 = tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0]
@@ -83,7 +84,7 @@ def em_predio(x, z, folga=0.0):
 
 
 # ---------- máscara de rua/calçada ----------
-ma = np.asarray(Image.open(DOCS / "ruas_a.png").convert("RGB")).astype(np.float32) / 255
+ma = np.asarray(Image.open(DOCS / "ruas_a.webp").convert("RGB")).astype(np.float32) / 255
 COB = np.clip(ma.sum(axis=2), 0, 1)
 MX0, MZ0 = XMIN, ZMIN
 

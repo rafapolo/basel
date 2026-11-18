@@ -1,15 +1,17 @@
-// Chão e ruas (tarefa 15): relevo swissALTI3D 0,5 m em malha adaptativa (terreno.bin.gz), ruas como áreas
-// (ruas_a.png / ruas_b.png, rasterizadas por script/chao.py), pintadas no shader do chão por cima da ortofoto:
+// Chão e ruas (tarefa 15): relevo swissALTI3D 0,5 m em malha adaptativa (terreno.v2.bin), ruas como áreas
+// (ruas_a.webp / ruas_b.webp, rasterizadas por script/chao.py), pintadas no shader do chão por cima da ortofoto:
 // paralelepípedo, asfalto com marca de faixa, calçada de lajes, oclusão falsa junto às fachadas e desgaste
 // procedural (rugosidade com ruído, como na simulação do atlas do tocador, design/realismo-tocador-sim.md).
 // Também: meio-fio em relevo, trilhos de bonde (bitola de 1 m), fio aéreo e postes.
 // criarChao(THREE, { meta, ruas, orto, nivelReno }) -> { malha, altura, grupo, ruas(on) }
+import { decodifica } from './compacta.js';
+
 export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, base = 'data/' }) {
   const T = meta.terreno;
-  const buf = await new Response((await fetch(base + 'terreno.bin.gz')).body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-  const nv = T.nv, nt = T.nt;
-  const col = new Uint16Array(buf, 0, nv), lin = new Uint16Array(buf, nv * 2, nv), hh = new Uint16Array(buf, nv * 4, nv);
-  const idx = new Uint32Array(buf.slice(nv * 6, nv * 6 + nt * 12));
+  // terreno.v2.bin (script/compacta.py): mesmos vértices e triângulos do terreno.bin.gz, em ~55% dos bytes
+  const { cols, idx } = decodifica(await (await fetch(base + 'terreno.v2.bin')).arrayBuffer(), 3, 3);
+  const nv = cols[0].length, nt = idx.length / 3;
+  const [col, lin, hh] = cols.map((c) => new Uint16Array(c.buffer));
   const pos = new Float32Array(nv * 3), cores = new Float32Array(nv * 3);
   const cChao = new THREE.Color('#dcd0b2'), cAgua = new THREE.Color('#6f8e99'), cMargem = new THREE.Color('#c9bd9c'), c = new THREE.Color();
   for (let k = 0; k < nv; k++) {
@@ -59,7 +61,7 @@ export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, ba
   const carregaImg = (nome) => new Promise((ok, no) => {
     const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = base + nome;
   });
-  const [imA, imB] = await Promise.all([carregaImg('ruas_a.png'), carregaImg('ruas_b.png')]);
+  const [imA, imB] = await Promise.all([carregaImg('ruas_a.webp'), carregaImg('ruas_b.webp')]);
   const mk = (im) => {
     const t = new THREE.Texture(im);
     t.flipY = false; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
