@@ -413,6 +413,8 @@ function porCamera({ alvo, dist, az, polar }) {
 // (a Mittlere Brücke fica em x≈25, z≈−204; o Münster em x≈213, z≈211; a câmera fica um pouco além e acima dele)
 const VISTA_PFALZ = { alvo: [25, 4, -190], dist: 540, az: THREE.MathUtils.degToRad(24), polar: THREE.MathUtils.degToRad(70) };
 porCamera(VISTA_PFALZ);
+// ?cam=<nome>: uma das 6 câmeras fixas de cameras.js (tarefa 21), para comparar com fotos da cidade real
+const CAM = q.get('cam') && (await import('./cameras.js')).CAMERAS[q.get('cam')];
 
 // ---------- laço ----------
 function redimensionar() {
@@ -459,6 +461,12 @@ const ini = +(q.get('ano') || 2026);
 definirAno(ini);
 definirModo(q.get('epoca') ? 'epoca' : 'gravura');
 if (q.get('noite')) definirNoite(true);
+if (CAM) {
+  const a = typeof CAM.alvo === 'string' ? centro(CAM.alvo) : [...CAM.alvo];
+  if (a[1] === null) a[1] = altura(a[0], a[2]);
+  porCamera({ alvo: a, dist: CAM.dist, az: THREE.MathUtils.degToRad(CAM.az), polar: THREE.MathUtils.degToRad(CAM.polar) });
+  controls.update();
+}
 requestAnimationFrame(quadro);
 $('carregando').classList.add('fora');
 

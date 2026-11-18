@@ -1,0 +1,22 @@
+{
+  "pfalz": [
+    {"arquivo": "ref/merian-1642.jpg", "titulo": "Basel, vista de pássaro de Merian (edição de 1642 da planta de 1615)", "autor": "Matthäus Merian", "licenca": "Domínio público", "fonte": "https://commons.wikimedia.org/wiki/File:Merian_Basel_1642.jpg", "obs": "Vista de pássaro quase a pino, de Kleinbasel para o sul: mostra a malha de ruas, a muralha e a densidade de telhados que a Altstadt tinha. Serve de composição e de escala, não de enquadramento exato (a Pfalz olha para o outro lado)."}
+  ],
+  "munster": [
+    {"arquivo": "ref/mittelholzer-1931-muenster.jpg", "titulo": "Münster e Mittlere Rheinbrücke, aérea de 1931", "autor": "Walter Mittelholzer (ETH-Bibliothek, LBS_MH01-006621)", "licenca": "Domínio público", "fonte": "https://commons.wikimedia.org/wiki/File:ETH-BIB-Basel,_M%C3%BCnster,_Mittlere_Rheinbr%C3%BCcke,_M%C3%BCnster-Inlandfl%C3%BCge-LBS_MH01-006621.tif", "obs": "Foto de 1931: a cidade de então, mas a forma do Münster, da Münsterplatz e do talude do Reno é a mesma."}
+  ],
+  "reno": [
+    {"arquivo": "ref/panorama-muensterturm.jpg", "titulo": "Panorama de Basel desde a torre do Münster (2015)", "autor": "Taxiarchos228", "licenca": "Free Art License 1.3", "fonte": "https://commons.wikimedia.org/wiki/File:Basel_-_Stadtpanorama_vom_M%C3%BCnsterturm.jpg", "obs": "Reno, pontes e Kleinbasel vistos do alto; o original tem 14144 px, aqui reduzido a 1280 px."}
+  ],
+  "rathaus": [
+    {"arquivo": "ref/mittelholzer-1933-rathaus.jpg", "titulo": "Marktplatz e Rathaus, aérea de 1933", "autor": "Walter Mittelholzer (ETH-Bibliothek, LBS_MH01-007562)", "licenca": "Domínio público", "fonte": "https://commons.wikimedia.org/wiki/File:ETH-BIB-Basel,_Marktplatz,_Rathaus-Inlandfl%C3%BCge-LBS_MH01-007562.tif", "obs": "A praça e a fachada vermelha do Rathaus de cima."},
+    {"arquivo": "ref/rathaus-gabriellemerk.jpg", "titulo": "Rathaus de Basel (2019)", "autor": "GabrielleMerk", "licenca": "CC BY-SA 4.0", "fonte": "https://commons.wikimedia.org/wiki/File:Basel-Rathaus-Townhall.jpg", "obs": "Fachada: arenito vermelho, janelas, pinturas, torre."}
+  ],
+  "marktplatz": [
+    {"arquivo": "ref/panoramax-marktplatz.jpg", "titulo": "Marktplatz, olhando para o leste (azimute 101°), 2021-10-17", "autor": "KaiPankrath, via Panoramax/MapComplete", "licenca": "CC BY-SA 4.0", "fonte": "https://api.panoramax.xyz/api/collections/1de6f4a1-73ac-4c75-ab7f-2a2aabddf50a/items/d5f23187-1b2e-47d7-ad5a-5095ebc302af", "obs": "Tirada em (x −129, z −6), a poucos metros da câmera da cena; o Rathaus aparece à esquerda. Foto em pé, vertical."},
+    {"arquivo": "ref/panoramax-marktplatz-2.jpg", "titulo": "Marktplatz, olhando para o oeste-sudoeste (azimute 246°), 2021-10-17", "autor": "KaiPankrath, via Panoramax/MapComplete", "licenca": "CC BY-SA 4.0", "fonte": "https://api.panoramax.xyz/api/collections/1de6f4a1-73ac-4c75-ab7f-2a2aabddf50a/items/96e4883f-8c28-4aa0-adec-9dd963c84e76", "obs": "Chão de paralelepípedo, trilho do bonde, fachadas coloridas."}
+  ],
+  "rheinsprung": [
+    {"arquivo": "ref/rheinsprung-waltpurg.jpg", "titulo": "Rheinsprung com o Hus zur Waltpurg (2023)", "autor": "JoachimKohler-HB", "licenca": "CC BY-SA 4.0", "fonte": "https://commons.wikimedia.org/wiki/File:Basel_-_Rheinsprung_mit_dem_%22Hus_zur_Waltpurg%22.jpg", "obs": "Casas de enxaimel, persianas, rua estreita em subida."}
+  ]
+}

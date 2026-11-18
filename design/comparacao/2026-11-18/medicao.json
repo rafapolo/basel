@@ -1,0 +1,73 @@
+{
+  "base": "http://localhost:3021",
+  "viewport": [
+    1280,
+    720
+  ],
+  "data": "2026-11-18",
+  "navegador": "159.0.8154.6",
+  "tempo_ate_cidade_s": 0.7,
+  "peso_abertura_descomprimido_mb": 8.03,
+  "peso_abertura_transferido_mb": 2.17,
+  "peso_por_arquivo_mb": {
+    "localhost:3021/data/predios.bin": 1.614,
+    "cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js": 0.208,
+    "localhost:3021/data/relevo.bin": 0.065,
+    "fonts.gstatic.com/s/imfellenglish/v14/Ktk1ALSLW8zDe0rthJysWrnLsAzHEKOYd4xI5g.woff2": 0.06,
+    "fonts.gstatic.com/s/imfellenglish/v14/Ktk3ALSLW8zDe0rthJysWrnLsAzHFZOafYtq5Mzh.woff2": 0.058,
+    "fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2": 0.049,
+    "localhost:3021/data/ruas.json": 0.044,
+    "localhost:3021/data/predios.json": 0.035
+  },
+  "fps_parado_pfalz": {
+    "fps": 60.1,
+    "pior_quadro_ms": 16.8
+  },
+  "fps_girando_pfalz": 60.1,
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+  "solidos_3d": 1892,
+  "cameras": {
+    "pfalz": {
+      "fps": {
+        "fps": 60.3,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 518.3
+    },
+    "munster": {
+      "fps": {
+        "fps": 60.3,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 523.1
+    },
+    "reno": {
+      "fps": {
+        "fps": 60.4,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 477.4
+    },
+    "rathaus": {
+      "fps": {
+        "fps": 60.4,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 573.1
+    },
+    "marktplatz": {
+      "fps": {
+        "fps": 60.4,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 531.9
+    },
+    "rheinsprung": {
+      "fps": {
+        "fps": 60.2,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 535.1
+    }
+  }
+}
