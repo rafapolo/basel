@@ -316,10 +316,11 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
       float fres = clamp(0.05 + 0.95 * pow(1.0 - cosv, 4.0), 0.0, 1.0);
       vec3 Rv = reflect(-V, N);
       // céu refletido: do horizonte (cor da névoa) ao zênite
-      vec3 ceuR = mix(uHoriz, uZenite, pow(clamp(Rv.y, 0.0, 1.0), 0.45));
+      vec3 ceuR = mix(uHoriz * 0.8, uZenite, pow(clamp(Rv.y, 0.0, 1.0), 0.45)); // horizonte refletido um pouco abaixo do céu (a água absorve)
       // sol: disco mais halo, quebrado pelas ondas
       float sd = max(dot(Rv, uSolDir), 0.0);
-      vec3 brilho = uSolCor * uSolI * (pow(sd, 900.0) * 28.0 + pow(sd, 80.0) * 0.5);
+      // brilho contido: o halo largo e o disco somados estouravam um rastro branco no Reno inteiro nas vistas altas
+      vec3 brilho = min(uSolCor * uSolI * (pow(sd, 900.0) * 18.0 + pow(sd, 80.0) * 0.25), vec3(2.2));
       vec3 refl = ceuR;
       if (uRefl > 0.5) {
         vec2 uv = vUvR.xy / vUvR.w + g * 0.035;

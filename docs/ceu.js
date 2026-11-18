@@ -144,7 +144,10 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
   sky.material.onBeforeCompile = (s) => {
     s.fragmentShader = s.fragmentShader
       .replace('void main() {', 'uniform float uNoite;\nvoid main() {')
-      .replace('gl_FragColor = vec4( retColor, 1.0 );', `retColor += uNoite * mix(vec3(${NOITE_H.join(',')}), vec3(${NOITE_Z.join(',')}), clamp(direction.y * 1.5, 0.0, 1.0));
+      // abaixo do horizonte (fora do recorte, vista de cima) o Preetham dava um cinza-claro chapado (#e8e8ea): escurece
+    // para uma bruma de terra distante, verde-acinzentada, que deixa a borda da cidade legível
+    .replace('gl_FragColor = vec4( retColor, 1.0 );', `retColor = mix(retColor, retColor * vec3(0.3, 0.34, 0.32), smoothstep(0.0, -0.35, direction.y));
+    retColor += uNoite * mix(vec3(${NOITE_H.join(',')}), vec3(${NOITE_Z.join(',')}), clamp(direction.y * 1.5, 0.0, 1.0));
     gl_FragColor = vec4( retColor, 1.0 );`);
   };
   cenaCeu.add(sky);
@@ -245,6 +248,10 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
     vFrente.normalize(); vFrente.y = 0.03; vFrente.normalize();
     const [fr, fg, fb] = corDoCeu(vFrente, e.dir, n);
     cena.fog.color.setRGB(fr, fg, fb, THREE.LinearSRGBColorSpace);
+    // névoa que acompanha a câmera (como na sim do tocador): de 900–2600 m fixos, a câmera alta (500–900 m) via a
+    // cidade do outro lado do recorte já leitosa; o começo e o fim crescem com a distância da câmera ao centro
+    const dc = camera.position.length();
+    cena.fog.near = Math.max(900, 300 + 0.9 * dc); cena.fog.far = cena.fog.near + 1700 + dc;
     if (fundo) fundo.copy(cena.fog.color);
 
     // exposição: mais aberta com o sol baixo e de noite, devagar (constante de ~1,2 s)
