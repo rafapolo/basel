@@ -7,6 +7,7 @@ import { iniciarCeu } from './ceu.js';
 import { criaOrtofoto } from './ortofoto.js';
 import { criarFachadas } from './fachadas.js';
 import { criarChao } from './chao.js';
+import { criarDetalhes } from './detalhes.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -272,6 +273,8 @@ cena.add(predios);
 // luz e céu (sol real, CSM, GTAO, bloom): ver ceu.js. Modo leve: ?leve=1, ou automático em celular
 const leve = q.get('leve') === '1' || (q.get('leve') !== '0' && (matchMedia('(pointer:coarse)').matches || innerWidth < 700 || (navigator.deviceMemory || 8) <= 4));
 const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f.replace('void main() {', 'varying float vEstado;\nvoid main() {\n  if (vEstado > 1.5) discard;'); } });
+// detalhes de rua (tarefa 17): fontes, postes, bancos, toldos, bandeiras, balsas e navios; antes do 1º render, para a sombra em cascata pegar
+await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => NIVEL_RENO - 0.35 });
 
 // prédios demolidos que o GWR registra: pinos vermelhos enquanto existiam
 const pinos = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 0.2, 9, 8).translate(0, 4.5, 0),
