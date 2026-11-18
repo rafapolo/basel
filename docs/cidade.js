@@ -7,6 +7,7 @@ import { iniciarCeu } from './ceu.js';
 import { criaOrtofoto } from './ortofoto.js';
 import { criarFachadas } from './fachadas.js';
 import { criarArvores } from './arvores.js';
+import { criarChao } from './chao.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -58,7 +59,9 @@ cena.add(sol, sol.target);
 // ---------- relevo e Reno ----------
 const R = meta.relevo;
 const alturas = new Uint16Array(rel);
-const altura = (x, z) => {
+let CH;
+const altura = (x, z) => (CH ? CH.altura(x, z) : altura0(x, z));
+const altura0 = (x, z) => {
   const fx = (x - R.x0) / R.passo, fz = (z - R.z0) / R.passo;
   const i = Math.max(0, Math.min(R.nx - 2, Math.floor(fx))), j = Math.max(0, Math.min(R.ny - 2, Math.floor(fz)));
   const u = Math.max(0, Math.min(1, fx - i)), v = Math.max(0, Math.min(1, fz - j));
@@ -67,23 +70,9 @@ const altura = (x, z) => {
 };
 {
   const larg = (R.nx - 1) * R.passo, prof = (R.ny - 1) * R.passo;
-  const g = new THREE.PlaneGeometry(larg, prof, R.nx - 1, R.ny - 1);
-  g.rotateX(-Math.PI / 2);
-  g.translate(R.x0 + larg / 2, 0, R.z0 + prof / 2);
-  const pos = g.attributes.position, cores = new Float32Array(pos.count * 3);
-  const chao = new THREE.Color('#dcd0b2'), agua = new THREE.Color('#6f8e99'), margem = new THREE.Color('#c9bd9c'), c = new THREE.Color();
-  for (let k = 0; k < pos.count; k++) {
-    const h = alturas[k] / 100;
-    pos.setY(k, h);
-    if (h < NIVEL_RENO) c.copy(agua); else c.copy(chao).lerp(margem, Math.max(0, 1 - (h - NIVEL_RENO) / 3));
-    c.toArray(cores, k * 3);
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(cores, 3));
-  g.computeVertexNormals();
-  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
-  m.receiveShadow = true;
-  orto.chao(m);
-  cena.add(m);
+  // relevo fino e ruas como áreas: docs/chao.js (tarefa 15); o relevo de 5 m (relevo.bin) fica só como reserva
+  CH = await criarChao(THREE, { meta, ruas, orto, nivelReno: NIVEL_RENO });
+  cena.add(CH.malha);
   // espelho d'água do Reno: um plano liso no nível do rio, um pouco brilhante
   const rio = new THREE.Mesh(
     new THREE.PlaneGeometry(larg, prof).rotateX(-Math.PI / 2).translate(R.x0 + larg / 2, NIVEL_RENO - 0.35, R.z0 + prof / 2),
@@ -124,7 +113,7 @@ const ruasObj = new THREE.Group();
   };
   for (const l of ruas.linhas) {
     const larg = LARGURA[l.t];
-    if (!larg) continue;
+    if (!larg || !l.ponte || l.t === 'tram') continue; // chão e bonde: chao.js; aqui só as pontes
     const pe = ['footway', 'path', 'steps', 'cycleway', 'pedestrian', 'living_street'].includes(l.t);
     faixa(l.c, larg, l.t === 'tram' ? cBonde : pe ? cPe : cRua, l.t === 'tram' ? 0.45 : pe ? 0.25 : 0.3, !!l.ponte);
   }
@@ -148,6 +137,7 @@ const ruasObj = new THREE.Group();
     const mm = new THREE.Mesh(gm, new THREE.MeshLambertMaterial({ color: 0x8a3b2a, side: THREE.DoubleSide }));
     mm.castShadow = true; ruasObj.add(mm);
   }
+  ruasObj.add(CH.grupo);
   cena.add(ruasObj);
 }
 
@@ -157,6 +147,7 @@ const q16 = new Int16Array(bin, 0, nVert * 3);
 const ids16 = new Uint16Array(bin, nVert * 6, nVert);
 const posicoes = new Float32Array(nVert * 3);
 for (let i = 0; i < q16.length; i++) posicoes[i] = q16[i] / meta.escala;
+for (let v = 0; v < nVert; v++) { const dz = P[ids16[v]].dz; if (dz) posicoes[v * 3 + 1] -= dz; } // base flutuando sobre o relevo fino (chao.py)
 const base = new Float32Array(P.length).fill(1e9);
 for (let v = 0; v < nVert; v++) base[ids16[v]] = Math.min(base[ids16[v]], posicoes[v * 3 + 1]);
 const aAno = new Float32Array(nVert), aBase = new Float32Array(nVert), aPid = new Float32Array(nVert);
@@ -351,7 +342,7 @@ function definirModo(m) {
 }
 $('c-epoca').addEventListener('change', (e) => definirModo(e.target.checked ? 'epoca' : 'gravura'));
 $('c-palidos').addEventListener('change', (e) => { U.uPalido.value = e.target.checked ? 1 : 0; });
-$('c-ruas').addEventListener('change', (e) => { ruasObj.visible = e.target.checked; });
+$('c-ruas').addEventListener('change', (e) => { ruasObj.visible = e.target.checked; CH.ruas(e.target.checked); });
 let noiteAlvo = 0;
 function definirNoite(on) { noiteAlvo = on ? 1 : 0; ceu.noite(on); $('c-noite').checked = on; document.body.classList.toggle('noite', on); }
 $('c-noite').addEventListener('change', (e) => definirNoite(e.target.checked));

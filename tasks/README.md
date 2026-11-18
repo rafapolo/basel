@@ -8,7 +8,7 @@ Rodada 2: deixar a cidade mais real. As tarefas 01–10 estão em [`done/`](done
 | 12 | [Fachadas: janelas, andares, pedra e reboco](done/12-fachadas.md) | — | feita em 2026-11-18 (`docs/fachadas.js`) |
 | 13 | [Luz, céu e câmera](done/13-luz-e-ceu.md) | — | feita em 2026-11-18 (`docs/ceu.js`, `?hora=`, `?leve=1`) |
 | 14 | [O Reno de verdade](14-reno.md) | 13 | aberta |
-| 15 | [Relevo fino, ruas e calçadas](15-chao-e-ruas.md) | 11 | aberta |
+| 15 | [Relevo fino, ruas e calçadas](done/15-chao-e-ruas.md) | 11 | feita em 2026-11-18 (`docs/chao.js`, `script/chao.py`; sem `area:highway` nem swissTLM3D, Overpass fora do ar) |
 | 16 | [Árvores e verde](16-arvores.md) | 13 | aberta |
 | 17 | [Detalhes de rua](17-detalhes-urbanos.md) | 15 | aberta |
 | 18 | [Marcos em alta definição](18-marcos.md) | 12 | aberta |
