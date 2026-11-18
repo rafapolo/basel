@@ -1,0 +1,90 @@
+{
+  "base": "http://localhost:3016",
+  "viewport": [
+    1280,
+    720
+  ],
+  "data": "2026-11-18",
+  "navegador": "159.0.8154.6",
+  "tempo_ate_cidade_s": 0.9,
+  "peso_abertura_descomprimido_mb": 8.28,
+  "peso_abertura_transferido_mb": 4.4,
+  "peso_por_arquivo_mb": {
+    "localhost:3016/data/predios.bin": 1.614,
+    "cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js": 0.208,
+    "localhost:3016/data/ortofoto/t_1_2.webp": 0.159,
+    "localhost:3016/data/ortofoto/t_0_3.webp": 0.159,
+    "localhost:3016/data/ortofoto/t_3_1.webp": 0.157,
+    "localhost:3016/data/ortofoto/t_0_1.webp": 0.154,
+    "localhost:3016/data/ortofoto/t_3_0.webp": 0.153,
+    "localhost:3016/data/ortofoto/t_0_2.webp": 0.153,
+    "localhost:3016/data/ortofoto/t_3_3.webp": 0.146,
+    "localhost:3016/data/ortofoto/t_2_0.webp": 0.145,
+    "localhost:3016/data/ortofoto/t_1_3.webp": 0.142,
+    "localhost:3016/data/ortofoto/t_0_0.webp": 0.136,
+    "localhost:3016/data/ortofoto/t_2_3.webp": 0.133,
+    "localhost:3016/data/ortofoto/t_1_1.webp": 0.128,
+    "localhost:3016/data/ortofoto/t_2_2.webp": 0.119,
+    "localhost:3016/data/ortofoto/geral.webp": 0.068,
+    "localhost:3016/data/ortofoto/t_2_1.webp": 0.068,
+    "localhost:3016/data/relevo.bin": 0.065,
+    "localhost:3016/data/ortofoto/t_3_2.webp": 0.062,
+    "fonts.gstatic.com/s/imfellenglish/v14/Ktk1ALSLW8zDe0rthJysWrnLsAzHEKOYd4xI5g.woff2": 0.06,
+    "localhost:3016/data/ortofoto/t_1_0.webp": 0.059,
+    "fonts.gstatic.com/s/imfellenglish/v14/Ktk3ALSLW8zDe0rthJysWrnLsAzHFZOafYtq5Mzh.woff2": 0.058,
+    "fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2": 0.049,
+    "localhost:3016/data/ruas.json": 0.044,
+    "localhost:3016/data/predios.json": 0.036
+  },
+  "fps_parado_pfalz": {
+    "fps": 60.1,
+    "pior_quadro_ms": 16.8
+  },
+  "fps_girando_pfalz": 60.1,
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+  "solidos_3d": 1892,
+  "cameras": {
+    "pfalz": {
+      "fps": {
+        "fps": 60.5,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 46
+    },
+    "munster": {
+      "fps": {
+        "fps": 60.2,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 87.5
+    },
+    "reno": {
+      "fps": {
+        "fps": 39.4,
+        "pior_quadro_ms": 33.4
+      },
+      "fps_sem_vsync": 78.8
+    },
+    "rathaus": {
+      "fps": {
+        "fps": 60.3,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 72.1
+    },
+    "marktplatz": {
+      "fps": {
+        "fps": 60.5,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 47.4
+    },
+    "rheinsprung": {
+      "fps": {
+        "fps": 60.2,
+        "pior_quadro_ms": 16.8
+      },
+      "fps_sem_vsync": 60.3
+    }
+  }
+}

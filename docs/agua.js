@@ -106,38 +106,29 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
   // ---- hook no relevo: dentro da água o leito afunda; fora, a margem sobe até a altura do cais ----
   const bed = new THREE.Color('#5d6a55'), terra = new THREE.Color('#d6caa8');
   const COTA_CAIS = NIVEL + 2.0;
+  // a malha do relevo (chao.js, swissALTI3D 0,5 m) já traz a margem; aqui só afunda o leito dentro do contorno
+  // (a água plana do DEM ficaria na mesma cota da superfície) e tira a cor de água de fora do contorno
   function relevo(pos, cores) {
     for (let k = 0; k < pos.count; k++) {
-      const x = pos.getX(k), z = pos.getZ(k);
-      let d = dsig(x, z);
-      if (Math.abs(d) <= 2.8) {
-        // vértice perto da margem: gruda no contorno real (a grade de 5 m não o desenha), na cota do cais
-        let gx = dsig(x + 3, z) - dsig(x - 3, z), gz = dsig(x, z + 3) - dsig(x, z - 3);
-        const gl = Math.hypot(gx, gz);
-        if (gl > 0.1) { pos.setX(k, x - (gx / gl) * d); pos.setZ(k, z - (gz / gl) * d); pos.setY(k, COTA_CAIS); terra.toArray(cores, k * 3); continue; }
-      }
-      if (d > 0) {
-        pos.setY(k, NIVEL - (d < 7 ? 5 : Math.min(2.8, 0.6 + 0.12 * d)));
-        bed.toArray(cores, k * 3);
-      } else {
-        if (d > -9 && pos.getY(k) < COTA_CAIS) { pos.setY(k, COTA_CAIS - 0.1 * (-d / 9)); terra.toArray(cores, k * 3); }
-        if (pos.getY(k) < 2.4) terra.toArray(cores, k * 3); // o relevo fora do polígono (tanque, Birsig) não é água
-      }
+      const d = dsig(pos.getX(k), pos.getZ(k));
+      if (d > 0) { pos.setY(k, Math.min(pos.getY(k), NIVEL - Math.min(0.7, 0.08 + 0.25 * d))); bed.toArray(cores, k * 3); }
+      else if (pos.getY(k) < 2.4) terra.toArray(cores, k * 3);
     }
   }
 
-  // ---- geometria: muros de cais, pilares e escadas ----
+  // ---- geometria: muros de cais, pilares e escadas (construída em iniciar(), depois do relevo) ----
+  const grupo = new THREE.Group(); grupo.name = 'agua-estruturas';
+  function estruturas() {
   // arenito de cais: blocos de ~1,2 × 0,5 m pintados num canvas (u pelo comprimento do muro, v pela altura)
   const tc = document.createElement('canvas'); tc.width = tc.height = 128;
   { const c = tc.getContext('2d'); c.fillStyle = '#8f8470'; c.fillRect(0, 0, 128, 128);
     for (let r = 0; r < 4; r++) for (let b = 0; b < 2; b++) {
-      const x = b * 64 + (r % 2) * 32, g = 175 + Math.floor(Math.random() * 40), y = r * 32;
+      const x = b * 64 + (r % 2) * 32, g = 185 + Math.floor(Math.random() * 25), y = r * 32;
       c.fillStyle = `rgb(${g + 8},${g},${g - 14})`; c.fillRect(x + 1, y + 1, 62, 30);
       for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(80,65,45,${Math.random() * 0.12})`; c.fillRect(x + Math.random() * 60, y + Math.random() * 28, 2 + Math.random() * 4, 1 + Math.random() * 2); }
     } }
   const texPedra = new THREE.CanvasTexture(tc); texPedra.wrapS = texPedra.wrapT = THREE.RepeatWrapping; texPedra.colorSpace = THREE.SRGBColorSpace; texPedra.anisotropy = 4;
   const pedra = new THREE.MeshLambertMaterial({ map: texPedra, color: 0xffffff, side: THREE.DoubleSide });
-  const grupo = new THREE.Group(); grupo.name = 'agua-estruturas';
   {
     const pos = [], idx = [], uvs = [];
     const area = anel.reduce((s, _, i) => (i % 2 ? s : s + anel[i] * anel[(i + 3) % anel.length] - anel[(i + 2) % anel.length] * anel[i + 1]), 0);
@@ -153,7 +144,7 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
       for (let k = 0; k <= n; k++) {
         const x0 = ax + ((bx - ax) * k) / n, z0 = az + ((bz - az) * k) / n;
         const x = x0 - nx * 1.8, z = z0 - nz * 1.8; // o muro entra 1,8 m na água: esconde o talude que a grade de 5 m deixa
-        const h = (altura(x0 + nx * 2.5, z0 + nz * 2.5) + altura(x0 + nx * 5, z0 + nz * 5) + altura(x0 + nx * 8, z0 + nz * 8)) / 3;
+        const h = Math.max(altura(x0 + nx * 2, z0 + nz * 2), altura(x0 + nx * 4, z0 + nz * 4), altura(x0 + nx * 6, z0 + nz * 6)) - 0.15;
         amostras.push({ x, z, nx, nz, h, liga: k > 0 && !corte });
       }
     }
@@ -228,6 +219,7 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
     }
   }
   cena.add(grupo);
+  }
 
   // ---- superfície ----
   let mat = null, malha = null, reflexo = false, aoMudarOff = null;
@@ -332,6 +324,7 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
   }
 
   function iniciar({ leve }) {
+    estruturas();
     reflexo = !leve;
     const forma = { name: 'AguaReno', uniforms: { color: { value: null }, tDiffuse: { value: null }, textureMatrix: { value: null }, ...U }, vertexShader: VERT, fragmentShader: FRAG };
     U.uRefl.value = reflexo ? 1 : 0;
