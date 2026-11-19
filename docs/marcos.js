@@ -267,12 +267,13 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     pedraL: std(texPedra({ cw: 4, ch: 4, cor: '#b99a7a', seed: 23 })),
     pedraLJ: std(texPedra({ cw: 4, ch: 12, cor: '#b99a7a', janela: true, seed: 24 })),
     telhaI: std(texTelha('#7c4634', 6)),
-    ponte: std(texPedra({ cw: 4, ch: 4, cor: '#a39482', seed: 31 })),
+    ponte: std(texPedra({ cw: 4, ch: 4, cor: '#a9a59c', seed: 31 })), // granito cinza-claro (foto aérea oblíqua, 2026-11-19)
+    ferro: new THREE.MeshStandardMaterial({ color: 0x2b2d30, roughness: 0.55, metalness: 0.6, envMap: ENV, envMapIntensity: 0.5 }),
     flecha: std(texTelha('#6c3a2e', 8)),
     ouro: new THREE.MeshStandardMaterial({ color: 0xc9a13b, roughness: 0.3, metalness: 0.85, envMap: ENV, envMapIntensity: 1.1 }),
     relogio: new THREE.MeshStandardMaterial({ map: texRelogio(), roughness: 0.4, metalness: 0.2, envMap: ENV, envMapIntensity: 0.5 }),
   };
-  for (const k of ['rathaus', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
+  for (const k of ['rathaus', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha', 'ferro']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
   let cotaMittlere = null;
   const raiz = new THREE.Group();
   raiz.name = 'marcos';
@@ -456,14 +457,28 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
       const gp = new THREE.BufferGeometry(); gp.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gp.setIndex(idx);
       mk.add('ponte', gp.toNonIndexed(), { sx: 4, sy: 4 });
     }
-    // quebra-mares triangulares nos pilares (a montante e a jusante)
+    // pilares como na foto: quebra-mar de ponta arredondada a montante e a jusante, que sobe até o parapeito e vira um
+    // balcão semicircular; em cada balcão, um mastro fino e alto (o fio do bonde e a luz)
     for (let i = 1; i < N; i++) {
-      const s = sA + i * passo;
+      const s = sA + i * passo, y = yConv(s);
       for (const d of [-1, 1]) {
-        const gt = new THREE.CylinderGeometry(0.01, 1.6, yConv(s) - 0.9 - yFundo, 3, 1).rotateY(Math.PI / 2 * (d > 0 ? 1 : -1)).translate(s, (yConv(s) - 0.9 + yFundo) / 2, d * (larg / 2 + 0.2));
-        gt.scale(1, 1, 1);
-        mk.add('ponte', gt, { sx: 4, sy: 4 });
+        const meio = (g) => g.translate(s, 0, d * (larg / 2 - 0.2));
+        // meia-coluna: θ de −π/2 a π/2 cobre z ≥ 0 (lado +b); o outro lado gira π
+        const rot = d > 0 ? -Math.PI / 2 : Math.PI / 2;
+        mk.add('ponte', meio(new THREE.CylinderGeometry(1.7, 1.9, y + 0.9 - yFundo, 16, 1, false, rot, Math.PI).translate(0, (y + 0.9 + yFundo) / 2, 0)), { sx: 4, sy: 4 });
+        mk.add('ponte', meio(new THREE.CylinderGeometry(1.95, 1.95, 0.25, 16, 1, false, rot, Math.PI).translate(0, y + 1.0, 0)), { sx: 2, sy: 2 }); // cornija do balcão
+        const bm = d * (larg / 2 + 0.9);
+        mk.add('ferro', new THREE.CylinderGeometry(0.06, 0.1, 9.5, 8).translate(s, y + 1.1 + 4.75, bm));
+        mk.add('ferro', new THREE.SphereGeometry(0.14, 8, 6).translate(s, y + 10.7, bm));
       }
+    }
+    // grade de ferro fundido no alto do parapeito, dos dois lados (a faixa escura que se vê de longe)
+    for (const b of [-larg / 2 - 0.02, larg / 2 + 0.02]) {
+      const pos = [], idx = [], n = 36;
+      for (let i = 0; i <= n; i++) { const s = (L * i) / n, y = yConv(s); pos.push(s, y + 0.35, b, s, y + 0.85, b); }
+      for (let i = 0; i < n; i++) { const o = i * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
+      const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gg.setIndex(idx);
+      mk.add('ferro', gg.toNonIndexed());
     }
     // Käppelijoch: capela de pedra pendurada a jusante, no meio da ponte. Posição do sólido 949 do swissBUILDINGS3D
     // (a capela real, sem registro no GWR), que esconde() tira: o pé (dz) do relevo fino o afundava 9 m no rio
