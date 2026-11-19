@@ -4,7 +4,7 @@
 // procedural (rugosidade com ruído, como na simulação do atlas do tocador, design/realismo-tocador-sim.md).
 // Também: meio-fio em relevo, trilhos de bonde (bitola de 1 m), fio aéreo e postes.
 // criarChao(THREE, { meta, ruas, orto, nivelReno }) -> { malha, altura, grupo, ruas(on) }
-import { decodifica } from './compacta.js';
+import { decodifica, baixaBin } from './compacta.js';
 
 // cota da ponta de uma ponte do OSM: a ponta costuma cair na beira do cais, onde o relevo já despenca para o rio
 // (a calçada de montante da Mittlere Brücke começava a 2,2 m, rente à água). Vale o maior entre a ponta e o chão
@@ -17,7 +17,7 @@ export function cotaPonta(altura, x, z, xi, zi) {
 export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, base = 'data/' }) {
   const T = meta.terreno;
   // terreno.v2.bin (script/compacta.py): mesmos vértices e triângulos do terreno.bin.gz, em ~55% dos bytes
-  const { cols, idx } = decodifica(await (await fetch(base + 'terreno.v2.bin')).arrayBuffer(), 3, 3);
+  const { cols, idx } = decodifica(await baixaBin(base + 'terreno.v2.bin'), 3, 3);
   const nv = cols[0].length, nt = idx.length / 3;
   const [col, lin, hh] = cols.map((c) => new Uint16Array(c.buffer));
   const pos = new Float32Array(nv * 3), cores = new Float32Array(nv * 3);

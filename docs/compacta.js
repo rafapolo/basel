@@ -25,3 +25,15 @@ export function decodifica(buf, ncol, nbIndice) {
   }
   return { cols, idx };
 }
+
+// baixa uma malha: no site publicado (script/build.js põe window.BASEL_GZ) vem a cópia .gz feita com zopfli, ~4% menor
+// que o gzip do GitHub Pages, aberta aqui; em desenvolvimento, o arquivo como está em docs/data
+export async function baixaBin(url) {
+  if (globalThis.BASEL_GZ && typeof DecompressionStream === 'function') {
+    try {
+      const r = await fetch(url + '.gz');
+      if (r.ok) return await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    } catch { /* cai no arquivo sem .gz */ }
+  }
+  return (await fetch(url)).arrayBuffer();
+}

@@ -8,7 +8,8 @@
 import { minify } from 'html-minifier-terser';
 import { minify as terser } from 'terser';
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, relative } from 'path';
+import { createHash } from 'crypto';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const SRC = join(ROOT, 'docs');
@@ -35,7 +36,21 @@ for (const f of CLASSICOS) {
   writeFileSync(join(DIST, f), t.code);
 }
 
-// ── 3. index.html: sem importmap, scripts sob o commit, registro do service worker ───────────────────────────────
+// ── 3. dados, e cópias .gz das malhas com zopfli quando o `uv` existe (o CI instala) ─────────────────────────────
+cpSync(join(SRC, 'data'), join(DIST, 'data'), { recursive: true });
+const MALHAS = ['data/predios.v2.bin', 'data/terreno.v2.bin'];
+const z = Bun.spawnSync(['uv', 'run', '--quiet', '--with', 'zopfli', 'python', join(ROOT, 'script/comprime_malhas.py'), ...MALHAS.map((m) => join(DIST, m))], { cwd: ROOT });
+const comGz = z.exitCode === 0;
+console.log(comGz ? z.stdout.toString().trim() : 'zopfli: sem uv, as malhas vão sem .gz');
+// hash do conteúdo de cada arquivo de dados: chave do cache de dados do service worker
+const HASH = {};
+for (const f of readdirSync(join(DIST, 'data'), { recursive: true })) {
+  const abs = join(DIST, 'data', String(f));
+  if (statSync(abs).isDirectory()) continue;
+  HASH[relative(DIST, abs)] = createHash('sha256').update(readFileSync(abs)).digest('hex').slice(0, 10);
+}
+
+// ── 4. index.html: sem importmap, scripts sob o commit, preload do que a abertura pede, service worker ───────────
 let html = readFileSync(join(SRC, 'index.html'), 'utf-8');
 const antes = html;
 html = html.replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, '');
@@ -45,20 +60,32 @@ for (const f of [...CLASSICOS, 'cidade.js']) {
   html = html.replace(`src="${f}"`, `src="${f}?v=${sha}"`);
   if (html === a) throw new Error(`index.html: <script src="${f}"> não encontrado`);
 }
+// pedaços importados estaticamente pelo cidade.js (o three entre eles): o navegador os pede já, sem esperar o parse
+const entrada = readFileSync(join(DIST, 'cidade.js'), 'utf-8');
+const estaticos = [...new Set([...entrada.matchAll(/(?:^|[;}\s])import\s*(?:[^'"()]*?from\s*)?["'](\.\/js\/[^"']+)["']/g)].map((m) => m[1]))];
+const ABERTURA = ['data/predios.json', 'data/ruas.json', 'data/relevo.bin', ...MALHAS.map((m) => (comGz ? m + '.gz' : m))];
+const pre = [
+  ...estaticos.map((u) => `<link rel="modulepreload" href="${u}">`),
+  ...ABERTURA.map((u) => `<link rel="preload" href="${u}" as="fetch" crossorigin>`),
+].join('');
+html = html.replace('</head>', `${pre}${comGz ? '<script>window.BASEL_GZ=1</script>' : ''}</head>`);
 html = html.replace('</body>', `<script>if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))</script>\n</body>`);
 const min = await minify(html, {
   collapseWhitespace: true, removeComments: true, removeRedundantAttributes: true, removeScriptTypeAttributes: true,
   removeStyleLinkTypeAttributes: true, useShortDoctype: true, minifyCSS: true, minifyJS: true, sortAttributes: true,
 });
 writeFileSync(join(DIST, 'index.html'), min);
+console.log(`preload     ${estaticos.length} módulos, ${ABERTURA.length} arquivos de dados`);
 
-// ── 4. service worker com o cache do commit ──────────────────────────────────────────────────────────────────────
-const sw = readFileSync(join(ROOT, 'script/sw.js'), 'utf-8').replace("const V = 'basel-dev';", `const V = 'basel-${sha}';`).replaceAll('?v=dev', `?v=${sha}`);
-if (!sw.includes(`basel-${sha}`)) throw new Error('sw.js: nome do cache não encontrado');
-await (async () => { const t = await terser(sw, { toplevel: true, compress: { passes: 2 }, mangle: true, format: { comments: false } }); writeFileSync(join(DIST, 'sw.js'), t.code); })();
-
-// ── 5. dados ─────────────────────────────────────────────────────────────────────────────────────────────────────
-cpSync(join(SRC, 'data'), join(DIST, 'data'), { recursive: true });
+// ── 5. service worker: código no cache do commit, dados no cache pelo conteúdo ───────────────────────────────────
+const CODIGO = ['./', './index.html', ...[...CLASSICOS, 'cidade.js'].map((f) => `./${f}?v=${sha}`), ...estaticos];
+let sw = readFileSync(join(ROOT, 'script/sw.js'), 'utf-8')
+  .replace("const V = 'basel-dev';", `const V = 'basel-${sha}';`)
+  .replace('const HASH = {};', `const HASH = ${JSON.stringify(HASH)};`)
+  .replace('const ABERTURA = [];', `const ABERTURA = ${JSON.stringify(ABERTURA)};`)
+  .replace("const CODIGO = ['./', './index.html'];", `const CODIGO = ${JSON.stringify(CODIGO)};`);
+if (!sw.includes(`basel-${sha}`) || sw.includes('const HASH = {};')) throw new Error('sw.js: marcadores não encontrados');
+writeFileSync(join(DIST, 'sw.js'), (await terser(sw, { toplevel: true, compress: { passes: 2 }, mangle: true, format: { comments: false } })).code);
 
 // ── 6. tamanhos ──────────────────────────────────────────────────────────────────────────────────────────────────
 const gz = (f) => Bun.gzipSync(readFileSync(f)).length;

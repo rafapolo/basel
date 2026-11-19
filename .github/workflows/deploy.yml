@@ -52,8 +52,26 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # zopfli das malhas (script/comprime_malhas.py, chamado pelo build): sem o uv o build segue sem as cópias .gz
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+
       - name: Build
         run: bun run build
+
+      # teste de fumaça: o dist/ abre sem erro de JS e a cidade termina de desenhar, senão não publica
+      - name: Cache Playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-pw-${{ hashFiles('bun.lock') }}
+
+      - name: Smoke test
+        run: |
+          bunx playwright install --with-deps chromium
+          python3 -m http.server -d dist 8000 >/dev/null 2>&1 &
+          sleep 1
+          bun script/smoke.mjs http://localhost:8000/
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

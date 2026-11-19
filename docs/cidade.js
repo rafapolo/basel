@@ -11,7 +11,7 @@ import { criaAgua } from './agua.js';
 import { criarArvores } from './arvores.js';
 import { criarChao, cotaPonta } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
-import { decodifica } from './compacta.js';
+import { decodifica, baixaBin } from './compacta.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -19,7 +19,7 @@ const q = new URLSearchParams(location.search);
 const [meta, ruas, bin, rel] = await Promise.all([
   fetch('data/predios.json').then((r) => r.json()),
   fetch('data/ruas.json').then((r) => r.json()),
-  fetch('data/predios.v2.bin').then((r) => r.arrayBuffer()),
+  baixaBin('data/predios.v2.bin'),
   fetch('data/relevo.bin').then((r) => r.arrayBuffer()),
 ]);
 const P = meta.predios;
