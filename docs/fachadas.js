@@ -338,7 +338,13 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
           float inG = step(x0 + borda, fu) * step(fu, 1.0 - x0 - borda) * step(yy + 0.04, fv) * step(fv, yy + wH - 0.04);
           vec3 ceu = mix(vec3(0.22, 0.30, 0.36), vec3(0.58, 0.68, 0.74), smoothstep(0.0, 1.0, fv - yy));
           vec3 vid = ceu * (0.75 + 0.4 * sorteioC);
-          vec3 mold = mat > 1.5 ? vec3(0.28, 0.29, 0.30) : vec3(0.93, 0.91, 0.86);
+          // cortina clara na metade de baixo de parte das janelas (casas, não escritórios)
+          if (mat < 1.5 && sorteioC < 0.28) vid = mix(vid, vec3(0.86, 0.84, 0.79), step(fv, yy + wH * 0.55) * 0.75 * dist);
+          // caixilho: branco, creme, cinza ou (casas antigas) verde-escuro e marrom, sorteado por prédio
+          float kc = fh21(vec2(vPidF, 41.0));
+          vec3 mold = mat > 1.5 ? vec3(0.28, 0.29, 0.30)
+            : kc < 0.55 ? vec3(0.93, 0.91, 0.86) : kc < 0.75 ? vec3(0.86, 0.80, 0.66) : kc < 0.87 || antigo < 0.5 ? vec3(0.62, 0.62, 0.60)
+            : kc < 0.94 ? vec3(0.20, 0.30, 0.22) : vec3(0.33, 0.22, 0.15);
           float cruz = mat > 1.5 ? step(abs(fu - 0.5), 0.012) : step(abs(fu - 0.5), 0.02) + step(abs(fv - (yy + wH * 0.62)), 0.015) * 0.0;
           cJan = inG > 0.5 ? (cruz > 0.5 ? mold : vid) : mold;
           tem = inW; vidro = inG * (1.0 - cruz);
@@ -354,6 +360,18 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
               cs *= 1.0 - 0.18 * smoothstep(0.35, 0.65, abs(fract(fv * fh / 0.07) - 0.5)) * dist;
               cJan = cs; tem = 1.0;
             }
+            // algumas fechadas: as duas folhas sobre o vidro
+            if (fh21(vec2(ci, ri) + vPidF * 3.1) > 0.82 && inW > 0.5) {
+              float k = fh21(vec2(vPidF, 32.0));
+              vec3 cs = k < 0.3 ? vec3(0.22, 0.38, 0.26) : k < 0.55 ? vec3(0.50, 0.55, 0.52) : k < 0.8 ? vec3(0.44, 0.47, 0.50) : vec3(0.42, 0.20, 0.16);
+              cs *= 1.0 - 0.18 * smoothstep(0.35, 0.65, abs(fract(fv * fh / 0.07) - 0.5)) * dist;
+              cJan = mix(cs, cs * 0.7, step(abs(fu - 0.5), 0.008)); vidro = 0.0;
+            }
+          }
+          // escorrido de chuva sob o peitoril: listras verticais mais escuras que somem para baixo
+          if (tem < 0.5 && ri > 0.5 && fu > x0 && fu < 1.0 - x0 && fv < yy) {
+            float esc = (1.0 - smoothstep(0.0, 0.45, yy - fv)) * smoothstep(0.35, 0.8, fhn(vec2(u * 14.0, v * 0.7) + wseed * 3.0));
+            parede *= 1.0 - 0.13 * esc * dist;
           }
         }
         if (soco > 0.5) {
@@ -361,6 +379,8 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
           float j = smoothstep(0.0, 0.07, fract(bj)) * smoothstep(0.0, 0.1, fract(v / 0.3));
           cJan = vec3(0.54, 0.50, 0.45) * mix(0.8, 1.0, j) * (0.9 + 0.2 * fh21(vec2(floor(bj), rb))); tem = 1.0; vidro = 0.0;
         }
+        // escorrido sob o beiral (o telhado pinga na parede): faixa irregular mais escura no alto
+        if (mat < 2.5) parede *= 1.0 - 0.10 * (1.0 - smoothstep(0.0, 1.4, hW - v)) * smoothstep(0.3, 0.7, fhn(vec2(u * 3.0, 1.0) + wseed));
         // lintel/cordão entre andares nas casas de reboco
         if (mat < 0.5 && fv < 0.035 && ri > 0.5 && tem < 0.5) parede *= 0.93;
         // cor por distância: de longe a janela vira uma média escura
