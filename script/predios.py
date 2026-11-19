@@ -48,11 +48,8 @@ SAIDA = RAIZ / "docs/data"
 # Recorte: Grossbasel entre Barfüsserplatz, Spalenberg, Petersgraben e Münster, e a margem de
 # Kleinbasel em frente (posicionado pelas entradas do GWR: Spalenberg 25 = 2611085/1267365,
 # Münsterplatz 4 = 2611516/1267388, Oberer Rheinweg 5 = 2611508/1267734).
-E0, E1 = 2610800.0, 2611900.0
-N0, N1 = 1266950.0, 1268100.0
-ORIGEM_E, ORIGEM_N = (E0 + E1) / 2, (N0 + N1) / 2
-BASE_Z = 244.0
-ESCALA = 50  # Int16 em 1/50 m: ±655 m
+# Desde 2026-11-19 o recorte vai da Allschwilerplatz à estação SBB e a origem fica fixa: tudo em script/recorte.py.
+from recorte import E0, E1, N0, N1, ORIGEM_E, ORIGEM_N, BASE_Z, ESCALA, RELEVO_NX, RELEVO_NY, RELEVO_PASSO
 
 BLOCOS = sorted((BRUTO / "sb3d").glob("*.gdb"))
 
@@ -61,7 +58,7 @@ def le_blocos():
     """Lê Building_solid de cada bloco recortado; devolve {uuid: (props, [triângulos])}."""
     predios = {}
     for gdb in BLOCOS:
-        tmp = BRUTO / f"sb3d/{gdb.stem}_recorte.geojson"
+        tmp = BRUTO / f"sb3d/{gdb.stem}_recorte_{int(E0)}_{int(N0)}_{int(E1)}_{int(N1)}.geojson"  # o recorte no nome: não reaproveita um velho
         if not tmp.exists():
             subprocess.run(
                 ["ogr2ogr", "-f", "GeoJSON", str(tmp), str(gdb), "Building_solid",
@@ -74,7 +71,7 @@ def le_blocos():
             if p["UUID"] in predios or not f["geometry"]:
                 continue  # a costura entre blocos repete prédios
             tris = [anel[0][:3] for anel in f["geometry"]["coordinates"] if len(anel[0]) >= 4]
-            # prédios que saem muito do recorte estourariam o Int16 (±655 m): ficam de fora
+            # prédios que saem muito do recorte ficam de fora (e o Int16 de ESCALA tem limite)
             if any(not (E0 - 60 < x < E1 + 60 and N0 - 60 < y < N1 + 60) for t in tris for x, y, _ in t):
                 continue
             predios[p["UUID"]] = (p, tris)
@@ -166,11 +163,11 @@ def main():
     arvore = STRtree(pegadas)
     # relevo fino (tarefa 15): malha adaptativa do swissALTI3D 0,5 m e prédios que flutuam sobre ele
     bases = [min((z for t in predios[u][1] for _, _, z in t), default=None) for u in uuids]
-    dem, dem_e0, dem_n1 = chao.carrega_dem(ORIGEM_E, ORIGEM_N)
+    dem, dem_e0, dem_n1 = chao.carrega_dem()
     dz_predio, folga = chao.pes_dos_predios(dem, dem_e0, dem_n1, pegadas, bases)
     print(f"base acima do chão ao redor: {(folga > 0.05).sum()} prédios (> 5 cm), {(folga > 0.5).sum()} (> 0,5 m), "
           f"{(folga > 2).sum()} (> 2 m); mediana {np.median(folga):.2f} m (o sólido desce ~3 m abaixo do chão)")
-    terreno_meta = chao.grava_terreno(dem, SAIDA, 0.25, ORIGEM_E, ORIGEM_N, (E1 - E0) / 2, (N1 - N0) / 2)
+    terreno_meta = chao.grava_terreno(dem, SAIDA, 0.35)  # 0,25 m no recorte antigo; 0,35 m tira ~0,9 MB da abertura no novo
     print(f"terreno: {terreno_meta['nv']} vértices, {terreno_meta['nt']} triângulos, "
           f"{(SAIDA / 'terreno.v2.bin').stat().st_size / 1e6:.2f} MB")
     pts = points(vivos["gkode"].to_numpy(), vivos["gkodn"].to_numpy())
@@ -244,6 +241,7 @@ def main():
                 pos[k] = (x - ORIGEM_E, z - BASE_Z, -(y - ORIGEM_N))
                 ids[k] = i
                 k += 1
+    assert np.abs(pos * ESCALA).max() < 32767, "coordenada fora do Int16: aumente o recorte.ESCALA"
     q = np.round(pos * ESCALA).astype(np.int16)
     (SAIDA / "predios.v2.bin").write_bytes(compacta.predios(q, ids))
 
@@ -253,7 +251,7 @@ def main():
         ["gdal_translate", "-q", "-of", "ENVI", "-ot", "Float32", str(relevo_tif), str(BRUTO / "alti/crop5.raw")],
         check=True,
     )
-    alt = np.fromfile(BRUTO / "alti/crop5.raw", dtype=np.float32).reshape(230, 220)
+    alt = np.fromfile(BRUTO / "alti/crop5.raw", dtype=np.float32).reshape(RELEVO_NY, RELEVO_NX)
     np.round((alt - BASE_Z) * 100).astype(np.uint16).tofile(SAIDA / "relevo.bin")
 
     # OSM
@@ -281,13 +279,13 @@ def main():
             linhas.append({"t": tg["highway"], "c": coords, **({"n": tg["name"]} if "name" in tg else {}),
                            **({"ponte": 1} if tg.get("bridge") else {})})
 
-    meio_fio, est_ruas = chao.mascaras(osm, pegadas, ORIGEM_E, ORIGEM_N, E0, N0, E1, N1, SAIDA)
+    meio_fio, est_ruas = chao.mascaras(osm, pegadas, ORIGEM_E, ORIGEM_N, E0, N0, E1, N1, SAIDA, passo=0.6)
     print("ruas como áreas:", est_ruas)
     meta = {
         "terreno": terreno_meta,
         "origem_lv95": [ORIGEM_E, ORIGEM_N], "base_z": BASE_Z, "escala": ESCALA,
         "recorte_lv95": [E0, N0, E1, N1],
-        "relevo": {"nx": 220, "ny": 230, "passo": 5, "x0": E0 - ORIGEM_E, "z0": -(N1 - ORIGEM_N)},
+        "relevo": {"nx": RELEVO_NX, "ny": RELEVO_NY, "passo": RELEVO_PASSO, "x0": E0 - ORIGEM_E, "z0": -(N1 - ORIGEM_N)},
         "n_tris": int(n_tris),
         "predios": atributos,
     }

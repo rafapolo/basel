@@ -43,4 +43,20 @@ Peso: `docs/data` igual, JS +4,2 KB em gzip. fps: em A/B intercalado, ~10% mais 
 Abertos: 363 triângulos de parede (172 sólidos) com giro trocado em relação aos vizinhos; 15 sólidos-casca sem tampa
 (cobertos pelos irmãos do mesmo EGID).
 
-Pendente: Basel-Stadt inteiro em tiles, KTX2, service worker, metas de fps.
+Pendente: Basel-Stadt inteiro em tiles, KTX2 (a ortofoto num canvas de 4096 px caiu para ~0,5 m/px no recorte maior), metas de fps.
+
+**2026-11-19:**
+- Service worker com cache do código pelo commit e dos dados pelo hash do conteúdo (`script/sw.js`).
+- Malhas em `.gz` com zopfli (`script/comprime_malhas.py`), lidas por DecompressionStream.
+- Preload do que a abertura pede.
+- Teste de fumaça com Playwright no CI (`script/smoke.mjs`).
+- three empacotado no build, sem jsDelivr.
+
+**Expansão do recorte (2026-11-19):**
+- O recorte passa de 1,1 × 1,15 km para 2,05 × 1,95 km, da Allschwilerplatz à estação SBB.
+- Origem fixa em 2611350/1267525: as coordenadas locais espalhadas pelo código continuam valendo.
+- Tudo fica num lugar só: `script/recorte.py`.
+- Int16 a 1/20 m, em vez de 1/50.
+- Relevo fino: grade 4097² a 0,6 m, centrada no meio do recorte.
+- Os marcos são achados pelo EGID, e não mais pelo índice.
+- O OSM é baixado por `script/baixa_osm.py`, com a caixa do recorte.

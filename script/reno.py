@@ -14,8 +14,7 @@ from shapely.geometry import Polygon, LineString, box, Point
 
 RAIZ = Path(__file__).resolve().parent.parent
 DADOS = RAIZ / "data/14-reno"
-ORIG_E, ORIG_N, BASE_Z = 2611350.0, 1267525.0, 244.0
-E0, N0, E1, N1 = 2610800.0, 1266950.0, 2611900.0, 1268100.0
+from recorte import ORIGEM_E as ORIG_E, ORIGEM_N as ORIG_N, BASE_Z, E0, N0, E1, N1, RELEVO_NX, RELEVO_NY, RELEVO_PASSO, X0, Z0
 ID_RIO = 1467859273
 tr = Transformer.from_crs(4326, 2056, always_xy=True)
 
@@ -39,12 +38,12 @@ def main():
     partes = [poly] if poly.geom_type == "Polygon" else list(poly.geoms)
     partes = [p for p in partes if p.area > 2000]
     # nível: moda das alturas do relevo bem dentro do polígono (swissALTI3D põe a água plana)
-    alt = np.fromfile(RAIZ / "data/raw/alti/crop5.raw", dtype=np.float32).reshape(230, 220)
-    xs = -550 + 5 * np.arange(220); zs = -575 + 5 * np.arange(230)
+    alt = np.fromfile(RAIZ / "data/raw/alti/crop5.raw", dtype=np.float32).reshape(RELEVO_NY, RELEVO_NX)
+    xs = X0 + RELEVO_PASSO * np.arange(RELEVO_NX); zs = Z0 + RELEVO_PASSO * np.arange(RELEVO_NY)
     vals = []
     nucleo = poly.buffer(-12)
-    for j in range(0, 230, 1):
-        for i in range(0, 220, 1):
+    for j in range(0, RELEVO_NY, 1):
+        for i in range(0, RELEVO_NX, 1):
             if nucleo.contains(Point(xs[i], zs[j])): vals.append(alt[j, i])
     v = np.round(np.array(vals), 1)
     mv, cn = np.unique(v, return_counts=True)

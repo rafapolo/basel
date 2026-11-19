@@ -95,13 +95,14 @@ def andavel(x, z, lim=0.35):
 
 
 # ---------- relevo (só para o tabuleiro das pontes; o resto usa altura() no navegador) ----------
-N_DEM, P_DEM, BASE_Z = 2049, 0.6, meta["base_z"]
-DEM = np.fromfile(BRUTO.parent / "15-chao/dem06.raw", dtype=np.float32).reshape(N_DEM, N_DEM)
+import chao  # mesma grade do relevo fino (script/chao.py, centrada no meio do recorte)
+DEM, _DEM_E0, _DEM_N1 = chao.carrega_dem()
+N_DEM, P_DEM, BASE_Z = chao.N, chao.PASSO, meta["base_z"]
+_GX0, _GZ0 = _DEM_E0 - E0, -(_DEM_N1 - N0)  # coordenada local da coluna 0 e da linha 0
 
 
 def dem(x, z):
-    m = (N_DEM - 1) * P_DEM / 2  # a grade é centrada na origem local; linha 0 = norte
-    c, r = int(round((x + m) / P_DEM)), int(round((z + m) / P_DEM))
+    c, r = int(round((x - _GX0) / P_DEM)), int(round((z - _GZ0) / P_DEM))  # linha 0 = norte
     return float(DEM[min(max(r, 0), N_DEM - 1), min(max(c, 0), N_DEM - 1)]) - BASE_Z
 
 

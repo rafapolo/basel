@@ -28,9 +28,10 @@ RAIZ = Path(__file__).resolve().parent.parent
 D = RAIZ / 'data' / '19-vida'
 G = D / 'gtfs'
 OUT = RAIZ / 'docs' / 'data' / 'vida.json'
-ORIGEM = (2611350.0, 1267525.0)   # docs/data/predios.json: origem_lv95
+from recorte import ORIGEM_E, ORIGEM_N, X0, X1, Z0, Z1
+ORIGEM = (ORIGEM_E, ORIGEM_N)
 T = Transformer.from_crs(4326, 2056, always_xy=True)
-LIM_X, LIM_Z = 545, 570           # mesma malha que docs/chao.js usa para os trilhos
+FOLGA = 5                        # dentro do recorte, com 5 m de folga da borda
 DIAS = {'util': '2026-11-17', 'sab': '2026-11-21', 'dom': '2026-11-22'}   # terça, sábado, domingo de referência (no calendário do feed)
 
 
@@ -62,7 +63,7 @@ def grafo_trilhos():
         if l['t'] != 'tram':
             continue
         c = l['c']
-        if any((abs(v) > LIM_Z if i % 2 else abs(v) > LIM_X) for i, v in enumerate(c)):
+        if any((not (Z0 + FOLGA < v < Z1 - FOLGA) if i % 2 else not (X0 + FOLGA < v < X1 - FOLGA)) for i, v in enumerate(c)):
             continue
         ids = [vid((c[i], c[i + 1])) for i in range(0, len(c), 2)]
         for a, b in zip(ids, ids[1:]):
@@ -415,7 +416,7 @@ def projeta(g):
 def zonas():
     rng = random.Random(19)
     f = json.loads((RAIZ / 'data/15-chao/fussgaenger.geojson').read_text())
-    recorte = box(-LIM_X, -LIM_Z, LIM_X, LIM_Z)
+    recorte = box(X0 + FOLGA, Z0 + FOLGA, X1 - FOLGA, Z1 - FOLGA)
     livres = []
     areas = []
     for ft in f['features']:

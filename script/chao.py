@@ -23,22 +23,32 @@ import rtin
 RAIZ = Path(__file__).resolve().parent.parent
 BRUTO15 = RAIZ / "data/15-chao"
 
-N = 2049
-PASSO = 0.6
+import recorte as RC
+
+N = RC.DEM_N          # 4097 (era 2049, centrada na origem, quando o recorte era a Altstadt)
+PASSO = RC.DEM_PASSO  # 0,6 m
 OFF = 10.0  # m somados à altitude antes de gravar em Uint16 (o relevo mais baixo fica ~ BASE_Z + 0,7)
 
 
-def carrega_dem(origem_e, origem_n):
-    """swissALTI3D 0,5 m reamostrado a 0,6 m numa grade 2049² centrada na origem local (cobre o recorte com folga)."""
-    raw = BRUTO15 / "dem06.raw"
+def carrega_dem(centro_e=RC.CENTRO_E, centro_n=RC.CENTRO_N):
+    """swissALTI3D 0,5 m reamostrado a 0,6 m numa grade N² centrada no meio do recorte (cobre o recorte com folga).
+    O cache leva N, passo e centro no nome: mudar o recorte não reaproveita uma grade velha."""
+    raw = BRUTO15 / f"dem_{N}_{PASSO}_{int(centro_e)}_{int(centro_n)}.raw"
     meio = (N - 1) * PASSO / 2
-    e0, n1 = origem_e - meio, origem_n + meio
+    e0, n1 = centro_e - meio, centro_n + meio
     if not raw.exists():
         vrt = BRUTO15 / "alti05.vrt"
         subprocess.run(["gdalbuildvrt", "-q", "-overwrite", str(vrt), *map(str, sorted(BRUTO15.glob("swissalti3d_*_0.5_*.tif")))], check=True)
         subprocess.run(["gdalwarp", "-q", "-overwrite", "-te", str(e0), str(n1 - 2 * meio), str(e0 + 2 * meio), str(n1),
                         "-ts", str(N), str(N), "-r", "bilinear", "-ot", "Float32", "-of", "ENVI", str(vrt), str(raw)], check=True)
     h = np.fromfile(raw, dtype=np.float32).reshape(N, N)
+    # a grade passa da borda dos blocos baixados (só fora do recorte): o vazio recebe o valor válido mais próximo,
+    # senão o RTIN vê um penhasco de 9999 m ali e enche a borda de triângulos
+    vazio = ~(h > 100)
+    if vazio.any():
+        from scipy.ndimage import distance_transform_edt
+        _, (ii, jj) = distance_transform_edt(vazio, return_indices=True)
+        h = h[ii, jj]
     return h, e0, n1
 
 
@@ -76,15 +86,17 @@ def pes_dos_predios(h, e0, n1, pegadas, bases):
     return dz, np.array(dif)
 
 
-def grava_terreno(h, saida, erro, origem_e, origem_n, metade_x, metade_z):
-    """Malha RTIN recortada ao retângulo local [-metade_x, metade_x] × [-metade_z, metade_z] (+ 2 m de folga)."""
+def grava_terreno(h, saida, erro, centro_e=RC.CENTRO_E, centro_n=RC.CENTRO_N):
+    """Malha RTIN recortada ao recorte (recorte.py), com 2 m de folga. A grade é centrada no meio do recorte; x0, z0 são
+    a coordenada local da coluna 0 e da linha 0 (o norte fica em cima: linha 0 = menor z)."""
     verts, tris = rtin.malha(h, erro)
     meio = (N - 1) * PASSO / 2
-    x = -meio + verts[:, 0] * PASSO
-    z = -meio + verts[:, 1] * PASSO
+    gx0, gz0 = centro_e - RC.ORIGEM_E - meio, -(centro_n - RC.ORIGEM_N) - meio
+    x = gx0 + verts[:, 0] * PASSO
+    z = gz0 + verts[:, 1] * PASSO
     cx = x[tris].mean(axis=1)
     cz = z[tris].mean(axis=1)
-    fica = (np.abs(cx) < metade_x + 2) & (np.abs(cz) < metade_z + 2)
+    fica = (cx > RC.X0 - 2) & (cx < RC.X1 + 2) & (cz > RC.Z0 - 2) & (cz < RC.Z1 + 2)
     tris = tris[fica]
     usados = np.unique(tris)
     novo = np.full(len(verts), -1, np.int64)
@@ -99,7 +111,7 @@ def grava_terreno(h, saida, erro, origem_e, origem_n, metade_x, metade_z):
     inv = area > 0  # em x,z com y para cima, a área "z para baixo" positiva é horária visto de cima: troca
     tris[inv] = tris[inv][:, [0, 2, 1]]
     (saida / "terreno.v2.bin").write_bytes(compacta.terreno(v[:, 0], v[:, 1], hv, tris))
-    return {"nv": int(len(usados)), "nt": int(len(tris)), "passo": PASSO, "x0": -meio, "z0": -meio, "off": OFF, "erro": erro}
+    return {"nv": int(len(usados)), "nt": int(len(tris)), "passo": PASSO, "x0": gx0, "z0": gz0, "nvlado": N - 1, "off": OFF, "erro": erro}
 
 
 # ---------------------------------------------------------------- ruas como áreas

@@ -53,7 +53,8 @@ for g, a in zip(genero, idade):
     arv.append((cls, max(2.5, min(hmax * 1.1, h)), cr))
 cls = np.array([a[0] for a in arv], np.uint8); H = np.array([a[1] for a in arv]); C = 0.9 * H * np.array([a[2] for a in arv])
 x = (d["e"].to_numpy() - OE); z = -(d["n"].to_numpy() - ON)
-dentro = (np.abs(x) < 560) & (np.abs(z) < 590)
+X0, X1, Z0, Z1 = E0 - OE, E1 - OE, -(N1 - ON), -(N0 - ON)  # recorte local, de predios.json
+dentro = (x > X0 - 10) & (x < X1 + 10) & (z > Z0 - 10) & (z < Z1 + 10)
 x, z, H, C, cls = x[dentro], z[dentro], H[dentro], C[dentro], cls[dentro]
 ids = np.arange(len(x))
 # estrutura: x,z (float32 m), altura, diâmetro de copa (m, float32), classe (uint8) — x,z,h,c em Float32Array, depois classes
@@ -80,7 +81,7 @@ from scipy.spatial import cKDTree
 ex = []
 if soltas:
     arr = np.array(soltas); dist, _ = cKDTree(np.stack([x, z], 1)).query(arr)
-    ex = [[round(a, 1), round(b, 1)] for (a, b), dd in zip(arr, dist) if dd > 4 and abs(a) < 560 and abs(b) < 590]
+    ex = [[round(a, 1), round(b, 1)] for (a, b), dd in zip(arr, dist) if dd > 4 and X0 - 10 < a < X1 + 10 and Z0 - 10 < b < Z1 + 10]
 
 # conferência: copa do cadastro × cobertura de copa 2024 (raster 0,5 m; >0 = copa) na mesma área
 conf = {}
@@ -88,7 +89,7 @@ try:
     import rasterio
     from rasterio.windows import from_bounds
     r = rasterio.open(BR / "Baumkronenbedeckung_2024.tif")
-    a = r.read(1, window=from_bounds(OE - 560, ON - 590, OE + 560, ON + 590, r.transform))
+    a = r.read(1, window=from_bounds(E0, N0, E1, N1, r.transform))
     area_raster = float((a > 0).sum()) * 0.25
     area_cad = float((np.pi * (C / 2) ** 2).sum())
     conf = {"copa_raster_m2": round(area_raster), "copa_cadastro_m2": round(area_cad), "razao": round(area_cad / area_raster, 2)}

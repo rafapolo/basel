@@ -22,9 +22,12 @@ for t in 2610-1266 2610-1267 2610-1268 2611-1266 2611-1267 2611-1268; do
   [ -f "data/raw/alti/$f" ] || curl -sfo "data/raw/alti/$f" "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2025_$t/$f"
 done
 (cd data/raw/alti && gdalbuildvrt -q -overwrite alti.vrt swissalti3d_*.tif \
-  && gdalwarp -q -overwrite -te 2610800 1266950 2611900 1268100 -tr 5 5 -r average alti.vrt crop5.tif)
+  && gdalwarp -q -overwrite -te 2609600 1266150 2611900 1268100 -tr 5 5 -r average alti.vrt crop5.tif)
 
-# OSM: ruas, bondes, muralha e fontanários (o Overpass responde 406 sem User-Agent)
+# OSM (ruas, lojas, água, verde, detalhes), com a caixa de script/recorte.py
+(cd script && uv run --with pyproj python baixa_osm.py)
+exit 0
+# (consulta antiga, de antes da expansão de 2026-11-19; o Overpass responde 406 sem User-Agent)
 curl -sf -m 120 -A "basel-3d-prototipo/0.1" https://overpass-api.de/api/interpreter -o data/raw/osm.json --data-urlencode \
   'data=[out:json][timeout:90];(way["highway"](47.5525,7.5815,47.5630,7.5965);way["railway"="tram"](47.5525,7.5815,47.5630,7.5965);way["historic"="citywalls"](47.540,7.570,47.575,7.610);node["amenity"="fountain"](47.5525,7.5815,47.5630,7.5965););out geom tags;'
 echo "fontes em data/raw/"

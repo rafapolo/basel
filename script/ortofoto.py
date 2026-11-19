@@ -26,9 +26,7 @@ TIF = RAIZ / "data/11-ortofoto"
 SAIDA = RAIZ / "docs/data/ortofoto"
 
 # mesmo recorte e origem de script/predios.py
-E0, E1 = 2610800.0, 2611900.0
-N0, N1 = 1266950.0, 1268100.0
-ORIGEM_E, ORIGEM_N = (E0 + E1) / 2, (N0 + N1) / 2
+from recorte import E0, E1, N0, N1, ORIGEM_E, ORIGEM_N
 
 GRADE = 4          # 4 × 4 tiles
 LADO = 1024        # px por tile

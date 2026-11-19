@@ -27,7 +27,9 @@ RAIZ = Path(__file__).resolve().parent.parent
 DOCS = RAIZ / "docs/data"
 ORIGEM = json.loads((DOCS / "predios.json").read_text())["origem_lv95"]
 T = Transformer.from_crs(4326, 2056, always_xy=True)
-LIM = 545
+from recorte import dentro as no_recorte
+LIM = None  # (era 545: ±545 m em x e z; agora vale o retângulo de script/recorte.py, com 15 m de folga)
+fora = lambda x, z: not no_recorte(x, z, -15)
 rnd = random.Random(19)
 
 
@@ -61,7 +63,7 @@ def amostra(reg, n, dist_min):
     while len(pts) < n and tent < n * 400:
         tent += 1
         p = (rnd.uniform(x0, x1), rnd.uniform(z0, z1))
-        if abs(p[0]) > LIM or abs(p[1]) > LIM or not reg.contains(Point(p)):
+        if fora(p[0], p[1]) or not reg.contains(Point(p)):
             continue
         if all(math.hypot(p[0] - q[0], p[1] - q[1]) >= dist_min for q in pts):
             pts.append(p)
@@ -72,6 +74,8 @@ def amostra(reg, n, dist_min):
 LUGARES = [  # nome, largura das linhas (m), quantos grupos, peso no foco de quem anda
     ("Münsterplatz", 9, 18, 1.0), ("Pfalz", 0, 10, 0.7), ("Marktplatz", 9, 16, 1.0),
     ("Barfüsserplatz", 9, 16, 1.0), ("Claraplatz", 8, 8, 0.7), ("Clarastrasse", 7, 14, 0.9),
+    # recorte de 2026-11-19: a estação SBB (sempre cheia), a Steinenvorstadt e a Allschwilerplatz
+    ("Centralbahnplatz", 12, 30, 1.6), ("Steinenvorstadt", 7, 12, 0.9), ("Allschwilerplatz", 8, 8, 0.6),
 ]
 grupos, focos = [], []
 for nome, buf, n, peso in LUGARES:
@@ -82,7 +86,7 @@ for nome, buf, n, peso in LUGARES:
     pts = amostra(reg, n, 5.5)
     grupos += [[round(x, 1), round(z, 1), nome] for x, z in pts]
     c = reg.centroid
-    if abs(c.x) < LIM and abs(c.y) < LIM:
+    if not fora(c.x, c.y):
         focos.append([round(c.x, 1), round(c.y, 1), peso])
     print(f"{nome}: {len(pts)} grupos")
 
@@ -99,7 +103,7 @@ for nome in ("Unterer Rheinweg", "Oberer Rheinweg"):
         while d < g.length:
             p = g.interpolate(d)
             d += 2.4
-            if abs(p.x) > LIM or abs(p.y) > LIM:
+            if fora(p.x, p.y):
                 continue
             m = nearest_points(margem, p)[0]
             dist = p.distance(m)
@@ -120,7 +124,7 @@ with open(RAIZ / "data/19-vida/gtfs/stops.txt", encoding="utf-8-sig") as f:
         if not r["stop_name"].startswith("Basel"):
             continue
         x, z = xz(float(r["stop_lon"]), float(r["stop_lat"]))
-        if abs(x) > LIM or abs(z) > LIM:
+        if fora(x, z):
             continue
         k = (round(x / 6), round(z / 6))
         if k in vistos:
