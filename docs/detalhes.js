@@ -170,6 +170,7 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     instanciar('fontanarios', geoFonte, material('fonte', { luz: false, roughness: 0.85, metalness: 0 }), itensF, { sombra: true });
     // água: disco no nível da bacia, normal perturbada por ondas (relógio uTempo)
     const agua = new THREE.MeshStandardMaterial({ color: 0x5f95ad, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.88 });
+    agua.userData.semNeve = true; // neve.js: a água da fonte não junta neve
     agua.onBeforeCompile = (s) => {
       Object.assign(s.uniforms, UL);
       s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vAg;')

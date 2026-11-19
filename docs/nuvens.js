@@ -58,7 +58,7 @@ export function atualizarNuvens(agora, ceu) {
 export const TEMPO = { ok: false };
 async function tempoAgora() {
   try {
-    const u = 'https://api.open-meteo.com/v1/forecast?latitude=47.557&longitude=7.59&current=cloud_cover,wind_speed_10m,wind_direction_10m,temperature_2m,precipitation&timezone=Europe%2FZurich';
+    const u = 'https://api.open-meteo.com/v1/forecast?latitude=47.557&longitude=7.59&current=cloud_cover,wind_speed_10m,wind_direction_10m,temperature_2m,precipitation,snowfall,snow_depth&timezone=Europe%2FZurich';
     const r = await fetch(u);
     if (!r.ok) return;
     const c = (await r.json()).current;
@@ -67,7 +67,7 @@ async function tempoAgora() {
     const a = THREE.MathUtils.degToRad(c.wind_direction_10m + 180), v = Math.max(1.5, c.wind_speed_10m / 3.6);
     NUV.uNuvVento.value.set(Math.sin(a) * v, -Math.cos(a) * v);
     NUV.vivo = true;
-    Object.assign(TEMPO, { ok: true, temp: c.temperature_2m, nuvens: c.cloud_cover, chuva: c.precipitation });
+    Object.assign(TEMPO, { ok: true, temp: c.temperature_2m, nuvens: c.cloud_cover, chuva: c.precipitation, nevando: c.snowfall || 0, neve: c.snow_depth || 0 });
     dispatchEvent(new CustomEvent('tempo:agora', { detail: TEMPO }));
   } catch { /* sem rede: fica a média do mês */ }
 }
