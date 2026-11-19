@@ -86,11 +86,11 @@ export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, ba
   mat.onBeforeCompile = (s) => {
     Object.assign(s.uniforms, U);
     s.vertexShader = s.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vChaoP;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvChaoP = position.xz;');
+      .replace('#include <common>', '#include <common>\nvarying vec2 vChaoP; varying float vChaoY;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvChaoP = position.xz; vChaoY = position.y;');
     s.fragmentShader = s.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec2 vChaoP; uniform sampler2D uRuasA; uniform sampler2D uRuasB; uniform vec4 uRuasRet; uniform float uRuasOn;
+varying vec2 vChaoP; varying float vChaoY; uniform sampler2D uRuasA; uniform sampler2D uRuasB; uniform vec4 uRuasRet; uniform float uRuasOn;
 float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hsh(i), hsh(i + vec2(1, 0)), f.x), mix(hsh(i + vec2(0, 1)), hsh(i + vec2(1, 1)), f.x), f.y); }
@@ -159,6 +159,25 @@ float gRelevo = 0.0; // relevo fino da rua (m), só perto da câmera: vira norma
     roughnessFactor = clamp(0.95 - 0.28 * mancha * (asf + cal) - 0.06 * ruido + 0.05 * pav, 0.4, 1.0);
     }
     diffuseColor.rgb *= mix(1.0, 0.62, ao * uRuasOn * 0.35 * (1.0 - cobre));
+  }`)
+      // encosta íngreme (as margens do Reno sob a Pfalz e o Rheinsprung, os taludes): a foto aérea, vista de cima, esticava
+      // num borrão verde na parede; ali vira muro de arrimo em blocos de arenito e calcário, com hera aqui e ali
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  { vec3 nW = inverseTransformDirection(normal, viewMatrix);
+    float ingreme = 1.0 - smoothstep(0.5, 0.78, nW.y);
+    if (ingreme > 0.01) {
+      vec2 tg = normalize(vec2(-nW.z, nW.x) + 1e-5);
+      vec2 q = vec2(dot(vChaoP, tg), vChaoY) / vec2(0.95, 0.42);
+      float fil = floor(q.y); q.x += hsh(vec2(fil, 7.0)) * 3.0;
+      vec2 cel = floor(q), fr = fract(q);
+      float junta = 1.0 - smoothstep(0.0, 0.08, min(min(fr.x, 1.0 - fr.x) * 0.45, min(fr.y, 1.0 - fr.y)));
+      float tom = hsh(cel);
+      vec3 cPedra = mix(vec3(0.56, 0.53, 0.48), vec3(0.60, 0.46, 0.40), step(0.72, tom)) * (0.85 + 0.25 * tom);
+      cPedra *= 1.0 - 0.4 * junta;
+      float hera = smoothstep(0.58, 0.78, fbm(vChaoP * 0.12 + vChaoY * 0.08));
+      cPedra = mix(cPedra, vec3(0.19, 0.28, 0.13) * (0.75 + 0.5 * fbm(vChaoP * 2.3 + vChaoY)), hera * 0.85);
+      diffuseColor.rgb = mix(diffuseColor.rgb, cPedra, ingreme * 0.88);
+    }
   }`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   { // relevo fino (bump) a partir de gRelevo: método de Mikkelsen, como o bumpmap do three

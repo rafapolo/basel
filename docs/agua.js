@@ -134,11 +134,13 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
   // (antes era Math.random e um creme claro e uniforme, uma grade regular que denunciava o muro ao longo do rio inteiro)
   let sem = 0x5eed; const rnd = () => { sem = (sem + 0x6d2b79f5) | 0; let t = Math.imul(sem ^ (sem >>> 15), 1 | sem); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const tc = document.createElement('canvas'); tc.width = tc.height = 256;
-  { const c = tc.getContext('2d'); c.fillStyle = '#5f5650'; c.fillRect(0, 0, 256, 256);
+  { const c = tc.getContext('2d'); c.fillStyle = '#77726a'; c.fillRect(0, 0, 256, 256); // junta clara: de longe a junta escura fazia o muro ler como tijolo
     for (let r = 0; r < 8; r++) for (let b = -1; b < 4; b++) {
       const x = b * 64 + (r % 2) * 32 + Math.round((rnd() - 0.5) * 10), y = r * 32;
-      const k = rnd(), cinza = rnd() < 0.35 ? 1 : 0; // alguns blocos mais cinzentos (pedra trocada)
-      const R = cinza ? 132 + k * 22 : 146 + k * 26, G = cinza ? 124 + k * 20 : 116 + k * 22, B = cinza ? 114 + k * 18 : 102 + k * 18;
+      // 2026-11-19: o vermelho dominante lia como tijolo; o cais é quase todo de calcário e arenito cinza-bege, com
+      // blocos de arenito vermelho trocados aqui e ali (sob a Pfalz há mais deles)
+      const k = rnd(), verm = rnd() < 0.2 ? 1 : 0;
+      const R = verm ? 150 + k * 20 : 156 + k * 26, G = verm ? 122 + k * 16 : 152 + k * 24, B = verm ? 108 + k * 14 : 142 + k * 22;
       c.fillStyle = `rgb(${R | 0},${G | 0},${B | 0})`; c.fillRect(x + 2, y + 2, 60, 28);
       for (let i = 0; i < 70; i++) { c.fillStyle = `rgba(${rnd() < 0.5 ? '40,30,25' : '220,200,180'},${rnd() * 0.1})`; c.fillRect(x + 2 + rnd() * 56, y + 2 + rnd() * 25, 1 + rnd() * 5, 1 + rnd() * 3); }
     } }
