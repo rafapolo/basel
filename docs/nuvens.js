@@ -8,6 +8,8 @@ const ALTURA = 1500; // m
 export const NUV = {
   uNuvT: { value: 0 }, uNuvCob: { value: 0.45 }, uNuvVento: { value: new THREE.Vector2(4, 1.5) },
   uSolDir: { value: new THREE.Vector3(0, 1, 0) }, uNuvDia: { value: 1 },
+  // três camadas (2026-11-19): baixa (~1,2 km), média (~3,5 km) e alta (cirros, ~9 km), cada uma com a sua cobertura
+  uNuvBaixa: { value: 0.3 }, uNuvMedia: { value: 0.2 }, uNuvAlta: { value: 0.2 },
 };
 // média de nebulosidade por mês em Basel (0..1, MeteoSchweiz, aproximada)
 const MEDIA = [0.78, 0.72, 0.64, 0.6, 0.6, 0.55, 0.5, 0.52, 0.56, 0.66, 0.78, 0.82];
@@ -26,6 +28,15 @@ float nuvem(vec2 xz) {
   return smoothstep(c, c + 0.07, f);
 }
 // sombra no chão: a nuvem que fica entre o ponto e o sol
+// camadas do céu: cobertura 0..1 de cada uma desloca o limiar do ruído; a alta é esticada no sentido do vento (cirros)
+uniform float uNuvBaixa, uNuvMedia, uNuvAlta;
+float camadaBaixa(vec2 xz) { float f = nvFbm((xz + uNuvVento * uNuvT) / 260.0); float c = mix(0.70, 0.28, uNuvBaixa); return smoothstep(c, c + 0.09, f); }
+float camadaMedia(vec2 xz) { vec2 p = (xz + uNuvVento * uNuvT * 1.6) / 520.0; float f = nvFbm(p) * 0.75 + nvN(p * 6.0) * 0.25; float c = mix(0.68, 0.32, uNuvMedia); return smoothstep(c, c + 0.06, f); }
+float camadaAlta(vec2 xz) {
+  vec2 v = normalize(uNuvVento + vec2(1e-3)), n = vec2(-v.y, v.x);
+  vec2 p = xz + uNuvVento * uNuvT * 3.0; p = vec2(dot(p, v) / 2600.0, dot(p, n) / 380.0);
+  float f = nvFbm(p); float c = mix(0.72, 0.38, uNuvAlta); return smoothstep(c, c + 0.12, f) * 0.6;
+}
 float sombraNuvem(vec2 xz) {
   vec2 desvio = uSolDir.xz / max(uSolDir.y, 0.12) * ${ALTURA.toFixed(1)};
   return nuvem(xz + desvio) * uNuvDia; // 0 = sol, 1 = sombra de nuvem
@@ -50,7 +61,10 @@ export function atualizarNuvens(agora, ceu) {
   const e = ceu.estado();
   NUV.uSolDir.value.copy(e.dir);
   NUV.uNuvDia.value = THREE.MathUtils.smoothstep(e.altitudeGraus, -2, 8);
-  if (!ceu.aoVivo || !NUV.vivo) NUV.uNuvCob.value = MEDIA[+e.data.slice(5, 7) - 1];
+  if (!ceu.aoVivo || !NUV.vivo) { // média do mês, repartida entre as camadas (as baixas mandam no inverno de Basel)
+    const m = MEDIA[+e.data.slice(5, 7) - 1], inv = m > 0.7 ? 1 : 0;
+    NUV.uNuvCob.value = m; NUV.uNuvBaixa.value = m * (0.55 + 0.25 * inv); NUV.uNuvMedia.value = m * 0.4; NUV.uNuvAlta.value = 0.25 + 0.2 * (1 - inv);
+  }
   if (ceu.aoVivo && !buscado) { buscado = true; tempoAgora(); }
 }
 
@@ -58,16 +72,17 @@ export function atualizarNuvens(agora, ceu) {
 export const TEMPO = { ok: false };
 async function tempoAgora() {
   try {
-    const u = 'https://api.open-meteo.com/v1/forecast?latitude=47.557&longitude=7.59&current=cloud_cover,wind_speed_10m,wind_direction_10m,temperature_2m,precipitation,snowfall,snow_depth&timezone=Europe%2FZurich';
+    const u = 'https://api.open-meteo.com/v1/forecast?latitude=47.557&longitude=7.59&current=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,temperature_2m,precipitation,rain,snowfall,snow_depth&timezone=Europe%2FZurich';
     const r = await fetch(u);
     if (!r.ok) return;
     const c = (await r.json()).current;
     NUV.uNuvCob.value = THREE.MathUtils.clamp(c.cloud_cover / 100, 0.05, 0.98);
+    if (c.cloud_cover_low != null) { NUV.uNuvBaixa.value = c.cloud_cover_low / 100; NUV.uNuvMedia.value = c.cloud_cover_mid / 100; NUV.uNuvAlta.value = c.cloud_cover_high / 100; }
     // vento de onde sopra (graus) → para onde a nuvem anda, em x (leste) e z (−norte)
     const a = THREE.MathUtils.degToRad(c.wind_direction_10m + 180), v = Math.max(1.5, c.wind_speed_10m / 3.6);
     NUV.uNuvVento.value.set(Math.sin(a) * v, -Math.cos(a) * v);
     NUV.vivo = true;
-    Object.assign(TEMPO, { ok: true, temp: c.temperature_2m, nuvens: c.cloud_cover, chuva: c.precipitation, nevando: c.snowfall || 0, neve: c.snow_depth || 0 });
+    Object.assign(TEMPO, { ok: true, temp: c.temperature_2m, nuvens: c.cloud_cover, chuva: c.rain ?? c.precipitation, camadas: [c.cloud_cover_low, c.cloud_cover_mid, c.cloud_cover_high], nevando: c.snowfall || 0, neve: c.snow_depth || 0 });
     dispatchEvent(new CustomEvent('tempo:agora', { detail: TEMPO }));
   } catch { /* sem rede: fica a média do mês */ }
 }

@@ -172,12 +172,18 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
     float zen = smoothstep(0.02, 0.65, direction.y) * (1.0 - uNoite);
     retColor *= mix(vec3(1.0), vec3(0.50, 0.66, 0.98), zen * 0.85);
     if (direction.y > 0.0) {
-      vec2 pN = cameraPosition.xz + direction.xz / max(direction.y, 0.02) * 1500.0;
-      float d = nuvem(pN) * smoothstep(0.02, 0.18, direction.y);
+      // três camadas com as coberturas de agora (Open-Meteo: baixa, média, alta), de trás para a frente
       float lumC = dot(retColor, vec3(0.299, 0.587, 0.114));
       float solV = pow(max(dot(direction, vSunDirection), 0.0), 8.0);
-      vec3 corN = vec3(lumC * 1.9 + 0.12) * mix(vec3(1.0), vec3(0.72, 0.75, 0.8), smoothstep(0.4, 1.0, d)) + vec3(1.0, 0.85, 0.65) * solV * lumC;
-      retColor = mix(retColor, corN * (1.0 - 0.85 * uNoite), d * 0.92);
+      vec3 brilho = vec3(1.0, 0.85, 0.65) * solV * lumC, noiteK = vec3(1.0 - 0.85 * uNoite);
+      vec2 dH = direction.xz / max(direction.y, 0.02);
+      float a = camadaAlta(cameraPosition.xz + dH * 9000.0) * smoothstep(0.03, 0.25, direction.y);
+      retColor = mix(retColor, (vec3(lumC * 1.6 + 0.2) + brilho * 1.4) * noiteK, a * 0.75);       // cirros: finos e brancos
+      float m = camadaMedia(cameraPosition.xz + dH * 3500.0) * smoothstep(0.02, 0.2, direction.y);
+      retColor = mix(retColor, (vec3(lumC * 1.75 + 0.14) * mix(vec3(1.0), vec3(0.8, 0.82, 0.86), m) + brilho) * noiteK, m * 0.85);
+      float d = camadaBaixa(cameraPosition.xz + dH * 1200.0) * smoothstep(0.02, 0.16, direction.y);
+      vec3 corN = vec3(lumC * 1.9 + 0.12) * mix(vec3(1.0), vec3(0.62, 0.65, 0.7), smoothstep(0.3, 1.0, d) * (0.5 + 0.5 * uNuvBaixa)) + brilho;
+      retColor = mix(retColor, corN * noiteK, d * 0.94);
     }
     retColor += uNoite * mix(vec3(${NOITE_H.join(',')}), vec3(${NOITE_Z.join(',')}), clamp(direction.y * 1.5, 0.0, 1.0));
     gl_FragColor = vec4( retColor, 1.0 );`);

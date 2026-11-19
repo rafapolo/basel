@@ -55,14 +55,14 @@ export function criarFlocos({ cena, camera, leve }) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('aFase', new THREE.BufferAttribute(fase, 1));
-  const u = { uT: { value: 0 }, uCam: { value: new THREE.Vector3() }, uDens: { value: 0 }, uVento: { value: new THREE.Vector2(0.6, 0.2) } };
+  const u = { uT: { value: 0 }, uCam: { value: new THREE.Vector3() }, uDens: { value: 0 }, uVento: { value: new THREE.Vector2(0.6, 0.2) }, uChuva: { value: 0 } };
   const mat = new THREE.ShaderMaterial({
     uniforms: u, transparent: true, depthWrite: false,
     vertexShader: `
-uniform float uT, uDens; uniform vec3 uCam; uniform vec2 uVento; attribute float aFase; varying float vA;
+uniform float uT, uDens, uChuva; uniform vec3 uCam; uniform vec2 uVento; attribute float aFase; varying float vA; varying float vChuva;
 void main() {
   vec3 p = position;
-  p.y = mod(p.y - uT * (0.8 + aFase * 0.5), ${H.toFixed(1)});
+  p.y = mod(p.y - uT * mix(0.8 + aFase * 0.5, 7.0 + aFase * 2.0, uChuva), ${H.toFixed(1)}); // gota: ~8 m/s; floco: ~1 m/s
   p.xz += uVento * uT + vec2(sin(uT * 0.7 + aFase * 30.0), cos(uT * 0.6 + aFase * 20.0)) * 0.6;
   // caixa que dá a volta em torno da câmera (sem salto: cada floco reaparece do outro lado)
   vec3 c = uCam - vec3(${(L / 2).toFixed(1)}, ${(H * 0.45).toFixed(1)}, ${(L / 2).toFixed(1)});
@@ -71,11 +71,11 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_Position = projectionMatrix * mv;
   vA = step(aFase, uDens) * (1.0 - smoothstep(60.0, 90.0, -mv.z));
-  gl_PointSize = clamp(90.0 / -mv.z, 1.0, 7.0);
+  gl_PointSize = clamp(mix(90.0, 45.0, uChuva) / -mv.z, 1.0, 7.0); vChuva = uChuva;
 }`,
     fragmentShader: `
-varying float vA;
-void main() { vec2 d = gl_PointCoord - 0.5; float a = vA * smoothstep(0.5, 0.15, length(d)); if (a < 0.02) discard; gl_FragColor = vec4(vec3(0.96), a * 0.9); }`,
+varying float vA; varying float vChuva;
+void main() { vec2 d = gl_PointCoord - 0.5; d.x *= mix(1.0, 3.5, vChuva); float a = vA * smoothstep(0.5, 0.15, length(d)); if (a < 0.02) discard; gl_FragColor = vec4(mix(vec3(0.96), vec3(0.72, 0.78, 0.86), vChuva), a * mix(0.9, 0.55, vChuva)); }`,
   });
   const pts = new THREE.Points(g, mat);
   pts.frustumCulled = false; pts.renderOrder = 5;
@@ -91,11 +91,14 @@ export function atualizarNeve(agora, ceu, cena, camera, leve) {
   const dt = t0 == null ? 0 : Math.min(0.1, (agora - t0) / 1000); t0 = agora;
   const e = ceu.estado();
   let alvo, cai;
-  if (ceu.aoVivo && TEMPO.ok) { alvo = THREE.MathUtils.clamp((TEMPO.neve || 0) / 0.04, 0, 1); cai = (TEMPO.nevando || 0) > 0 ? Math.min(1, 0.3 + TEMPO.nevando) : 0; }
+  let chove = 0;
+  if (ceu.aoVivo && TEMPO.ok) { alvo = THREE.MathUtils.clamp((TEMPO.neve || 0) / 0.04, 0, 1); cai = (TEMPO.nevando || 0) > 0 ? Math.min(1, 0.3 + TEMPO.nevando) : 0;
+    if (!cai && (TEMPO.chuva || 0) > 0) { chove = 1; cai = Math.min(1, 0.35 + TEMPO.chuva / 3); } } // chuva de agora: as mesmas partículas, como gotas
   else { alvo = neveClima(e.data); cai = alvo > 0.05 ? 0.25 + 0.75 * ss(0.3, 0.9, alvo) : 0; }
   NEVE.uNeve.value += (alvo - NEVE.uNeve.value) * Math.min(1, dt * 1.5);
   const u = flocos.u;
   u.uDens.value += (cai - u.uDens.value) * Math.min(1, dt * 1.5);
+  u.uChuva.value += (chove - u.uChuva.value) * Math.min(1, dt * 2);
   u.uT.value += dt;
   u.uCam.value.copy(camera.position);
   flocos.pts.visible = u.uDens.value > 0.01;

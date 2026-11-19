@@ -11,7 +11,7 @@ import recorte as RC
 RAIZ = Path(__file__).resolve().parent.parent
 DIR = RAIZ / "data/21-referencia"
 FOTOS = DIR / "commons"
-UA = {"User-Agent": "basel-3d-prototipo/0.1"}
+UA = {"User-Agent": "basel-3d/0.1 (https://rafapolo.github.io/basel/)"}  # a Wikimedia pede um contato no User-Agent
 
 # escolhidos a mão das consultas por fama (sitelinks) e por tipo (fontes, esculturas) na caixa de Basel
 NOMES = [
