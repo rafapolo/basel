@@ -115,6 +115,46 @@ const ruasObj = new THREE.Group();
     const pe = ['footway', 'path', 'steps', 'cycleway', 'pedestrian', 'living_street'].includes(l.t);
     faixa(l.c, larg, l.t === 'tram' ? cBonde : pe ? cPe : cRua, l.t === 'tram' ? 0.45 : pe ? 0.25 : 0.3, !!l.ponte);
   }
+  // tabuleiro das outras pontes (a Mittlere tem o de pedra em marcos.js): no OSM cada pista e calçada é uma linha à
+  // parte, e entre as faixas via-se o rio (a Wettsteinbrücke tem duas pistas separadas). Junta as linhas de ponte
+  // próximas e põe por baixo uma laje de concreto que cobre de uma borda à outra, com 1,2 m de espessura.
+  {
+    const lin = ruas.linhas.filter((l) => l.ponte && l.c.length >= 4 && Math.hypot(l.c.at(-2) - l.c[0], l.c.at(-1) - l.c[1]) > 30);
+    const grupos = [];
+    for (const l of lin) {
+      const mx = (l.c[0] + l.c.at(-2)) / 2, mz = (l.c[1] + l.c.at(-1)) / 2;
+      let g = grupos.find((G) => Math.hypot(G.mx - mx, G.mz - mz) < 40);
+      if (!g) grupos.push((g = { mx, mz, ls: [] }));
+      g.ls.push(l);
+    }
+    const cConc = new THREE.Color('#8b877e');
+    for (const G of grupos) {
+      if (G.ls.some((l) => l.n === 'Mittlere Rheinbrücke')) continue;
+      const ref = G.ls.reduce((a, b) => (Math.hypot(b.c.at(-2) - b.c[0], b.c.at(-1) - b.c[1]) > Math.hypot(a.c.at(-2) - a.c[0], a.c.at(-1) - a.c[1]) ? b : a));
+      const ax = ref.c[0], az = ref.c[1], dx = ref.c.at(-2) - ax, dz = ref.c.at(-1) - az, L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L, nx = -uz, nz = ux;
+      let b0 = Infinity, b1 = -Infinity, s0 = Infinity, s1 = -Infinity;
+      for (const l of G.ls) {
+        const meia = (LARGURA[l.t] || 2) / 2;
+        for (let i = 0; i < l.c.length; i += 2) {
+          const px = l.c[i] - ax, pz = l.c[i + 1] - az, s = px * ux + pz * uz, b = px * nx + pz * nz;
+          b0 = Math.min(b0, b - meia); b1 = Math.max(b1, b + meia); s0 = Math.min(s0, s); s1 = Math.max(s1, s);
+        }
+      }
+      b0 -= 0.8; b1 += 0.8;
+      const hA = cotaPonta(altura, ax, az, ax + ux * 4, az + uz * 4), hB = cotaPonta(altura, ax + dx, az + dz, ax + dx - ux * 4, az + dz - uz * 4);
+      const yTop = (s) => hA + (hB - hA) * (s / L) + 0.55; // 5 cm sob as faixas (0,6 m)
+      const P = (s, b, y) => [ax + ux * s + nx * b, y, az + uz * s + nz * b];
+      const quad = (a, b, c, d) => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); for (let k = 0; k < 6; k++) cor.push(cConc.r, cConc.g, cConc.b); };
+      const n = Math.max(1, Math.ceil((s1 - s0) / 8));
+      for (let i = 0; i < n; i++) {
+        const sa = s0 + ((s1 - s0) * i) / n, sb = s0 + ((s1 - s0) * (i + 1)) / n, ya = yTop(sa), yb = yTop(sb);
+        quad(P(sa, b0, ya), P(sa, b1, ya), P(sb, b1, yb), P(sb, b0, yb));                         // topo
+        quad(P(sa, b0, ya - 1.2), P(sb, b0, yb - 1.2), P(sb, b1, yb - 1.2), P(sa, b1, ya - 1.2)); // fundo
+        quad(P(sa, b0, ya), P(sb, b0, yb), P(sb, b0, yb - 1.2), P(sa, b0, ya - 1.2));             // lados
+        quad(P(sa, b1, ya), P(sa, b1, ya - 1.2), P(sb, b1, yb - 1.2), P(sb, b1, yb));
+      }
+    }
+  }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(cor, 3));
@@ -413,7 +453,7 @@ function abrirFicha(id) {
   if (p.cls) linhas.push([t('Uso', 'Use', 'Nutzung'), uso(p.cls)]);
   if (p.prot) linhas.push([t('Proteção', 'Protection', 'Schutz'), t('patrimônio protegido', 'listed heritage', 'geschützt')]);
   if (p.ano && p.ano > anoAtual) linhas.push([t('Em ', 'In ', 'Im Jahr ') + anoAtual, t('ainda não existia', 'not yet built', 'noch nicht gebaut')]);
-  if (p.egid) linhas.push(['EGID', `<a href="https://map.geo.admin.ch/?lang=${LANG === 'pt' ? 'en' : LANG}&layers=ch.bfs.gebaeude_wohnungs_register&swisssearch=${p.egid}" target="_blank" rel="noopener">${p.egid}</a>`]);
+  if (p.egid) linhas.push(['EGID', `<a href="https://map.geo.admin.ch/?lang=${LANG}&layers=ch.bfs.gebaeude_wohnungs_register&swisssearch=${p.egid}" target="_blank" rel="noopener">${p.egid}</a>`]);
   $('f-dl').innerHTML = linhas.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
   $('ficha').hidden = false;
 }

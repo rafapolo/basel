@@ -33,7 +33,7 @@ mechanics are our own. It is not a copy of his interface.
   The side-by-side comparison with openly licensed photos is in [design/comparacao/](design/comparacao/).
 - **The Rhine** (`docs/agua.js`, data from `script/reno.py` -> `docs/data/reno.json`): OSM river polygon (way 1467859273, ODbL) instead of a height threshold, planar reflection of the buildings plus Preetham sky colours (off in light mode), waves travelling north-west (downstream), foam along the banks and around the bridge piers, water colour from the live data.bs.ch temperature (100046, CC BY 4.0) and turbidity (100323, CC0) with an offline snapshot, sandstone quay walls, bridge piers and bank stairs as geometry.
 - **Light and sky** (`docs/ceu.js`): the real sun for Basel (47.557 N, 7.59 E; SunCalc formulas, EU daylight saving) with time and date
-  controls in the panel (`?hora=15.5&data=2026-06-21`, default 21 June 15:00); physical sky (Preetham) with the fog taken from the same
+  controls in the panel (`?hora=15.5&data=2026-06-21`; by default it opens at the current time and date in Basel, Europe/Zurich, and follows the clock until you move the controls); physical sky (Preetham) with the fog taken from the same
   sky, ACES tone mapping with slow auto-exposure, cascaded shadow maps (3 cascades), ambient occlusion (GTAO, half resolution) and bloom
   at night only. The "night" switch slides to 22:30 and back. **Light mode** (`?leve=1`, automatic on phones): no CSM, GTAO or bloom.
 - **Trees and green** (`docs/arvores.js`, data from `script/arvores.py`): 1,195 trees of the Basel tree register (data.bs.ch 100052, CC BY 4.0) plus 193 OSM-only trees, instanced per genus class with 3 LODs, wind sway, autumn colours and leaf fall driven by `ceu.estado().data`, bare branches in winter; OSM lawns and gardens draped on the terrain. Height comes from age and genus (the register has no height); crowns are calibrated against the 2024 canopy cover (100357). `?arvores=0` turns it off.
@@ -43,7 +43,7 @@ mechanics are our own. It is not a copy of his interface.
   the Rhine cable ferries and ships. All instanced, hidden by the time machine according to era or the building's year; `?detalhes=0` turns it off.
   Sources: OpenStreetMap (ODbL), data.bs.ch 100008 (fountains, IWB, free use with attribution) and 100241 (bike racks, CC BY 4.0).
 - **People and motion** (`docs/vida.js`, `docs/ambiente-som.js`, data by `script/vida.py` → `docs/data/vida.json`): BVB (green) and BLT (yellow) trams run on the OSM rails by the Swiss static GTFS timetable (opentransportdata.swiss; weekday/Saturday/Sunday reference days), instanced pedestrians (leg and arm swing in the shader) on streets and squares, denser near the data.bs.ch 100013 counters and following their hourly/weekly/monthly profile, bicycles, a few cars outside the pedestrian zone, gulls over the Rhine, and Wickelfisch swimmers in summer (zones 100270). Density follows `ceu.estado()` and the time-machine year (no trams before 1895, bikes 1890, cars 1910). Ambient sound (water, crowd, trams, hourly church bells, gulls; Web Audio, no files) has its own switch; `?vida=0` hides everything. Respects `ceu.leve` and `prefers-reduced-motion`.
-- **Three languages:** PT, EN and DE, from the selector at the top or `?lang=en|de`.
+- **Two languages:** English (default) and German, from the selector at the top or `?lang=de`.
 
 ### Time and sun API (for the Rhine, trees, etc.)
 

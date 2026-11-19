@@ -57,7 +57,9 @@ def main():
     ESPERA_MS = a.espera
     out = Path(a.saida); out.mkdir(parents=True, exist_ok=True)
     base = a.base.rstrip("/")
-    extra = ("&" + a.query) if a.query else ""
+    # a página abre na hora real de Basel; as capturas fixam 21/6 às 15h para serem comparáveis
+    fixo = "" if ("hora=" in a.query or "data=" in a.query or "noite=" in a.query) else "&hora=15&data=2026-06-21"
+    extra = fixo + (("&" + a.query) if a.query else "")
     med = {"base": base, "viewport": [a.largura, a.altura], "data": time.strftime("%Y-%m-%d")}
     with sync_playwright() as p:
         b = p.chromium.launch(headless=True, args=ARGS)

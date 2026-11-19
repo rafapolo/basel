@@ -1,9 +1,10 @@
-// Três línguas: português (padrão), inglês e alemão. O idioma vem do endereço (?lang=en|de, ou
-// ?tour=en|de, que também abre o convite do tour); o seletor PT/EN/DE recarrega com ?lang=.
+// Duas línguas no site: inglês (padrão) e alemão. O idioma vem do endereço (?lang=de, ou ?tour=de,
+// que também abre o convite do tour); o seletor EN/DE recarrega com ?lang=. Os textos em português
+// continuam nas tabelas (primeiro elemento) mas não são mais oferecidos.
 (() => {
   const q = new URLSearchParams(location.search);
   const pedido = q.get('lang') || q.get('tour');
-  const LANG = ['en', 'de'].includes(pedido) ? pedido : 'pt';
+  const LANG = pedido === 'de' ? 'de' : 'en';
   window.LANG = LANG;
   window.t = (pt, en, de) => (LANG === 'en' ? en : LANG === 'de' ? de : pt);
   const LOC = { pt: 'pt-BR', en: 'en-GB', de: 'de-CH' }[LANG];
@@ -59,7 +60,7 @@
       b.addEventListener('click', () => {
         const p = new URLSearchParams(location.search);
         p.delete('tour');
-        if (b.dataset.lang === 'pt') p.delete('lang'); else p.set('lang', b.dataset.lang);
+        if (b.dataset.lang === 'en') p.delete('lang'); else p.set('lang', b.dataset.lang);
         location.search = p.toString();
       });
     });

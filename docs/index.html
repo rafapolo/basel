@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en-GB">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -43,8 +43,17 @@
   .marcas { display: flex; justify-content: space-between; font-size: 11px; color: var(--suave); font-variant-numeric: tabular-nums; }
   #contagem { font-size: 12px; color: var(--suave); margin: 6px 0 10px; }
   .chaves { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .chave { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; padding: 5px 8px; border: 1px solid var(--linha); border-radius: 6px; user-select: none; }
-  .chave input { accent-color: var(--tinta); margin: 0; }
+  /* chaves: interruptor deslizante; o rótulo inteiro é clicável e ganha fundo quando ligado */
+  .chave { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; line-height: 1.2; cursor: pointer; padding: 6px 8px 6px 10px; border: 1px solid var(--linha); border-radius: 8px; user-select: none; transition: background .2s var(--ease), border-color .2s var(--ease); }
+  .chave:hover { background: rgba(29,24,18,.05); }
+  .chave:has(input:checked) { background: rgba(29,24,18,.07); border-color: rgba(29,24,18,.32); }
+  .chave span { order: -1; }
+  .chave input { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 30px; height: 18px; margin: 0; border-radius: 999px; background: rgba(29,24,18,.22); cursor: pointer; transition: background .2s var(--ease); }
+  .chave input::before { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fffaf0; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .2s var(--ease); }
+  .chave input:checked { background: var(--tinta); }
+  .chave input:checked::before { transform: translateX(12px); }
+  .chave input:focus-visible { outline: 2px solid var(--ouro); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .chave, .chave input, .chave input::before { transition: none; } }
   #sol-ctl { margin: 0 0 10px; font-size: 12px; color: var(--suave); }
   #sol-ctl label { display: flex; justify-content: space-between; }
   #sol-ctl output { font-variant-numeric: tabular-nums; color: var(--tinta); font-weight: 600; }
@@ -76,6 +85,10 @@
 
   body.noite #marca, body.noite #painel { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
   body.noite .chave { border-color: rgba(232,225,208,.18); }
+  body.noite .chave:hover { background: rgba(232,225,208,.06); }
+  body.noite .chave:has(input:checked) { background: rgba(232,225,208,.1); border-color: rgba(232,225,208,.32); }
+  body.noite .chave input { background: rgba(232,225,208,.25); }
+  body.noite .chave input:checked { background: var(--ouro); }
   body.noite #marca p, body.noite .marcas, body.noite #contagem, body.noite .nota, body.noite #creditos { color: #a99f8c; }
   body.noite .btn:not(#tour-abrir) { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
 
@@ -127,7 +140,7 @@
 <header id="topo">
   <div id="marca"><h1>Basel</h1><p data-i18n="sub">A Altstadt prédio por prédio, com o ano de cada um</p></div>
   <div class="acoes">
-    <div id="linguas" role="group" aria-label="Idioma / Language / Sprache"><button type="button" data-lang="pt">PT</button><button type="button" data-lang="en">EN</button><button type="button" data-lang="de">DE</button></div>
+    <div id="linguas" role="group" aria-label="Language / Sprache"><button type="button" data-lang="en">EN</button><button type="button" data-lang="de">DE</button></div>
     <button id="tour-abrir" class="btn" type="button" data-i18n="tour" data-i18n-title="tour-titulo" title="Um passeio de 1 minuto, com som">Tour de 1 min</button>
   </div>
 </header>
@@ -138,7 +151,7 @@
   <div class="marcas"><span>1100</span><span>1500</span><span>1800</span><span>1900</span><span>2026</span></div>
   <div id="contagem"></div>
   <div id="sol-ctl">
-    <label for="c-hora"><span data-i18n="hora">hora</span> <output id="hora-txt">15:00</output></label>
+    <label for="c-hora"><span data-i18n="hora">hora</span> <output id="hora-txt"></output></label>
     <input id="c-hora" type="range" min="0" max="24" step="0.05" value="15" aria-label="Hora do dia" data-i18n-aria="aria-hora">
     <div class="sol-linha"><input id="c-data" type="date" value="2026-06-21" aria-label="Data" data-i18n-aria="aria-data"><span id="sol-info" title="altura do sol · nascer → poente"></span></div>
   </div>
