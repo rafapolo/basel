@@ -22,13 +22,16 @@ const q = new URLSearchParams(location.search);
 const carga = window.carga;
 carga?.etapa(0.03, t('baixando os dados…', 'downloading the data…', 'Daten werden geladen…'));
 const binTerreno = baixaBin('data/terreno.v2.bin'); // em paralelo com os prédios: a barra da abertura conta os dois
-const [meta, ruas, bin, rel] = await Promise.all([
+const [meta, ruas, bin, rel, RETOQUES] = await Promise.all([
   fetch('data/predios.json').then((r) => r.json()),
   fetch('data/ruas.json').then((r) => r.json()),
   baixaBin('data/predios.v2.bin'),
   fetch('data/relevo.bin').then((r) => r.arrayBuffer()),
+  // retoques por prédio (EGID → cor da parede, do telhado, material), tirados de fotos reais do Commons (script/casa_referencias.py)
+  fetch('data/retoques.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
 ]);
 const P = meta.predios;
+for (const p of P) { const r = p.egid && RETOQUES[p.egid]; if (r) { if (r.mat != null) p.mat = r.mat; if (r.parede) p.cor = r.parede; if (r.telhado) p.telha = r.telhado; } }
 // recorte em coordenadas locais (predios.json): desde 2026-11-19 vai da Allschwilerplatz (oeste) à SBB (sul)
 const REC = (() => { const [e0, n0, e1, n1] = meta.recorte_lv95, [oe, on] = meta.origem_lv95; return { x0: e0 - oe, x1: e1 - oe, z0: -(n1 - on), z1: -(n0 - on) }; })();
 const foraREC = (x, z, f = 0) => x < REC.x0 + f || x > REC.x1 - f || z < REC.z0 + f || z > REC.z1 - f;
@@ -247,6 +250,7 @@ function colorir() {
     // telhados planos (modernos) ficam cinza; inclinados, de telha
     c.copy(ehTelhado[t] ? telhas[Math.floor(h * telhas.length)] : parede[Math.floor(h * parede.length)]);
     if (ehTelhado[t] && (p.ano ?? 0) > 1945) c.set('#8c8578');
+    if (ehTelhado[t] ? p.telha : p.cor) c.set(ehTelhado[t] ? p.telha : p.cor); // retoque a partir de foto real
     for (let k = 0; k < 3; k++) c.toArray(cores, (t * 3 + k) * 3);
   }
   geo.attributes.color.needsUpdate = true;

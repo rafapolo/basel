@@ -159,7 +159,7 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
     }
   }
 
-  const corTelhaDe = (id) => P[id].ano > 1945 ? 0x8c8578 : [0x9c4f35, 0x8e4a33, 0xa85d3d, 0x7f4636, 0x6e5a4e][Math.floor(hash(id) * 5)];
+  const corTelhaDe = (id) => P[id].telha ? new THREE.Color(P[id].telha).getHex() : P[id].ano > 1945 ? 0x8c8578 : [0x9c4f35, 0x8e4a33, 0xa85d3d, 0x7f4636, 0x6e5a4e][Math.floor(hash(id) * 5)];
   const instancias = [];
   const matInst = (chop) => {
     const m = chop ? new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }) : new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });

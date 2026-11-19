@@ -1,0 +1,15 @@
+{
+ "440197": {"parede": "#d9b468", "telhado": "#4f5256", "fonte": "Hotel Les Trois Rois, foto do Commons"},
+ "243003482": {"parede": "#eadfc8", "telhado": "#8c9aa6", "fonte": "Synagoge Basel"},
+ "440599": {"parede": "#a8945e", "fonte": "Markgräflerhof"},
+ "243011533": {"parede": "#ecebe6", "telhado": "#7a5040", "fonte": "Das Weisse Haus"},
+ "440812": {"parede": "#a5584a", "mat": 1, "fonte": "Haus zum Kirschgarten"},
+ "2085021": {"parede": "#7d6046", "mat": 2, "fonte": "BIZ-Turm (bronze)"},
+ "243056792": {"parede": "#a8acb0", "mat": 2, "fonte": "Meret Oppenheim Hochhaus"},
+ "442248": {"parede": "#cfc9bd", "telhado": "#a8644e", "fonte": "Markthalle (cúpula de cobre avermelhado)"},
+ "440173": {"parede": "#b07f6c", "mat": 1, "fonte": "Hauptpost (arenito)"},
+ "454111": {"parede": "#ecebe5", "telhado": "#4e4a48", "fonte": "Café Spitz / Hotel Merian"},
+ "243057824": {"parede": "#d4cdbd", "telhado": "#6f9a86", "fonte": "Bahnhof SBB (pedra clara, cúpulas de cobre verde)"},
+ "243000741": {"parede": "#e2d8c0", "fonte": "Naturhistorisches Museum / Museum der Kulturen"},
+ "243000173": {"parede": "#ece6d6", "telhado": "#5b4a40", "fonte": "Antikenmuseum"}
+}

@@ -337,6 +337,23 @@ function texSpalenEsculturas() {
   });
   return t;
 }
+// nave de igreja de Basel como nas fotos do Commons (Peterskirche, Prediger, St. Clara, Barfüsser, Leonhard): reboco
+// branco, janela gótica alta com moldura de arenito vermelho e cunhal de arenito; célula de 6 × 12 m
+function texIgrejaBranca(seed = 81) {
+  const ppm = 32, W = 6 * ppm, H = 12 * ppm;
+  return tex(W, H, (g) => {
+    const r = mulberry(seed), X = (u) => u * ppm, Y = (v) => H - v * ppm;
+    g.fillStyle = '#ece8df'; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 700; i++) { g.fillStyle = `rgba(${r() > 0.5 ? '255,255,250' : '90,80,70'},${r() * 0.05})`; g.fillRect(r() * W, r() * H, 3 + r() * 14, 3 + r() * 10); }
+    g.fillStyle = '#a5584a'; g.fillRect(0, 0, W, X(0.5)); // soco de arenito
+    for (let v = 0.5; v < 12; v += 0.9) g.fillRect(0, Y(v + 0.8), X(Math.round(v / 0.9) % 2 ? 0.7 : 0.45), X(0.8)); // cunhal
+    const cx = 3, w = 1.5, v0 = 3.2, v1 = 9.0;
+    const ogiva = (k) => { g.beginPath(); g.moveTo(X(cx - w / 2 - k), Y(v0 - k)); g.lineTo(X(cx - w / 2 - k), Y(v1)); g.quadraticCurveTo(X(cx - w / 2 - k), Y(v1 + 1.1 + k), X(cx), Y(v1 + 1.5 + k)); g.quadraticCurveTo(X(cx + w / 2 + k), Y(v1 + 1.1 + k), X(cx + w / 2 + k), Y(v1)); g.lineTo(X(cx + w / 2 + k), Y(v0 - k)); g.fill(); };
+    g.fillStyle = '#a5584a'; ogiva(0.22);
+    const vid = g.createLinearGradient(0, Y(v1 + 1.5), 0, Y(v0)); vid.addColorStop(0, '#41566a'); vid.addColorStop(1, '#2d3a44'); g.fillStyle = vid; ogiva(0);
+    g.strokeStyle = '#a5584a'; g.lineWidth = 3; g.beginPath(); g.moveTo(X(cx), Y(v0)); g.lineTo(X(cx), Y(v1 + 1.3)); g.stroke();
+  });
+}
 // reboco claro das torres laterais (verputzt), com manchas
 function texReboco(cor, seed = 71) {
   return tex(128, 128, (g) => { const r = mulberry(seed); g.fillStyle = cor; g.fillRect(0, 0, 128, 128);
@@ -498,7 +515,8 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     for (const [i, [sx, sz, n]] of soma) { const d = Math.hypot(sx / n - 29.7, sz / n + 190.6); if (d < d0) { d0 = d; melhor = i; } }
     return melhor;
   })();
-  const EG = { munster: 243009807, rathaus: 440080, martin: 243009202, peter: 243010854, leonhard: 243008474, spalen: 243013263 };
+  const EG = { munster: 243009807, rathaus: 440080, martin: 243009202, peter: 243010854, leonhard: 243008474, spalen: 243013263,
+    barfusser: 243000946, prediger: 243014187, clara: 243016294, elisabeth: 2084811, paulus: 243013506 };
   const RUG = ruido();
   const pmrem = new THREE.PMREMGenerator(renderer);
   const ENV = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -514,7 +532,8 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     rosace: std(texRosace(), { roughness: 0.4, envMap: ENV, envMapIntensity: 0.6 }),
     rathaus: std(texRathaus()),
     rathausFrente: std(texRathausFrente()),
-    pedraSp: std(texPedra({ cw: 4, ch: 4, cor: '#9a8070', seed: 63 })),
+    pedraSp: std(texPedra({ cw: 4, ch: 4, cor: '#a8918a', seed: 63 })), // a torre central é cinza-rosada (foto do Commons)
+    igrejaBranca: std(texIgrejaBranca()),
     rebocoSp: std(texReboco('#cdbfa4')),
     brasoes: std(texBrasoes(), { roughness: 0.5 }),
     balmer: std(texBalmer()),
@@ -530,7 +549,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     ouro: new THREE.MeshStandardMaterial({ color: 0xc9a13b, roughness: 0.3, metalness: 0.85, envMap: ENV, envMapIntensity: 1.1 }),
     relogio: new THREE.MeshStandardMaterial({ map: texRelogio(), roughness: 0.4, metalness: 0.2, envMap: ENV, envMapIntensity: 0.5 }),
   };
-  for (const k of ['pedraSp', 'rebocoSp', 'rathaus', 'rathausFrente', 'brasoes', 'balmer', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha', 'ferro']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
+  for (const k of ['igrejaBranca', 'pedraSp', 'rebocoSp', 'rathaus', 'rathausFrente', 'brasoes', 'balmer', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha', 'ferro']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
   let cotaMittlere = null;
   const raiz = new THREE.Group();
   raiz.name = 'marcos';
@@ -718,11 +737,12 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     const m = novo(); m.y0 = yMin(ts);
     recapeia(m, ts, (v) => Math.hypot(v.x - t.cx, v.z - t.cz) < t.r, pedraJ, 'telhaI', 4, 12);
     const topo = Math.max(...ts.flatMap((k) => [1, 4, 7].map((o) => posicoes[k * 9 + o])));
-    torre(m, { cx: t.cx, cz: t.cz, ang: t.ang, s: t.s, y0: m.y0, yFuste: topo - t.flecha - t.tambor, yTambor: topo - t.flecha, yTopo: topo, matF: pedraJ, matS: 'flecha', sx: 4 });
+    torre(m, { cx: t.cx, cz: t.cz, ang: t.ang, s: t.s, y0: m.y0, yFuste: topo - t.flecha - t.tambor, yTambor: topo - t.flecha, yTopo: topo, matF: pedraJ === 'igrejaBranca' ? pedra : pedraJ, matS: 'flecha', sx: 4 }); // nave branca, torre de pedra
     fecha(m, nome, pid);
   }
   igreja('Martinskirche', ids(EG.martin), um(EG.martin), { cx: -72.7, cz: -57.4, r: 5.2, ang: Math.atan2(0.367, -0.93), s: 7.2, flecha: 17, tambor: 5 }, 'pedraN', 'pedraNJ');
-  igreja('Peterskirche', ids(EG.peter), um(EG.peter), { cx: -296.7, cz: -113.1, r: 5.2, ang: 0, s: 6.8, flecha: 14, tambor: 4 }, 'pedraN', 'pedraNJ');
+  // Peterskirche e Leonhardskirche: nave de reboco branco com arenito vermelho (fotos do Commons); a torre segue de pedra
+  igreja('Peterskirche', ids(EG.peter), um(EG.peter), { cx: -296.7, cz: -113.1, r: 5.2, ang: 0, s: 6.8, flecha: 14, tambor: 4 }, 'pedraN', 'igrejaBranca');
   // =====================================================================================================
   // Spalentor: o LOD2 tem a forma certa; trocam-se os materiais e entram as duas faces do portal desenhadas
   // =====================================================================================================
@@ -789,7 +809,15 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     if (flecha.length) (m.mundo.telhaV ??= []).push(uvMetros(new THREE.BufferGeometry().setFromPoints(flecha.flatMap(tri)), 3, 3)); // telha vidrada colorida
     fecha(m, 'Spalentor', um(EG.spalen));
   }
-  igreja('Leonhardskirche', ids(EG.leonhard), um(EG.leonhard), { cx: -100.5, cz: 365, r: 5.8, ang: Math.atan2(-0.297, 0.955), s: 7.4, flecha: 15, tambor: 5 }, 'pedraL', 'pedraLJ');
+  // naves recapeadas pelas fotos do Commons (2026-11-19): Barfüsser, Prediger e St. Clara são de reboco branco com arenito
+  // vermelho; a Elisabethenkirche e a Pauluskirche, de arenito claro (a Paulus com telhado de telha vermelha)
+  const nave = (nome, egid, matP, matT) => { const ts = triangulos(ids(egid)); if (!ts.length) return; const m = novo(); m.y0 = yMin(ts); recapeia(m, ts, null, matP, matT, 6, 12); fecha(m, nome, um(egid)); };
+  nave('Barfüsserkirche', EG.barfusser, 'igrejaBranca', 'telhaI');
+  nave('Predigerkirche', EG.prediger, 'igrejaBranca', 'telhaI');
+  nave('St. Clara', EG.clara, 'igrejaBranca', 'telhaI');
+  nave('Elisabethenkirche', EG.elisabeth, 'pedraLJ', 'telhaI');
+  nave('Pauluskirche', EG.paulus, 'pedraLJ', 'telhaM');
+  igreja('Leonhardskirche', ids(EG.leonhard), um(EG.leonhard), { cx: -100.5, cz: 365, r: 5.8, ang: Math.atan2(-0.297, 0.955), s: 7.4, flecha: 15, tambor: 5 }, 'pedraL', 'igrejaBranca');
 
   // =====================================================================================================
   // Mittlere Brücke: arcos de pedra extrudados ao longo do eixo da ponte do OSM, parapeitos e Käppelijoch
