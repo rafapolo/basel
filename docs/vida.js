@@ -570,8 +570,10 @@ uniform float uVidaT; uniform float uAnima;`)
   const pA = { x: 0, y: 0, z: 0 }, pB = { x: 0, y: 0, z: 0 }, pC = { x: 0, y: 0, z: 0 };
   const lbound = (a, v) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < v) lo = m + 1; else hi = m; } return lo; };
   const bondeInfo = { perto: 1e9, vel: 0, n: 0 };
+  const modulos = []; // [x, z, ux, uz] de cada módulo de bonde no quadro (o jogo testa colisão com eles)
   function bondes(dt) {
     let nB = 0, nL = 0; const visto = new Set();
+    modulos.length = 0;
     bondeInfo.perto = 1e9; bondeInfo.vel = 0;
     const alvoCam = controls?.target;
     const diaCh = `i_${S.dia}`;
@@ -602,6 +604,7 @@ uniform float uVidaT; uniform float uAnima;`)
             qq.setFromEuler(eu);
             m4.compose(v3.set(pA.x, pA.y, pA.z), qq, esc3);
             m.setMatrixAt(nn * MOD + q, m4);
+            if (dx * dx + dz * dz > 1e-6) modulos.push([pA.x, pA.z, dx / Lh, dz / Lh]); // no fim da linha pB = pC: sem direção, ficaria de fora
           }
           if (tr.p.e === 'BLT') nL++; else nB++;
           if (alvoCam && !e.parada) { posS(tr, e.s, pA); const d = Math.hypot(pA.x - alvoCam.x, pA.z - alvoCam.z); if (d < bondeInfo.perto) { bondeInfo.perto = d; bondeInfo.vel = Math.abs(e.vel); } }
@@ -770,7 +773,17 @@ uniform float uVidaT; uniform float uAnima;`)
     }
   }
   function ligar(on) { ligado = on; grupo.visible = on; if (on) ultimo = null; if (!on) window.ambiente?.contexto?.({ agua: 0, gente: 0, bonde: 1e9, bondeVel: 0, gaivotas: 0, nadadores: 0, noite: S.noite, dia: S.dia01, carros: 0, hora: hora(), simT: S.simT }); }
-  const api = { grupo, atualizar, ligar, info, S, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
+  // colisão para o jogo: um disco de raio r em (x, z) bate num bonde (caixa de LM × 2,4 m) ou num carro (disco de 2,2 m)?
+  function bate(x, z, r) {
+    if (!ligado) return null;
+    for (const [mx, mz, ux, uz] of modulos) {
+      const dx = x - mx, dz = z - mz, a = dx * ux + dz * uz, b = -dx * uz + dz * ux;
+      if (Math.abs(a) < LM / 2 + r && Math.abs(b) < 1.2 + r) return 'bonde';
+    }
+    for (let i = 0; i < carro.n; i++) if (carro.esc[i] > 0.5 && Math.hypot(x - carro.x[i], z - carro.z[i]) < 2.2 + r) return 'carro';
+    return null;
+  }
+  const api = { grupo, atualizar, ligar, info, S, bate, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
   window.vida = api;
   return api;
 }

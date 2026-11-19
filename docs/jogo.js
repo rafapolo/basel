@@ -1,8 +1,10 @@
 // Modo jogo (2026-11-19): uma bicicleta vermelha que sai do meio da Mittlere Brücke e corre pela cidade atrás de sete
-// lugares (Marktplatz, Münsterplatz, Pfalz, Barfi, Rheinbord, Claraplatz e a chegada na estação SBB), contra o relógio. W/S ou ↑/↓ pedalam e
-// freiam, A/D ou ←/→ viram, Shift dá um sprint, B toca a campainha, V troca a câmera (atrás / primeira pessoa), Esc sai.
+// lugares (Marktplatz, Münsterplatz, Pfalz, Barfi, Rheinbord, Claraplatz e a chegada na estação SBB), contra o relógio. É uma
+// e-bike (S-Pedelec): até 45 km/h. W/S ou ↑/↓ pedalam e freiam, A/D ou ←/→ viram, B toca a campainha, V troca a câmera
+// (atrás / primeira pessoa), Esc sai. Bater num bonde ou num carro, ou cair no Reno, acaba a corrida: volta à largada.
+// Sair e entrar de novo pelo botão retoma de onde parou (posição, lugares feitos e relógio).
 // Em tela de toque, quatro botões. Os prédios são sólidos: uma grade de 1 m com a projeção dos telhados do LOD2
-// (montada só na primeira volta); as pontes, pela altura das faixas do OSM; quem cai no Reno volta para a margem.
+// (montada só na primeira volta); as pontes, pela altura das faixas do OSM.
 const C = window.cidade;
 const { THREE, camera, controls, altura } = C;
 const $ = (id) => document.getElementById(id);
@@ -185,10 +187,10 @@ hud.innerHTML = `
 document.body.appendChild(hud);
 
 // ---------- estado ----------
-let ativo = false, bici = null, farol = null, raf = 0, tAnt = 0, primeira = false;
-const S = { x: 0, z: 0, y: 0, rumo: 0, v: 0, incl: 0, fase: 0, alvo: 0, t0: 0, fim: 0, seguro: [0, 0, 0], tSeguro: 0, tremor: 0, caiu: 0 };
-const tecla = { frente: false, tras: false, esq: false, dir: false, sprint: false };
-const MAPA = { KeyW: 'frente', ArrowUp: 'frente', KeyS: 'tras', ArrowDown: 'tras', KeyA: 'esq', ArrowLeft: 'esq', KeyD: 'dir', ArrowRight: 'dir', ShiftLeft: 'sprint', ShiftRight: 'sprint' };
+let ativo = false, bici = null, farol = null, raf = 0, tAnt = 0;
+const S = { x: 0, z: 0, y: 0, rumo: 0, v: 0, incl: 0, fase: 0, alvo: 0, t0: 0, fim: 0, tremor: 0, caiu: 0, morto: 0 };
+const tecla = { frente: false, tras: false, esq: false, dir: false };
+const MAPA = { KeyW: 'frente', ArrowUp: 'frente', KeyS: 'tras', ArrowDown: 'tras', KeyA: 'esq', ArrowLeft: 'esq', KeyD: 'dir', ArrowRight: 'dir' };
 let salvo = null;
 
 let msgT = 0;
@@ -228,6 +230,7 @@ function proximoAlvo() {
 
 function iniciar() {
   if (ativo || window.tour?.ativo()) return;
+  if (C.rua()) C.sairRua();
   if (!ocup) montarGrade();
   if (!bici) { bici = criarBici(); farol = criarFarol(); C.cena.add(bici, farol); }
   bici.visible = farol.visible = true;
@@ -237,27 +240,50 @@ function iniciar() {
   controls.enabled = false;
   document.body.classList.add('jogando');
   hud.hidden = false;
-  // largada: na Mittlere, do lado de Kleinbasel, virada para Grossbasel
-  const { A, B } = C.ponte, f = 0.62;
-  Object.assign(S, { x: A[0] + (B[0] - A[0]) * f, z: A[1] + (B[1] - A[1]) * f, rumo: Math.atan2(A[0] - B[0], A[1] - B[1]), v: 0, incl: 0, alvo: 0, fim: 0, caiu: 0, primeira: true });
-  S.y = piso(S.x, S.z).y; S.seguro = [S.x, S.z, S.rumo];
-  S.t0 = performance.now();
-  primeira = false;
-  proximoAlvo();
+  const retoma = pausa != null && !S.fim;
+  if (retoma) { S.t0 += performance.now() - pausa; S.v = 0; proximoAlvo(); farol.visible = S.alvo < ALVOS.length; }
+  else largada();
+  pausa = null;
   const melhor = lerMelhor();
-  $('jogo-ajuda').innerHTML = t('W/S ou ↑/↓ pedala e freia · A/D ou ←/→ vira · Shift sprint · B campainha · V câmera · Esc sai',
-    'W/S or ↑/↓ pedal and brake · A/D or ←/→ steer · Shift sprint · B bell · V camera · Esc exits',
-    'W/S oder ↑/↓ treten und bremsen · A/D oder ←/→ lenken · Shift Sprint · B Klingel · V Kamera · Esc beendet') +
+  $('jogo-ajuda').innerHTML = t('W/S ou ↑/↓ pedala e freia · A/D ou ←/→ vira · B campainha · V câmera · Esc sai (o botão retoma) · cuidado com bondes, carros e o Reno',
+    'W/S or ↑/↓ pedal and brake · A/D or ←/→ steer · B bell · V camera · Esc exits (the button resumes) · mind trams, cars and the Rhine',
+    'W/S oder ↑/↓ treten und bremsen · A/D oder ←/→ lenken · B Klingel · V Kamera · Esc beendet (der Knopf macht weiter) · Achtung vor Trams, Autos und dem Rhein') +
     (melhor ? `<br>${t('melhor tempo', 'best time', 'Bestzeit')}: ${mmss(melhor)}` : '');
-  mensagem(t('Bicicleta vermelha na Mittlere Brücke', 'Red bike on the Mittlere Brücke', 'Rotes Velo auf der Mittleren Brücke'),
+  if (retoma) mensagem(t('De volta à e-bike', 'Back on the e-bike', 'Zurück auf dem E-Bike'), `${S.alvo}/${ALVOS.length} · ${mmss(performance.now() - S.t0)}`, 1800);
+  else mensagem(t('E-bike vermelha na Mittlere Brücke', 'Red e-bike on the Mittlere Brücke', 'Rotes E-Bike auf der Mittleren Brücke'),
     t(`Passe pelos ${ALVOS.length} lugares; siga a seta e a luz dourada.`, `Ride through all ${ALVOS.length} places; follow the arrow and the golden light.`, `Fahren Sie alle ${ALVOS.length} Orte an; folgen Sie dem Pfeil und dem goldenen Licht.`), 3800);
   tAnt = performance.now();
   raf = requestAnimationFrame(passo);
 }
 
+// largada: na Mittlere, do lado de Kleinbasel, virada para Grossbasel; relógio e lugares do zero
+function largada() {
+  // na calçada de montante (7 m do eixo, fora dos trilhos do bonde que corre pelo meio da ponte)
+  const { A, B } = C.ponte, f = 0.62, L = Math.hypot(B[0] - A[0], B[1] - A[1]), nx = -(B[1] - A[1]) / L, nz = (B[0] - A[0]) / L;
+  Object.assign(S, { x: A[0] + (B[0] - A[0]) * f + nx * 7, z: A[1] + (B[1] - A[1]) * f + nz * 7, rumo: Math.atan2(A[0] - B[0], A[1] - B[1]), v: 0, incl: 0, alvo: 0, fim: 0, caiu: 0, morto: 0 });
+  S.y = piso(S.x, S.z).y;
+  S.t0 = performance.now();
+  bici.rotation.set(0, 0, 0);
+  farol.visible = true;
+  proximoAlvo();
+}
+// batida ou Reno: a bici tomba, a tela avisa e, 1,8 s depois, a corrida recomeça da largada
+function morrer(agora, motivo) {
+  if (S.morto) return;
+  S.morto = agora; S.tremor = 0.6;
+  const txt = {
+    bonde: t('Bateu num bonde!', 'Hit by a tram!', 'Von einem Tram erwischt!'),
+    carro: t('Bateu num carro!', 'Hit by a car!', 'Von einem Auto erwischt!'),
+    reno: t('Tchibum! Caiu no Reno', 'Splash! Into the Rhine', 'Platsch! In den Rhein'),
+  }[motivo];
+  mensagem(txt, t('de volta à largada…', 'back to the start…', 'zurück zum Start…'), 1700);
+}
+
+let pausa = null; // instante em que se saiu no meio da corrida (para retomar e descontar do relógio)
 function parar() {
   if (!ativo) return;
   ativo = false;
+  pausa = S.fim || S.morto ? null : performance.now();
   cancelAnimationFrame(raf);
   hud.hidden = true;
   document.body.classList.remove('jogando');
@@ -276,15 +302,20 @@ function passo(agora) {
   raf = requestAnimationFrame(passo);
   const dt = Math.min(0.05, (agora - tAnt) / 1000); tAnt = agora;
   // ---- física ----
-  const vmax = tecla.sprint ? 12.5 : 8.3; // ~45 e 30 km/h
-  if (tecla.frente) S.v += (S.v < 0 ? 6 : 3.2 * (1 - S.v / vmax)) * dt;
+  if (S.morto) { // tombada: só a queda e a espera até recomeçar
+    S.v *= 1 - 4 * dt; S.incl += (1.45 - S.incl) * Math.min(1, dt * 5);
+    if (agora - S.morto > 1800) largada();
+  }
+  const vmax = 12.5; // e-bike rápida (S-Pedelec): 45 km/h
+  if (S.morto) { /* sem pedal */ }
+  else if (tecla.frente) S.v += (S.v < 0 ? 6 : 5.2 * (1 - (S.v / vmax) ** 2)) * dt; // o motor ajuda até perto do teto
   else if (tecla.tras) S.v = S.v > 0 ? Math.max(0, S.v - 9 * dt) : Math.max(-2.2, S.v - 2 * dt);
   else S.v *= 1 - 0.25 * dt;
   if (S.v > vmax) S.v -= (S.v - vmax) * 2 * dt;
   const giro = (tecla.esq ? 1 : 0) - (tecla.dir ? 1 : 0);
   const pega = Math.min(1, Math.abs(S.v) / 2.5);
   S.rumo += giro * dt * (1.9 - 0.8 * Math.min(1, Math.abs(S.v) / 12)) * pega * Math.sign(S.v || 1);
-  S.incl += (-giro * Math.min(1, S.v / 7) * 0.32 - S.incl) * Math.min(1, dt * 6);
+  if (!S.morto) S.incl += (-giro * Math.min(1, S.v / 7) * 0.32 - S.incl) * Math.min(1, dt * 6);
   const fx = Math.sin(S.rumo), fz = Math.cos(S.rumo);
   const nx = S.x + fx * S.v * dt, nz = S.z + fz * S.v * dt;
   const frente = 0.7 * Math.sign(S.v || 1);
@@ -294,17 +325,13 @@ function passo(agora) {
   else if (livre(S.x, nz)) { S.z = nz; S.v *= 1 - 1.5 * dt; }
   else if (Math.abs(S.v) > 0.5) { if (Math.abs(S.v) > 3) { S.tremor = 0.35; campainha(); } S.v = -S.v * 0.2; }
   else S.v = 0;
-  // Reno: tchibum, e volta ao último ponto seguro
-  if (naAgua(S.x, S.z)) {
-    if (!S.caiu) {
-      S.caiu = agora;
-      mensagem(t('Tchibum! Caiu no Reno', 'Splash! Into the Rhine', 'Platsch! In den Rhein'), t('de volta à margem…', 'back to the bank…', 'zurück ans Ufer…'), 1600);
-    }
-    S.v *= 1 - 3 * dt;
-    if (agora - S.caiu > 1300) { [S.x, S.z, S.rumo] = S.seguro; S.v = 0; S.caiu = 0; S.y = piso(S.x, S.z).y; }
-  } else if (agora - S.tSeguro > 800 && Math.abs(S.v) > 0.5) { S.seguro = [S.x, S.z, S.rumo]; S.tSeguro = agora; }
-  const p0 = piso(S.x, S.z), yAlvo = S.caiu ? C.nivelReno - 1.2 : p0.y;
-  S.y += (yAlvo - S.y) * Math.min(1, dt * (S.caiu ? 2 : 14));
+  // Reno, bonde ou carro: fim da corrida (morrer() mostra o aviso; largada() vem 1,8 s depois)
+  if (!S.morto && agora - S.t0 > 2000) { // 2 s de folga na largada
+    if (naAgua(S.x, S.z)) { S.caiu = agora; morrer(agora, 'reno'); }
+    else { const v = window.vida?.bate(S.x + fx * 0.4, S.z + fz * 0.4, 0.45); if (v) morrer(agora, v); }
+  }
+  const p0 = piso(S.x, S.z), naRio = S.morto && S.caiu, yAlvo = naRio ? C.nivelReno - 1.2 : p0.y;
+  S.y += (yAlvo - S.y) * Math.min(1, dt * (naRio ? 2 : 14));
   const pf = piso(S.x + fx * 0.6, S.z + fz * 0.6).y, pt = piso(S.x - fx * 0.6, S.z - fz * 0.6).y;
   const arfagem = Math.atan2(pf - pt, 1.2);
   // ---- desenho da bici ----
@@ -325,7 +352,7 @@ function passo(agora) {
     // seta: ângulo do alvo em relação ao rumo da câmera
     const ang = Math.atan2(a.x - S.x, a.z - S.z) - S.rumo;
     $('jogo-seta').style.transform = `rotate(${-ang}rad)`;
-    if (d < RAIO_ALVO) {
+    if (d < RAIO_ALVO && !S.morto) {
       campainha();
       S.alvo++;
       if (S.alvo < ALVOS.length) { mensagem(a.n, t('próximo: ', 'next: ', 'nächstes: ') + ALVOS[S.alvo].n, 1800); proximoAlvo(); }
@@ -380,5 +407,7 @@ for (const b of hud.querySelectorAll('.toque button')) {
 }
 $('jogo-sair').addEventListener('click', parar);
 $('jogo-abrir').addEventListener('click', iniciar);
-window.jogo = { iniciar, parar, ativo: () => ativo, estado: () => ({ ...S }), tecla, bloqueado, piso };
+// para a vista de rua (cidade.js): o ponto está fora de qualquer prédio, com folga de f metros? (monta a grade se preciso)
+const livreRua = (x, z, f = 1.5) => { if (!ocup) montarGrade(); for (const [dx, dz] of [[0, 0], [f, 0], [-f, 0], [0, f], [0, -f]]) if (bloqueado(x + dx, z + dz)) return false; return true; };
+window.jogo = { iniciar, parar, ativo: () => ativo, estado: () => ({ ...S }), S, tecla, bloqueado, piso, livreRua };
 if (new URLSearchParams(location.search).get('jogo') === '1') iniciar();
