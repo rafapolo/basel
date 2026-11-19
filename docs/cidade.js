@@ -481,6 +481,9 @@ function andarRua(dt) {
   let nx = x + vRua.x * velRua * dt, nz = z + vRua.z * velRua * dt;
   if (!pode(nx, nz)) { if (pode(nx, z)) nz = z; else if (pode(x, nz)) nx = x; else { velRua = 0; return; } } // desliza ao longo da parede
   const y = J.piso(nx, nz).y + 1.7 + Math.abs(Math.sin(performance.now() / 280)) * 0.03 * Math.min(1, Math.abs(velRua));
+  // esbarrão: quem está no caminho cai (e o passo para um instante)
+  const fx = vRua.x * s, fz = vRua.z * s;
+  if ((window.vida?.atropela(nx + fx * 0.45, nz + fz * 0.45, 0.5, fx, fz) || 0) + (window.cidade?.fasnacht?.()?.derruba(nx + fx * 0.45, nz + fz * 0.45, 0.5, fx, fz) || 0)) velRua *= 0.2;
   const d = new THREE.Vector3(nx - x, y - camera.position.y, nz - z);
   camera.position.add(d); controls.target.add(d);
 }

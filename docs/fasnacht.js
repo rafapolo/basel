@@ -99,6 +99,9 @@ function clique({ cena, altura, semente = 0 }) {
       for (const m of [corpo, cabeca, nariz, cabelo, chapeu]) m.setColorAt(i, c); }
     for (let i = 0; i < nT; i++) tambor.setColorAt(i, new THREE.Color(1, 1, 1));
     for (const m of [corpo, cabeca, nariz, cabelo, chapeu, tambor]) m.instanceColor.needsUpdate = true; }
+  // quem a e-bike (ou quem anda) derruba: s no chão e direção da queda; a Clique segue, o caído fica onde caiu
+  const caido = new Float32Array(n), caiX = new Float32Array(n), caiZ = new Float32Array(n), caiP = new Float32Array(n * 3), CAIDO = 6;
+  const eixo = new THREE.Vector3(), qT = new THREE.Quaternion();
   // ---- caminho e marcha ----
   let pts = null, acum = null, total = 0, s0 = 0, vel = 1.05, t0 = 0, volta = false, vaivem = false;
   const em = (s, o) => { // posição e rumo no caminho a s metros
@@ -122,11 +125,17 @@ function clique({ cena, altura, semente = 0 }) {
     if (!g.visible || !pts) return;
     const s = s0 + ((agora - t0) / 1000) * vel;
     let iT = 0, dMin = 1e9;
+    const dt = Math.min(0.1, (agora - (atualizar.t || agora)) / 1000); atualizar.t = agora;
     M.forEach(([tipo, fil, lat], i) => {
       em(s - fil, P);
-      const x = P.x - P.hz * lat, z = P.z + P.hx * lat, y = altura(x, z);
+      let x = P.x - P.hz * lat, z = P.z + P.hx * lat, y = altura(x, z);
+      if (caido[i] > 0) { caido[i] = Math.max(0, caido[i] - dt); x = caiP[i * 3]; z = caiP[i * 3 + 2]; y = caiP[i * 3 + 1]; }
       const fase = (agora / 1000) * vel * 1.9 + i * 0.37, pulo = Math.abs(Math.sin(fase * Math.PI)) * 0.05;
       q.setFromAxisAngle(Y, Math.atan2(P.hx, P.hz) + Math.sin(fase * Math.PI) * 0.05);
+      if (caido[i] > 0) { // tomba: gira em torno do eixo horizontal perpendicular à queda
+        const th = (Math.PI / 2) * Math.min(1, (CAIDO - caido[i]) / 0.35, caido[i] / 0.6);
+        qT.setFromAxisAngle(eixo.set(caiZ[i], 0, -caiX[i]), th); q.premultiply(qT);
+      }
       const k = tipo === 'tambormor' ? 1.2 : 1;
       esc.set(k, k, k); m4.compose(v.set(x, y + pulo, z), q, esc);
       for (const im of [corpo, cabeca, nariz, cabelo, chapeu]) im.setMatrixAt(i, m4);
@@ -139,7 +148,18 @@ function clique({ cena, altura, semente = 0 }) {
     luzL.intensity = 6 * noite; matL.emissiveIntensity = 0.35 + 1.4 * noite;
     return dMin;
   }
-  return { marchar, parar, atualizar, grupo: g, visivel: () => g.visible, onde: () => lanterna.position.toArray() };
+  // derruba quem estiver a menos de r de (x, z); devolve quantos
+  function derruba(x0, z0, r, fx, fz) {
+    if (!g.visible || !pts) return 0;
+    const s = s0 + ((performance.now() - t0) / 1000) * vel; let k = 0;
+    M.forEach(([, fil, lat], i) => {
+      if (caido[i] > 0) return;
+      em(s - fil, P); const x = P.x - P.hz * lat, z = P.z + P.hx * lat;
+      if (Math.hypot(x - x0, z - z0) < r) { caido[i] = CAIDO; caiX[i] = fx; caiZ[i] = fz; caiP[i * 3] = x; caiP[i * 3 + 1] = altura(x, z); caiP[i * 3 + 2] = z; k++; }
+    });
+    return k;
+  }
+  return { marchar, parar, atualizar, derruba, grupo: g, visivel: () => g.visible, onde: () => lanterna.position.toArray() };
 }
 
 // ---- som: tambor de marcha (ruído em rajadas com acento), da Clique mais perto ----
@@ -199,5 +219,6 @@ export function criarFasnacht({ cena, altura, ruas, ceu }) {
     if (prox > 0.02 && agora - ultCompasso > (60 / 112) * 4 * 1000 - 30) { ultCompasso = agora; tocar(); }
     somVol(prox * prox * 0.35);
   }
-  return { atualizar, forcar: (v) => { forcar = v; }, cliques: cs.length, ativa: () => ligada, onde: () => cs.map((c) => c.onde()) };
+  const derruba = (x, z, r, fx, fz) => (ligada ? cs.reduce((k, c) => k + c.derruba(x, z, r, fx, fz), 0) : 0);
+  return { atualizar, derruba, forcar: (v) => { forcar = v; }, cliques: cs.length, ativa: () => ligada, onde: () => cs.map((c) => c.onde()) };
 }

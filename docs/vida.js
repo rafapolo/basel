@@ -194,13 +194,22 @@ uniform float uVidaT; uniform float uAnima;`)
     a[o + 8] = s * sz; a[o + 9] = 0; a[o + 10] = c * sz; a[o + 11] = 0;
     a[o + 12] = x; a[o + 13] = y; a[o + 14] = z; a[o + 15] = 1;
   };
+  // matriz de alguém caído: tomba na direção (fx, fz) em 0,35 s, fica deitado e levanta nos últimos 0,6 s (resta = s no chão)
+  const CAIDO = 6;
+  const matrizCaida = (a, i, px, py, pz, fx, fz, resta, e, sy) => {
+    const tq = CAIDO - resta, th = (Math.PI / 2) * Math.min(1, tq / 0.35, resta / 0.6), sT = Math.sin(th), cT = Math.cos(th), o = i * 16;
+    a[o] = -fz * e; a[o + 1] = 0; a[o + 2] = fx * e; a[o + 3] = 0;
+    a[o + 4] = sT * fx * sy; a[o + 5] = cT * sy; a[o + 6] = sT * fz * sy; a[o + 7] = 0;
+    a[o + 8] = -fx * cT * e; a[o + 9] = sT * e; a[o + 10] = -fz * cT * e; a[o + 11] = 0;
+    a[o + 12] = px; a[o + 13] = py + 0.12 * sT; a[o + 14] = pz; a[o + 15] = 1;
+  };
   function populacao({ n, grafo, geo, mat, vel, desloc, offTipo, livres = 0, sombra = true, respawnLonge = false }) {
     const im = malhaInst(geo, mat, n, sombra);
     const x = new Float32Array(n), z = new Float32Array(n), y = new Float32Array(n), hx = new Float32Array(n), hz = new Float32Array(n);
     const alvo = new Int32Array(n), ant = new Int32Array(n), spd = new Float32Array(n), off = new Float32Array(n), esc = new Float32Array(n);
     const modo = new Uint8Array(n), seg = new Int32Array(n), sentido = new Uint8Array(n), pausa = new Float32Array(n), tx = new Float32Array(n), tz = new Float32Array(n);
     const offA = new Float32Array(n), tipoA = new Array(n), alt = new Float32Array(n), prog = new Float32Array(n), elen = new Float32Array(n), escI = new Float32Array(n).fill(1);
-    const caido = new Float32Array(n), caiX = new Float32Array(n), caiZ = new Float32Array(n), CAIDO = 6; // derrubados pela e-bike do jogo: s no chão e para onde caíram
+    const caido = new Float32Array(n), caiX = new Float32Array(n), caiZ = new Float32Array(n); // derrubados pela e-bike ou por quem anda na vista de rua
     const g = grafo;
     const escolhe = (i) => {
       const v = alvo[i], nb = g.viz[v];
@@ -292,15 +301,8 @@ uniform float uVidaT; uniform float uAnima;`)
           else py = altura(px, pz) + 0.02;
           if (py < nivelReno - 0.3) py = nivelReno - 0.3;
           const e = esc[i];
-          if (caido[i] > 0) {
-            // tomba na direção do empurrão em 0,35 s, fica deitado e levanta nos últimos 0,6 s
-            const tq = CAIDO - caido[i], th = (Math.PI / 2) * Math.min(1, tq / 0.35, caido[i] / 0.6), sT = Math.sin(th), cT = Math.cos(th);
-            const fx = caiX[i], fz = caiZ[i], o = i * 16, sy = e * alt[i];
-            a[o] = -fz * e; a[o + 1] = 0; a[o + 2] = fx * e; a[o + 3] = 0;
-            a[o + 4] = sT * fx * sy; a[o + 5] = cT * sy; a[o + 6] = sT * fz * sy; a[o + 7] = 0;
-            a[o + 8] = -fx * cT * e; a[o + 9] = sT * e; a[o + 10] = -fz * cT * e; a[o + 11] = 0;
-            a[o + 12] = px; a[o + 13] = py + 0.12 * sT; a[o + 14] = pz; a[o + 15] = 1;
-          } else matriz(im, i, px, py, pz, hx[i], hz[i], e, e * alt[i], e);
+          if (caido[i] > 0) matrizCaida(a, i, px, py, pz, caiX[i], caiZ[i], caido[i], e, e * alt[i]);
+          else matriz(im, i, px, py, pz, hx[i], hz[i], e, e * alt[i], e);
           const vv = v > 0 ? spd[i] : 0;
           if (A.getY(i) !== vv) { A.setY(i, vv); animar = true; }
           if (alvoCam && Math.abs(px - alvoCam.x) < 70 && Math.abs(pz - alvoCam.z) < 70) perto++;
@@ -445,6 +447,29 @@ uniform float uVidaT; uniform float uAnima;`)
   pintarParados();
   const ESTACAO_RIO = { verao: 1, meia: 0.4, inverno: 0.1 };
   let tParados = -1e9;
+  const caidoP = new Float32Array(nLug), caiPX = new Float32Array(nLug), caiPZ = new Float32Array(nLug);
+  let algumCaidoP = false;
+  // quem está parado (rodinhas, parapeito, paradas) também cai; anima a cada quadro enquanto houver alguém no chão
+  function caidosParados(dt) {
+    if (!algumCaidoP || !imPar) return;
+    const m = imPar.instanceMatrix.array; algumCaidoP = false;
+    for (let i = 0; i < nLug; i++) {
+      if (caidoP[i] <= 0) continue;
+      caidoP[i] = Math.max(0, caidoP[i] - dt);
+      if (caidoP[i] > 0) { algumCaidoP = true; matrizCaida(m, i, LUG.x[i], LUG.y[i], LUG.z[i], caiPX[i], caiPZ[i], caidoP[i], 1, LUG.alt[i]); }
+      else matriz(imPar, i, LUG.x[i], LUG.y[i], LUG.z[i], LUG.hx[i], LUG.hz[i], 1, LUG.alt[i], 1);
+    }
+    imPar.instanceMatrix.needsUpdate = true;
+  }
+  function derrubaParados(x, z, r, fx, fz) {
+    if (!imPar) return 0;
+    const m = imPar.instanceMatrix.array; let k = 0;
+    for (let i = 0; i < nLug; i++) {
+      if (caidoP[i] > 0 || m[i * 16 + 15] !== 1) continue; // só quem está à vista
+      if (Math.hypot(LUG.x[i] - x, LUG.z[i] - z) < r) { caidoP[i] = CAIDO; caiPX[i] = fx; caiPZ[i] = fz; k++; algumCaidoP = true; }
+    }
+    return k;
+  }
   function parados(agora, fp, h) {
     if (agora - tParados < 900) return; // muda pouco: uma vez por segundo
     tParados = agora;
@@ -462,6 +487,7 @@ uniform float uVidaT; uniform float uAnima;`)
     if (imPar) {
       const m = imPar.instanceMatrix.array;
       for (let i = 0; i < nLug; i++) {
+        if (caidoP[i] > 0) { n++; continue; } // no chão: caidosParados() cuida
         if (LUG.lim[i] < dens[LUG.tipo[i]]) { matriz(imPar, i, LUG.x[i], LUG.y[i], LUG.z[i], LUG.hx[i], LUG.hz[i], 1, LUG.alt[i], 1); n++; }
         else m.fill(0, i * 16, i * 16 + 16);
       }
@@ -782,6 +808,7 @@ uniform float uVidaT; uniform float uAnima;`)
     const nCarro = Math.round(NCARRO * fc);
     ped.atualizar(sd, nPed, alvoCam); bici.atualizar(sd, nBici, alvoCam); carro.atualizar(sd, nCarro, alvoCam);
     parados(agora, fp, h);
+    caidosParados(sd);
     bondes(sd);
     const nAve = Math.round(NAVE * suave(-4, 8, S.alt ?? 40) * (S.noite > 0.9 ? 0 : 1));
     gaivotas(sd, nAve);
@@ -807,8 +834,8 @@ uniform float uVidaT; uniform float uAnima;`)
     for (let i = 0; i < carro.n; i++) if (carro.esc[i] > 0.5 && Math.hypot(x - carro.x[i], z - carro.z[i]) < 2.2 + r) return 'carro';
     return null;
   }
-  // a e-bike do jogo atropela pedestres: eles caem e levantam (só quem anda; os parados e sentados ficam)
-  const atropela = (x, z, r, fx, fz) => (ligado ? ped.derruba(x, z, r, fx, fz) : 0);
+  // a e-bike do jogo e quem anda na vista de rua derrubam gente: quem anda, os ciclistas e quem está parado (os sentados ficam)
+  const atropela = (x, z, r, fx, fz) => (ligado ? ped.derruba(x, z, r, fx, fz) + bici.derruba(x, z, r + 0.3, fx, fz) + derrubaParados(x, z, r, fx, fz) : 0);
   const api = { grupo, atualizar, ligar, info, S, bate, atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
   window.vida = api;
   return api;

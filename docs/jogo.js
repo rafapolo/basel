@@ -337,6 +337,7 @@ function passo(agora) {
   S.rumo += giro * dt * (1.9 - 0.8 * Math.min(1, Math.abs(S.v) / 12)) * pega * Math.sign(S.v || 1);
   if (!S.morto) S.incl += (-giro * Math.min(1, S.v / 7) * 0.32 - S.incl) * Math.min(1, dt * 6);
   const fx = Math.sin(S.rumo), fz = Math.cos(S.rumo);
+  const xAnt = S.x, zAnt = S.z; // para varrer o trajeto do quadro (a 45 km/h, ~0,8 m a 15 fps)
   const nx = S.x + fx * S.v * dt, nz = S.z + fz * S.v * dt;
   const frente = 0.7 * Math.sign(S.v || 1);
   const livre = (x, z) => !bloqueado(x + fx * frente, z + fz * frente) && !bloqueado(x, z);
@@ -352,7 +353,12 @@ function passo(agora) {
   }
   // pedestres: quem a bici pega cai no chão (e levanta 6 s depois); a bici perde metade da velocidade
   if (!S.morto && Math.abs(S.v) > 1.5) {
-    const k = window.vida?.atropela(S.x + fx * 0.6, S.z + fz * 0.6, 0.75, fx, fz) || 0;
+    let k = 0;
+    const passos = Math.max(1, Math.ceil(Math.hypot(S.x - xAnt, S.z - zAnt) / 0.4));
+    for (let p = 1; p <= passos; p++) {
+      const px = xAnt + ((S.x - xAnt) * p) / passos + fx * 0.6, pz = zAnt + ((S.z - zAnt) * p) / passos + fz * 0.6;
+      k += (window.vida?.atropela(px, pz, 0.75, fx, fz) || 0) + (C.fasnacht?.()?.derruba(px, pz, 0.75, fx, fz) || 0);
+    }
     if (k) {
       S.v *= 0.5; S.tremor = 0.25; S.derrubados = (S.derrubados || 0) + k; campainha();
       mensagem(t('Opa! Derrubou alguém', 'Oops! Knocked someone over', 'Hoppla! Jemanden umgefahren'), t(`${S.derrubados} no chão nesta corrida`, `${S.derrubados} knocked down this race`, `${S.derrubados} umgefahren in diesem Rennen`), 1400);
