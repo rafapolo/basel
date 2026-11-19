@@ -138,7 +138,8 @@ varying vec3 vLocal; varying float vRnd, vTipo;
 float h3(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
 bool folhaCai(vec3 loc, float rnd){
   float dens = uEver > 0.5 ? 1.0 : clamp(uFolha * 1.4 - rnd * 0.4, 0.0, 1.0);
-  return h3(floor(loc * 13.0) + rnd * 17.0) > dens * 1.0001;
+  // grão fino (1/36 da árvore): em cubos de 1/13 as copas de outono pareciam recortadas em papel
+  return h3(floor(loc * 36.0) + rnd * 17.0) > dens * 1.0001;
 }`;
   function injetar(s, { cheio, leveSemBalanco }) {
     Object.assign(s.uniforms, G, { uEver: { value: s.uEver ?? 0 }, uOutono: { value: new THREE.Vector3(1, 0.7, 0.2) } });
@@ -157,6 +158,8 @@ bool folhaCai(vec3 loc, float rnd){
   float bal = (sin(uT * 1.15 + fase) * 0.6 + sin(uT * 2.3 + fase * 1.7) * 0.4) * rajada;
   transformed.x += bal * pesoV * uVento * 0.028;
   transformed.z += bal * 0.55 * pesoV * uVento * 0.028;
+  // copa que perde folha também afina um pouco (sem isso, o outono só abria buracos numa casca do mesmo tamanho)
+  if (aTipo > 0.5 && uEver < 0.5) transformed.xz *= mix(0.86, 1.0, clamp(uFolha, 0.0, 1.0));
   if (aTipo > 0.5) transformed += uVento * 0.006 * vec3(sin(uT * 4.7 + position.x * 31.0 + fase), sin(uT * 3.9 + position.z * 27.0), sin(uT * 4.1 + position.y * 29.0)) * pesoV;`);
     s.fragmentShader = s.fragmentShader
       .replace('#include <common>', `#include <common>\n${GLSL_COMUM}`);
@@ -168,8 +171,11 @@ bool folhaCai(vec3 loc, float rnd){
     float ti = smoothstep(0.0, 1.0, uTinta * 1.6 - vRnd * 0.6) * (1.0 - uEver);
     vec3 c = diffuseColor.rgb;
     c = mix(c, uOutono * (0.75 + 0.5 * h3(floor(vLocal * 7.0))), ti * 0.9);
+    // fim do outono: o que sobra na copa escurece para o marrom de folha seca (o amarelo vivo é de outubro)
+    c = mix(c, vec3(0.42, 0.28, 0.15) * (0.8 + 0.4 * vRnd), ti * (1.0 - uEver) * 0.6 * smoothstep(0.85, 0.25, uFolha));
     c = mix(c, vec3(0.50, 0.62, 0.16) * (0.7 + 0.5 * vRnd), uBrota * (1.0 - uEver) * 0.55);
     c *= mix(0.55, 1.0, smoothstep(0.0, 0.8, vLocal.y)) * (0.9 + 0.2 * vRnd);   // copa mais escura por baixo e por dentro
+    if (!gl_FrontFacing) c *= 0.5; // o lado de dentro da copa, visto pelos vãos das folhas que caíram
     diffuseColor.rgb = c;
   } else {
     diffuseColor.rgb *= mix(0.55, 1.0, smoothstep(0.0, 0.25, vLocal.y));          // pé do tronco escurecido (oclusão falsa)
@@ -196,7 +202,7 @@ bool folhaCai(vec3 loc, float rnd){
     s.fragmentShader = s.fragmentShader.replace('void main() {', `varying vec3 vLocalA; varying float vRndA, vTipoA; uniform float uFolha;
 float h3a(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
 void main() {
-  if (vTipoA > 0.5 && h3a(floor(vLocalA * 13.0) + vRndA * 17.0) > clamp(uFolha * 1.4 - vRndA * 0.4, 0.0, 1.0) * 0.985) discard;`);
+  if (vTipoA > 0.5 && h3a(floor(vLocalA * 36.0) + vRndA * 17.0) > clamp(uFolha * 1.4 - vRndA * 0.4, 0.0, 1.0) * 0.985) discard;`);
   };
 
   // ---------- malhas: 1 por classe e LOD ----------
@@ -209,11 +215,12 @@ void main() {
     const lista = porClasse[ci];
     malhas[ci] = [];
     for (const lod of LODS) {
-      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.FrontSide });
+      // os dois lados: pelos vãos das folhas que caem aparece o outro lado da copa, e não o vazio de uma casca oca
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
       const uEver = { value: P.ever ? 1 : 0 }, uOut = { value: new THREE.Vector3(...AUTUMN[ci].map((v, i) => v * [0.8, 0.74, 0.8][i])) };
       mat.onBeforeCompile = (s) => { injetar(s, { cheio: true }); s.uniforms.uEver = uEver; s.uniforms.uOutono = uOut; };
       mat.customProgramCacheKey = () => 'arv';
-      const dep = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.FrontSide });
+      const dep = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
       dep.onBeforeCompile = (s) => { injetar(s, { cheio: false }); s.uniforms.uEver = uEver; };
       dep.customProgramCacheKey = () => 'arv-dep';
       const m = new THREE.InstancedMesh(construir(ci, lod), mat, Math.max(1, lista.length));
@@ -255,7 +262,7 @@ void main() {
   function estacao(e) {
     const [a, mes, dia] = e.data.split('-').map(Number);
     const doy = Math.round((Date.UTC(a, mes - 1, dia) - Date.UTC(a, 0, 0)) / 86400000);
-    G.uFolha.value = ss(100, 126, doy) * (1 - ss(305, 350, doy));
+    G.uFolha.value = ss(100, 126, doy) * (1 - ss(292, 338, doy)); // Basel: copa cheia até meados de outubro, quase pelada no fim de novembro
     G.uTinta.value = doy > 200 ? ss(272, 318, doy) : 0;
     G.uBrota.value = doy < 200 ? ss(100, 118, doy) * (1 - ss(118, 150, doy)) : 0;
     G.uTrans.value = 0.1 * e.dia;
