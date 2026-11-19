@@ -111,7 +111,8 @@ function texRathaus() {
 // fachada do Rathaus para a Marktplatz (2026-11-19), num desenho só de 41,4 x 36,5 m (de 6,1 m, o chão da praça, para
 // cima), em vez da célula repetida: à esquerda a Kanzlei de 1606–08, com janelas em cruz e pinturas em grisalha; no meio
 // o corpo de 1504–14, com os três arcos da Bogenhalle, a fileira de janelas góticas, o relógio dourado com a Justitia,
-// os escudos de Basel e o friso pintado (os murais de Hans Bock, em versão de longe); à direita o pé da torre de 1900.
+// os anjos com os escudos de Basel sobre os arcos e o friso pintado (Hans Bock, 1608–11, em versão de longe); à direita o pé
+// da torre de 1898–1904. Fatos conferidos na Wikipedia (de: Rathaus Basel) em 2026-11-19.
 // u em metros ao longo da fachada a partir do canto norte (x −110,96, z −1,18); v em metros acima de 6,1 m.
 const RATH = { L: 41.4, H: 36.5, ppm: 40, kanzlei: [0, 17.6], corpo: [17.6, 34], topoCorpo: 18.6, topoKanzlei: 22.9 };
 function texRathausFrente() {
@@ -194,15 +195,20 @@ function texRathausFrente() {
     g.beginPath(); g.moveTo(X(cm - 0.55), Y(vr + 2.35)); g.lineTo(X(cm + 0.55), Y(vr + 2.35)); g.lineTo(X(cm + 0.25), Y(vr + 3.4)); g.lineTo(X(cm - 0.25), Y(vr + 3.4)); g.fill();
     g.strokeStyle = '#d9b24a'; g.lineWidth = 3; g.beginPath(); g.moveTo(X(cm - 0.9), Y(vr + 3.3)); g.lineTo(X(cm + 0.9), Y(vr + 3.3)); g.stroke();
     for (const s of [-0.9, 0.9]) { g.beginPath(); g.arc(X(cm + s), Y(vr + 2.95), 0.2 * ppm, 0, Math.PI); g.stroke(); }
-    // escudos: báculo de Basel, preto sobre branco
-    for (const s of [-1, 1]) {
-      const uc = cm + s * 4.6, v = vr + 0.4;
-      g.fillStyle = '#c9a13b'; g.beginPath(); g.moveTo(X(uc - 1.05), Y(v + 1.45)); g.lineTo(X(uc + 1.05), Y(v + 1.45)); g.lineTo(X(uc + 1.05), Y(v - 0.2)); g.quadraticCurveTo(X(uc + 1.05), Y(v - 1.4), X(uc), Y(v - 1.75)); g.quadraticCurveTo(X(uc - 1.05), Y(v - 1.4), X(uc - 1.05), Y(v - 0.2)); g.fill();
-      g.fillStyle = '#f1ece0'; g.beginPath(); g.moveTo(X(uc - 0.9), Y(v + 1.3)); g.lineTo(X(uc + 0.9), Y(v + 1.3)); g.lineTo(X(uc + 0.9), Y(v - 0.2)); g.quadraticCurveTo(X(uc + 0.9), Y(v - 1.25), X(uc), Y(v - 1.55)); g.quadraticCurveTo(X(uc - 0.9), Y(v - 1.25), X(uc - 0.9), Y(v - 0.2)); g.fill();
-      g.fillStyle = '#151515'; g.fillRect(X(uc - 0.12), Y(v + 0.6), X(0.24), X(1.9));
-      g.lineWidth = 7; g.strokeStyle = '#151515'; g.beginPath(); g.arc(X(uc + 0.12), Y(v + 0.65), 0.4 * ppm, Math.PI, 0.2 * Math.PI, true); g.stroke();
-      g.fillRect(X(uc - 0.35), Y(v - 1.25), X(0.7), X(0.18));
+    // sobre os arcos, nos vãos entre eles: anjos da vitória segurando os escudos de Basel (báculo preto sobre branco)
+    for (const fr of [1 / 3, 2 / 3]) {
+      const uc = c0 + cw * fr, v = 5.75, k = 0.62;
+      g.fillStyle = '#d9b24a'; // asas
+      for (const s of [-1, 1]) { g.beginPath(); g.moveTo(X(uc + s * 0.7 * k), Y(v + 0.9 * k)); g.quadraticCurveTo(X(uc + s * 2.1 * k), Y(v + 1.9 * k), X(uc + s * 2.0 * k), Y(v - 0.2 * k)); g.quadraticCurveTo(X(uc + s * 1.4 * k), Y(v + 0.4 * k), X(uc + s * 0.7 * k), Y(v - 0.4 * k)); g.fill(); }
+      g.fillStyle = '#c9a13b'; g.beginPath(); g.moveTo(X(uc - 1.05 * k), Y(v + 1.45 * k)); g.lineTo(X(uc + 1.05 * k), Y(v + 1.45 * k)); g.lineTo(X(uc + 1.05 * k), Y(v - 0.2 * k)); g.quadraticCurveTo(X(uc + 1.05 * k), Y(v - 1.4 * k), X(uc), Y(v - 1.75 * k)); g.quadraticCurveTo(X(uc - 1.05 * k), Y(v - 1.4 * k), X(uc - 1.05 * k), Y(v - 0.2 * k)); g.fill();
+      g.fillStyle = '#f1ece0'; g.beginPath(); g.moveTo(X(uc - 0.9 * k), Y(v + 1.3 * k)); g.lineTo(X(uc + 0.9 * k), Y(v + 1.3 * k)); g.lineTo(X(uc + 0.9 * k), Y(v - 0.2 * k)); g.quadraticCurveTo(X(uc + 0.9 * k), Y(v - 1.25 * k), X(uc), Y(v - 1.55 * k)); g.quadraticCurveTo(X(uc - 0.9 * k), Y(v - 1.25 * k), X(uc - 0.9 * k), Y(v - 0.2 * k)); g.fill();
+      g.fillStyle = '#151515'; g.fillRect(X(uc - 0.12 * k), Y(v + 0.6 * k), X(0.24 * k), X(1.9 * k));
+      g.lineWidth = 6 * k; g.strokeStyle = '#151515'; g.beginPath(); g.arc(X(uc + 0.12 * k), Y(v + 0.65 * k), 0.4 * k * ppm, Math.PI, 0.2 * Math.PI, true); g.stroke();
+      g.fillRect(X(uc - 0.35 * k), Y(v - 1.25 * k), X(0.7 * k), X(0.18 * k));
+      g.fillStyle = '#e0b894'; g.beginPath(); g.ellipse(X(uc), Y(v + 1.75 * k), 0.2 * k * ppm, 0.24 * k * ppm, 0, 0, 7); g.fill(); // cabeça do anjo
     }
+    // dos lados do relógio: janelas da Vordere Ratsstube, a sala onde fica a Justitia
+    for (const s of [-1, 1]) { const u = cm + s * 4.6; ret(u - 1.25, 13.2, u + 1.25, 16.4, '#d2ba8c'); ret(u - 1.0, 13.45, u + 1.0, 16.15, '#2c3c48'); ret(u - 0.06, 13.45, u + 0.06, 16.15, '#d2ba8c'); }
     // friso pintado no alto do corpo: figuras em vestes coloridas entre colunas fingidas (os murais, vistos de longe)
     const f0 = 18.6 - 4.0 + 0.6, f1 = 18.6 - 0.6;
     ret(c0, f0 - 0.35, c1, f0, '#c8ae80');
@@ -222,6 +228,49 @@ function texRathausFrente() {
     // ---- pé da torre (direita) e o alto, acima dos telhados (o que sobrar do LOD2 ali)
     ret(c1, 0, L, H, '#a33429');
     for (let v = 2; v < H; v += 4.4) { ret(c1 + 2.2, v, c1 + 3.6, v + 2.4, '#d6c194'); ret(c1 + 2.4, v + 0.2, c1 + 3.4, v + 2.2, '#2a3440'); }
+  });
+}
+// escudos dos cantões nas ameias (Wikipedia: "Zinnen mit den Wappen der Kantone"): oito brasões simplificados num atlas 8 x 1
+function texBrasoes() {
+  const N = 8, w = 64, h = 80;
+  const cores = [['#d52b1e', '#ffffff', 'cruz'], ['#1f5aa6', '#ffffff', 'faixa'], ['#ffffff', '#151515', 'baculo'], ['#f2c14e', '#151515', 'urso'],
+    ['#d52b1e', '#f2c14e', 'faixa'], ['#2f7a3a', '#ffffff', 'faixa'], ['#151515', '#f2c14e', 'cruz'], ['#ffffff', '#1f5aa6', 'faixa']];
+  return tex(N * w, h, (g) => {
+    g.fillStyle = '#a8352a'; g.fillRect(0, 0, N * w, h);
+    cores.forEach(([fundo, fig, tipo], i) => {
+      const x = i * w;
+      const escudo = () => { g.beginPath(); g.moveTo(x + 8, 6); g.lineTo(x + w - 8, 6); g.lineTo(x + w - 8, 40); g.quadraticCurveTo(x + w - 8, 66, x + w / 2, 76); g.quadraticCurveTo(x + 8, 66, x + 8, 40); g.closePath(); };
+      g.fillStyle = '#c9a13b'; escudo(); g.fill();
+      g.save(); g.translate(x + w / 2, 41); g.scale(0.86, 0.88); g.translate(-(x + w / 2), -41); g.fillStyle = fundo; escudo(); g.fill(); g.clip();
+      g.fillStyle = fig;
+      if (tipo === 'cruz') { g.fillRect(x + w / 2 - 5, 18, 10, 40); g.fillRect(x + 16, 33, w - 32, 10); }
+      else if (tipo === 'faixa') g.fillRect(x, 6, w, 30);
+      else if (tipo === 'baculo') { g.fillRect(x + w / 2 - 3, 26, 6, 40); g.lineWidth = 6; g.strokeStyle = fig; g.beginPath(); g.arc(x + w / 2 + 3, 26, 9, Math.PI, 0.2 * Math.PI, true); g.stroke(); }
+      else { g.beginPath(); g.ellipse(x + w / 2, 44, 14, 18, 0, 0, 7); g.fill(); }
+      g.restore();
+    });
+  });
+}
+// pintura da torre (Wilhelm Balmer, 1901): o porta-bandeira Hans Bär, morto em Marignano em 1515, de pé com a bandeira
+function texBalmer() {
+  const ppm = 40, W = 6 * ppm, H = 10 * ppm;
+  return tex(W, H, (g) => {
+    g.fillStyle = '#a33429'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#c8ae80'; g.fillRect(8, 8, W - 16, H - 16); g.fillStyle = '#e9dfc4'; g.fillRect(16, 16, W - 32, H - 32);
+    const cx = W / 2;
+    // bandeira de Basel tremulando
+    g.fillStyle = '#5a3a22'; g.fillRect(cx + 34, 40, 6, H - 80);
+    g.fillStyle = '#f6f2e6'; g.beginPath(); g.moveTo(cx + 40, 44); g.quadraticCurveTo(cx + 90, 30, cx + 100, 70); g.quadraticCurveTo(cx + 80, 130, cx + 40, 140); g.fill();
+    g.fillStyle = '#151515'; g.fillRect(cx + 62, 66, 6, 50); g.lineWidth = 5; g.strokeStyle = '#151515'; g.beginPath(); g.arc(cx + 68, 70, 8, Math.PI, 0.2 * Math.PI, true); g.stroke();
+    // o porta-bandeira: gibão vermelho e branco, calção, chapéu com pluma
+    g.fillStyle = '#e0b894'; g.beginPath(); g.ellipse(cx, 120, 16, 19, 0, 0, 7); g.fill();
+    g.fillStyle = '#2b2b2b'; g.beginPath(); g.ellipse(cx, 104, 26, 8, 0, 0, 7); g.fill();
+    g.fillStyle = '#f6f2e6'; g.beginPath(); g.moveTo(cx + 10, 100); g.quadraticCurveTo(cx + 40, 70, cx + 34, 104); g.fill();
+    g.fillStyle = '#b3201c'; g.fillRect(cx - 28, 140, 28, 90); g.fillStyle = '#f6f2e6'; g.fillRect(cx, 140, 28, 90);
+    g.fillStyle = '#b3201c'; g.fillRect(cx + 26, 150, 14, 50); g.fillStyle = '#f6f2e6'; g.fillRect(cx - 40, 150, 14, 60);
+    g.fillStyle = '#3a3a5a'; g.fillRect(cx - 24, 230, 20, 100); g.fillRect(cx + 4, 230, 20, 100);
+    g.fillStyle = '#2b2b2b'; g.fillRect(cx - 28, 326, 26, 10); g.fillRect(cx + 2, 326, 26, 10);
+    g.fillStyle = '#9a9a9a'; g.fillRect(cx - 50, 200, 8, 120); // espada
   });
 }
 // telha vidrada do Münster: losangos concêntricos amarelo, vermelho, verde, preto; telhas de 8 px
@@ -378,6 +427,8 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     rosace: std(texRosace(), { roughness: 0.4, envMap: ENV, envMapIntensity: 0.6 }),
     rathaus: std(texRathaus()),
     rathausFrente: std(texRathausFrente()),
+    brasoes: std(texBrasoes(), { roughness: 0.5 }),
+    balmer: std(texBalmer()),
     telhaR: std(texTelha('#8d4a34', 4)),
     pedraN: std(texPedra({ cw: 4, ch: 4, cor: '#b98a68', seed: 21 })),
     pedraNJ: std(texPedra({ cw: 4, ch: 12, cor: '#b98a68', janela: true, seed: 22 })),
@@ -390,7 +441,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     ouro: new THREE.MeshStandardMaterial({ color: 0xc9a13b, roughness: 0.3, metalness: 0.85, envMap: ENV, envMapIntensity: 1.1 }),
     relogio: new THREE.MeshStandardMaterial({ map: texRelogio(), roughness: 0.4, metalness: 0.2, envMap: ENV, envMapIntensity: 0.5 }),
   };
-  for (const k of ['rathaus', 'rathausFrente', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha', 'ferro']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
+  for (const k of ['rathaus', 'rathausFrente', 'brasoes', 'balmer', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha', 'ferro']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
   let cotaMittlere = null;
   const raiz = new THREE.Group();
   raiz.name = 'marcos';
@@ -538,10 +589,25 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     // ameias sobre o corpo de 1504 (vermelhas, com cobertura de arenito) e pináculos dourados nas quinas e no meio
     {
       const ang = Math.atan2(dir.y, dir.x), mk = new Marco(quadro(o.x, o.y, ang)), [c0, c1] = RATH.corpo, yt = Y0 + RATH.topoCorpo;
+      let nb = 0;
       for (let u = c0 + 0.2; u < c1 - 0.6; u += 1.3) {
         mk.caixa('rathaus', u, u + 0.75, -0.25, 0.35, yt - 0.2, yt + 1.15, { sx: 3.6, sy: 4.2 });
         mk.caixa('pedraL', u - 0.05, u + 0.8, -0.3, 0.4, yt + 1.15, yt + 1.3, { sx: 2 });
+        // brasão de um cantão na frente de cada ameia (b = 0,36: 1 cm à frente)
+        const k = nb++ % 8, q = new THREE.PlaneGeometry(0.6, 0.75); // de frente para +b, a normal da fachada
+        const uvq = q.attributes.uv; for (let i = 0; i < uvq.count; i++) uvq.setX(i, (k + uvq.getX(i)) / 8);
+        q.translate(u + 0.375, yt + 0.5, 0.36);
+        mk.add('brasoes', q, { uvPronto: true });
       }
+      // Erker da ala esquerda (1898–1904): balcão fechado de dois andares, saliente 1,2 m, com telhadinho em ponta
+      { const u0 = 5.6, u1 = 9.4, y0 = Y0 + 6.2, y1 = Y0 + 13.4;
+        mk.caixa('rathaus', u0, u1, 0, 1.25, y0, y1, { sx: 3.6, sy: 4.2 });
+        mk.caixa('pedraL', u0 - 0.15, u1 + 0.15, -0.05, 1.4, y0 - 0.5, y0, { sx: 2 });
+        mk.tronco('flecha', (u0 + u1) / 2, 0.62, 2.5, 0.05, y1, y1 + 2.6, 4, Math.PI / 4);
+        mk.tronco('ouro', (u0 + u1) / 2, 0.62, 0.08, 0.08, y1 + 2.6, y1 + 3.4, 6); }
+      // pintura de Wilhelm Balmer (1901) na face da torre voltada para a praça
+      { const q = new THREE.PlaneGeometry(4.6, 7.6); q.translate(38.4, Y0 + 22, 0.68); // centro da torre: u 38,4, b −3,2; face a +0,6
+        mk.add('balmer', q, { uvPronto: true }); }
       for (const u of [c0 + 0.3, (c0 + c1) / 2, c1 - 0.3]) {
         mk.tronco('ouro', u, 0.05, 0.28, 0.28, yt + 1.3, yt + 2.2, 6);
         mk.tronco('ouro', u, 0.05, 0.3, 0.0, yt + 2.2, yt + 4.4, 6);
