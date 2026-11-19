@@ -383,6 +383,72 @@ canvas.addEventListener('pointerup', (e) => {
   else if (hit) abrirFicha(ids16[hit.face.a]); else fecharFicha();
 });
 
+// ---------- vista de rua: clique duplo no chão desce a câmera à altura dos olhos ali ----------
+// Arrastar olha em volta (a órbita fica a 30 cm à frente do olho), um novo clique duplo anda até o ponto, a roda para trás
+// ou Esc voltam para o alto. Clique duplo num prédio desce na rua em frente à fachada clicada.
+const RUA = { on: false, salvo: null, anim: 0 };
+const chipRua = document.createElement('div');
+chipRua.id = 'rua-chip'; chipRua.hidden = true;
+chipRua.textContent = t('Vista de rua · arraste para olhar · clique duplo para andar · roda ou Esc para sair', 'Street view · drag to look · double-click to walk · scroll or Esc to leave', 'Strassenansicht · ziehen zum Umschauen · Doppelklick zum Gehen · Mausrad oder Esc zum Verlassen');
+Object.assign(chipRua.style, { position: 'fixed', left: '50%', bottom: '18px', transform: 'translateX(-50%)', zIndex: 30, background: 'rgba(20,18,24,.75)', color: '#f6efe0', font: '600 13px system-ui, sans-serif', padding: '8px 14px', borderRadius: '999px', pointerEvents: 'none', maxWidth: 'calc(100% - 32px)', textAlign: 'center' });
+document.body.appendChild(chipRua);
+function voarPara(posFim, alvoFim, ms = 900) {
+  cancelAnimationFrame(RUA.anim);
+  const p0 = camera.position.clone(), a0 = controls.target.clone(), t0 = performance.now();
+  const passo = (agora) => {
+    const k = Math.min(1, (agora - t0) / ms), e = k * k * (3 - 2 * k);
+    camera.position.lerpVectors(p0, posFim, e); controls.target.lerpVectors(a0, alvoFim, e);
+    camera.lookAt(controls.target);
+    if (k < 1) RUA.anim = requestAnimationFrame(passo);
+  };
+  RUA.anim = requestAnimationFrame(passo);
+}
+function entrarRua(x, z) {
+  if (!RUA.on) {
+    RUA.salvo = { minDistance: controls.minDistance, maxPolarAngle: controls.maxPolarAngle, minPolarAngle: controls.minPolarAngle, enablePan: controls.enablePan, enableZoom: controls.enableZoom, rotateSpeed: controls.rotateSpeed };
+    Object.assign(controls, { minDistance: 0.05, maxPolarAngle: THREE.MathUtils.degToRad(170), minPolarAngle: THREE.MathUtils.degToRad(10), enablePan: false, enableZoom: false, rotateSpeed: -0.35 });
+    RUA.on = true; chipRua.hidden = false; fecharFicha();
+  }
+  // olha na direção em que a câmera já olhava, na horizontal
+  const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
+  const y = altura(x, z) + 1.7, olho = new THREE.Vector3(x, y, z);
+  voarPara(olho, olho.clone().addScaledVector(f, 0.3));
+}
+function sairRua() {
+  if (!RUA.on) return;
+  RUA.on = false; chipRua.hidden = true;
+  const salvo = RUA.salvo;
+  setTimeout(() => { if (!RUA.on) Object.assign(controls, salvo); }, 1150); // depois do voo: com minDistance de 25 m já valendo, a câmera saltava
+  const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize();
+  const alvo = camera.position.clone(); alvo.y -= 1.7;
+  voarPara(alvo.clone().addScaledVector(f, -90).add(new THREE.Vector3(0, 80, 0)), alvo, 1100);
+}
+canvas.addEventListener('dblclick', (e) => {
+  if ((typeof window.tour?.ativo === 'function' && window.tour.ativo()) || window.jogo?.ativo()) return;
+  const r = canvas.getBoundingClientRect();
+  raio.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const chao = raio.intersectObject(CH.malha, false)[0], pr = raio.intersectObject(predios, false)[0];
+  let p = chao?.point;
+  // prédio na frente do chão: desce na rua diante da fachada clicada
+  if (pr && (!chao || pr.distance < chao.distance)) p = pr.point.clone();
+  if (!p || foraREC(p.x, p.z, 2)) return;
+  // fora de qualquer prédio: recua na horizontal, para o lado de quem olha, até achar a rua (grade de jogo.js, 1 m)
+  const livre = window.jogo?.livreRua;
+  if (livre && !livre(p.x, p.z)) {
+    const v = new THREE.Vector2(camera.position.x - p.x, camera.position.z - p.z).normalize();
+    let d0 = 0;
+    for (let d = 1; d <= 40 && !d0; d += 1) if (livre(p.x + v.x * d, p.z + v.y * d)) d0 = d;
+    if (!d0) return;
+    // e mais até 8 m pela rua (enquanto livre), para ver a fachada clicada inteira e não colado nela
+    let d1 = d0; while (d1 < d0 + 8 && livre(p.x + v.x * (d1 + 1), p.z + v.y * (d1 + 1))) d1++;
+    p = p.clone(); p.x += v.x * d1; p.z += v.y * d1;
+  }
+  e.preventDefault();
+  entrarRua(p.x, p.z);
+});
+canvas.addEventListener('wheel', (e) => { if (RUA.on && e.deltaY > 0) sairRua(); }, { passive: true });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && RUA.on) sairRua(); });
+
 // ---------- câmera: posição por alvo, distância, rumo (az) e inclinação (polar) ----------
 const esf = new THREE.Spherical();
 function lerCamera() {
@@ -505,7 +571,7 @@ function centro(nome) {
 
 window.cidade = {
   THREE, FACH, MARC, U, camera, arvores, centro, controls, lerCamera, porCamera, definirNoite, fecharFicha, abrirFicha,
-  noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura, ceu, cena,
+  noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura, ceu, cena, sairRua, rua: () => RUA.on,
   // para o modo jogo (jogo.js): plantas dos prédios, pontes e o Reno
   posicoes, nTris: meta.n_tris, ruas, cotaPonta, cotaPonte: MARC.cotaPonte, nivelReno: AGUA.nivel, relevo: R, ponte: MITTLERE,
 };

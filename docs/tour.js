@@ -230,6 +230,7 @@ function progresso() {
 
 async function iniciar() {
   if (ativo) return;
+  if (C.rua?.()) C.sairRua();
   ativo = true;
   const e0 = C.ceu.estado();
   salvo = { noite: C.noite(), data: e0.data, hora: e0.hora, vivo: C.ceu.aoVivo };
