@@ -56,8 +56,16 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
       // copa de árvore vizinha que a foto deita sobre o telhado: verde vira cinza quente
       foto = mix(foto, vec3(lum) * vec3(1.04, 1.0, 0.94), smoothstep(0.015, 0.08, foto.g - max(foto.r, foto.b)) * 0.8);
       float inclinado = 1.0 - smoothstep(0.93, 0.98, abs(nO.y));
-      vec3 telha = diffuseColor.rgb * clamp(0.55 + 1.5 * lum, 0.6, 1.35);
-      foto = mix(foto, telha, inclinado * 0.5);
+      // água inclinada: a cor é da telha do prédio (vértice); da foto fica só a luz e a sombra (o pátio e o vizinho
+      // que a foto deita no telhado somem). Manchas de idade e musgo nas águas viradas para o norte
+      vec3 nC = nO.y < 0.0 ? -nO : nO;
+      vec2 pT = vMundo.xz;
+      float hT = fract(sin(dot(floor(pT * 0.35), vec2(127.1, 311.7))) * 43758.5453);
+      float idade = 0.88 + 0.24 * hT;
+      vec3 telha = diffuseColor.rgb * idade * clamp(0.78 + 0.55 * (lum - 0.35), 0.7, 1.15);
+      float musgo = smoothstep(0.15, 0.55, -nC.z) * smoothstep(0.45, 0.8, fract(sin(dot(floor(pT * 1.3), vec2(12.9898, 78.233))) * 43758.5453));
+      telha = mix(telha, vec3(0.30, 0.31, 0.21), musgo * 0.35);
+      foto = mix(foto, telha, inclinado * 0.85);
       diffuseColor.rgb = mix(diffuseColor.rgb, foto, teto);
     }
   }`);
