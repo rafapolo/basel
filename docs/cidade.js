@@ -12,7 +12,7 @@ import { criarArvores } from './arvores.js';
 import { criarChao, cotaPonta } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
 import { decodifica, baixaBin } from './compacta.js';
-import { injetarSombra, atualizarNuvens, TEMPO } from './nuvens.js';
+import { atualizarNuvens, TEMPO } from './nuvens.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -283,7 +283,7 @@ function injetar(shader, cheio) {
   }`);
 }
 const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-material.onBeforeCompile = (s) => { injetar(s, true); FACH.injetar(s); injetarSombra(s, 'vMundo.xz'); };
+material.onBeforeCompile = (s) => { injetar(s, true); FACH.injetar(s); };
 // a ortofoto encadeia depois das fachadas: a foto entra logo após <color_fragment> e vira a base da telha
 orto.telhados(material);
 const predios = new THREE.Mesh(geo, material);

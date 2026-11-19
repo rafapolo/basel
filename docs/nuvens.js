@@ -1,6 +1,5 @@
-// Nuvens (realismo 4 e 1): uma camada só, a ~1,5 km, que faz duas coisas com o mesmo ruído:
-//  - sombras que passam pela cidade (prédios, chão, árvores): corta só a luz direta do sol, em <lights_fragment_end>
-//  - as nuvens no céu (ceu.js desenha a camada de baixo para cima)
+// Nuvens no céu (ceu.js desenha a camada, a ~1,5 km). As sombras delas no chão saíram em 2026-11-19: as manchas de luz
+// andando pela cidade pareciam holofotes de festa. injetarSombra() fica aqui, sem uso, caso se queira voltar.
 // A cobertura e o vento são os de agora em Basel quando o relógio está ao vivo (Open-Meteo, sem chave; nada do usuário vai
 // no pedido); senão, a média do mês (Basel: céu mais fechado no inverno). Uso: injetarSombra(shader, 'vMundoXZ').
 import * as THREE from 'three';
