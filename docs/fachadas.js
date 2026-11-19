@@ -26,6 +26,7 @@ const hash2 = (a, b) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349
 export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
   const P = meta.predios, nTris = meta.n_tris, nVert = nTris * 3;
   const fa = new Float32Array(nVert * 4), fb = new Float32Array(nVert * 4);
+  const muro = (p) => !p.egid && p.ano == null;
   const velho = (p) => (p.ano ?? 2000) < 1950 ? 1 : 0;
 
   // ---- 1. agrupa triângulos por plano: paredes (u,v) e telhados (cumeeira) ----
@@ -94,8 +95,10 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
     if (hW / nF > 4.6) nF = Math.max(1, Math.round(hW / 4.0));
     g.len = len; g.hW = hW; g.nF = nF;
     g.seed = hash(g.id * 977 + Math.round(g.umin * 3) + Math.round(g.ymin));
-    g.mat = (p.mat ?? 0) + 10 * velho(p);
-    g.loja = p.lj ?? 0;
+    // sem registro no GWR (sem EGID nem ano): muro, cais ou terraço do swissBUILDINGS3D (o muro da Pfalz sob o
+    // Münster é o caso clássico), não prédio: pedra de cantaria e nenhuma janela, porta ou vitrine (material 3)
+    g.mat = (muro(p) ? 3 : (p.mat ?? 0)) + 10 * velho(p);
+    g.loja = muro(p) ? 0 : (p.lj ?? 0);
   }
   for (let t = 0; t < nTris; t++) {
     const gi = triParede[t];
@@ -139,7 +142,7 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
   };
   for (const [id, gs] of porPredio) {
     const p = P[id];
-    if ((p.mat ?? 0) === 2) continue; // concreto e vidro: telhado quase sempre plano
+    if ((p.mat ?? 0) === 2 || muro(p)) continue; // concreto e vidro: telhado quase sempre plano; muro: sem telhado
     const sorteio = (k) => hash2(id * 31 + 7, k);
     gs.sort((x, y) => y.ymax - x.ymax);
     const alto = gs[0];
@@ -285,6 +288,15 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
           vec3 pedra = vec3(0.64, 0.36, 0.28) * (0.86 + 0.28 * fh21(vec2(floor(bu), rowB) + vPred * 37.0));
           parede = mix(vec3(0.60, 0.36, 0.29), pedra * mix(0.68, 1.0, jx * jy), f);
           fachH = mix(0.0, jx * jy, f); fachBump = 0.35;
+        } else if (mat > 2.5) {
+          // muro de cantaria (Pfalz, cais, terraços): blocos grandes de arenito acinzentado, juntas fundas, manchas de umidade
+          float rowB = floor(v / 0.55); float bu = u / 1.3 + 0.5 * mod(rowB, 2.0) + wseed * 5.0;
+          float jx = smoothstep(0.0, 0.04, fract(bu)) * smoothstep(1.0, 0.96, fract(bu)), jy = smoothstep(0.0, 0.07, fract(v / 0.55));
+          float f = 1.0 - smoothstep(0.12, 0.45, lw / 0.55);
+          vec3 pedra = vec3(0.58, 0.52, 0.46) * (0.82 + 0.3 * fh21(vec2(floor(bu), rowB) + vPred * 23.0));
+          pedra *= 1.0 - 0.18 * smoothstep(0.55, 0.9, fhn(vec2(u * 0.15, v * 0.5) + wseed * 9.0)); // escorrido de umidade
+          parede = mix(vec3(0.55, 0.50, 0.45), pedra * mix(0.62, 1.0, jx * jy), f);
+          fachH = mix(0.0, jx * jy, f); fachBump = 0.45;
         } else if (mat > 1.5) {
           float pj = smoothstep(0.0, 0.025, fract(u / 2.4)) * smoothstep(0.0, 0.025, fract(v / 3.1));
           parede = mix(vec3(0.70, 0.69, 0.66), vec3(0.63, 0.64, 0.64), vPred) * mix(0.92, 1.0, mix(1.0, pj, 1.0 - smoothstep(0.2, 0.7, lw)));
@@ -295,7 +307,7 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
         // sujeira perto do chão e sombra sob o beiral
         parede *= mix(0.80, 1.0, smoothstep(0.0, 1.6, v)) * mix(0.9, 1.0, smoothstep(0.0, 0.5, hW - v));
       }
-      if (len > 1.3 && v < hW + 0.01) {
+      if (len > 1.3 && v < hW + 0.01 && mat < 2.5) {
         float cols = max(1.0, floor(len / (2.5 + 1.3 * vPred) + 0.5));
         float cw = len / cols, cu = u / cw, ci = clamp(floor(cu), 0.0, cols - 1.0), fu = cu - ci;
         float fh = hW / max(nF, 1.0), cv = v / fh, ri = floor(cv), fv = cv - ri;
