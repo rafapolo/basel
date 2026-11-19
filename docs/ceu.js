@@ -15,6 +15,7 @@
 // `azimute` em radianos a partir do norte, no sentido horário (π/2 = leste); `altitude` em radianos acima do horizonte.
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { NUV, GLSL_NUVEM } from './nuvens.js';
 
 const LAT = 47.557, LNG = 7.59; // Basel
 const rad = Math.PI / 180;
@@ -158,12 +159,26 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
   const su = sky.material.uniforms;
   su.turbidity.value = PARAM.turbidez; su.rayleigh.value = PARAM.rayleigh; su.mieCoefficient.value = PARAM.mie; su.mieDirectionalG.value = PARAM.g;
   su.uNoite = { value: 0 };
+  Object.assign(su, NUV); // a mesma camada de nuvens que faz sombra no chão (nuvens.js)
   sky.material.onBeforeCompile = (s) => {
     s.fragmentShader = s.fragmentShader
-      .replace('void main() {', 'uniform float uNoite;\nvoid main() {')
+      .replace('void main() {', `uniform float uNoite;\n${GLSL_NUVEM}\nvoid main() {`)
       // abaixo do horizonte (fora do recorte, vista de cima) o Preetham dava um cinza-claro chapado (#e8e8ea): escurece
     // para uma bruma de terra distante, verde-acinzentada, que deixa a borda da cidade legível
     .replace('gl_FragColor = vec4( retColor, 1.0 );', `retColor = mix(retColor, retColor * vec3(0.3, 0.34, 0.32), smoothstep(0.0, -0.35, direction.y));
+    // nuvens: o raio de visão encontra a camada a 1,5 km; densa = base cinza, rala = branca iluminada pelo sol,
+    // somem perto do horizonte (a camada fica longe demais) e escurecem à noite
+    // degradê próprio: o Preetham com a bruma de Basel saía quase branco até o zênite; azul mais fundo no alto
+    float zen = smoothstep(0.02, 0.65, direction.y) * (1.0 - uNoite);
+    retColor *= mix(vec3(1.0), vec3(0.50, 0.66, 0.98), zen * 0.85);
+    if (direction.y > 0.0) {
+      vec2 pN = cameraPosition.xz + direction.xz / max(direction.y, 0.02) * 1500.0;
+      float d = nuvem(pN) * smoothstep(0.02, 0.18, direction.y);
+      float lumC = dot(retColor, vec3(0.299, 0.587, 0.114));
+      float solV = pow(max(dot(direction, vSunDirection), 0.0), 8.0);
+      vec3 corN = vec3(lumC * 1.9 + 0.12) * mix(vec3(1.0), vec3(0.72, 0.75, 0.8), smoothstep(0.4, 1.0, d)) + vec3(1.0, 0.85, 0.65) * solV * lumC;
+      retColor = mix(retColor, corN * (1.0 - 0.85 * uNoite), d * 0.92);
+    }
     retColor += uNoite * mix(vec3(${NOITE_H.join(',')}), vec3(${NOITE_Z.join(',')}), clamp(direction.y * 1.5, 0.0, 1.0));
     gl_FragColor = vec4( retColor, 1.0 );`);
   };
