@@ -11,7 +11,7 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
     uOrtoRet: { value: new THREE.Vector4(0, 0, 1, 1) }, // x0, z0, 1/largura, 1/profundidade
     uOrtoChao: { value: 0 }, uOrtoTelhado: { value: 0 }, uOrtoK: { value: 0.78 },
   };
-  let modoEpoca = false, pronto = false;
+  let pronto = false;
   const DECL = 'uniform sampler2D uOrto; uniform vec4 uOrtoRet; uniform float uOrtoChao; uniform float uOrtoTelhado; uniform float uOrtoK;';
   const amostra = (p) => `texture2D(uOrto, (${p} - uOrtoRet.xy) * uOrtoRet.zw).rgb * uOrtoK`;
 
@@ -63,7 +63,6 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
   }`);
       }, 'telhado');
     },
-    modo(m) { modoEpoca = m === 'epoca'; if (pronto) U.uOrtoTelhado.value = modoEpoca ? 0 : 1; },
     async carrega() {
       const meta = await fetch(base + 'ortofoto.json').then((r) => r.json());
       const N = meta.grade, LADO = meta.lado;
@@ -85,7 +84,7 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
       U.uOrto.value = tex;
       U.uOrtoRet.value.set(meta.x0, meta.z0, 1 / (meta.x1 - meta.x0), 1 / (meta.z1 - meta.z0));
       U.uOrtoChao.value = 1;
-      U.uOrtoTelhado.value = modoEpoca ? 0 : 1;
+      U.uOrtoTelhado.value = 1;
       pronto = true;
 
       // tiles de 1024 px, do mais perto do alvo da câmera ao mais longe; um upload por rajada

@@ -1,8 +1,8 @@
 // Detalhes de rua (tarefa 17): fontanários com água e jatos, postes de luz que acendem de noite (com poça de luz no chão e brilho
 // no bloom), bancos, lixeiras, bicicletários (data.bs.ch 100241), toldos e mesas de café com guarda-sol no verão, letreiros
 // de loja por categoria (sem marcas), bandeiras de Basel nos prédios públicos, balsas de cabo do Reno e navios.
-// Posições: docs/data/detalhes.json (script/detalhes.py). Tudo em InstancedMesh (poucas chamadas de desenho); o que está preso a
-// um prédio ou tem época (postes elétricos, bicicletários…) some pela máquina do tempo: atributo de instância `iAno` contra uAno.
+// Posições: docs/data/detalhes.json (script/detalhes.py). Tudo em InstancedMesh (poucas chamadas de desenho).
+// A cidade é a de hoje: tudo aparece (não há mais máquina do tempo).
 // Modo leve (`ceu.leve`): sem sombras, sem poça de luz, menos postes e menos gotas.
 // criarDetalhes({ THREE, cena, renderer, camera, U, altura, ceu, P, nivelAgua, leve, base }) -> { grupo, estat, ... }
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -11,10 +11,9 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
   const D = await fetch(base + 'detalhes.json').then((r) => r.json());
   const grupo = new THREE.Group(); grupo.name = 'detalhes';
   cena.add(grupo);
-  const UL = { uAno: U.uAno, uNoite: U.uNoite, uLuz: { value: 0 }, uTempo: { value: 0 }, uPx: { value: 400 } };
+  const UL = { uNoite: U.uNoite, uLuz: { value: 0 }, uTempo: { value: 0 }, uPx: { value: 400 } };
   const estat = { instancias: 0, malhas: 0 };
   const rnd = (i) => { let x = Math.imul(i + 1, 0x9e3779b1); x ^= x >>> 15; x = Math.imul(x, 0x85ebca6b); return ((x ^ (x >>> 13)) >>> 0) / 4294967296; };
-  const anoDe = (bid, minimo) => Math.max(minimo, bid == null ? 0 : (P[bid]?.ano ?? 2026)); // prédio sem ano só existe em 2026 (como no shader dos prédios)
 
   // ---------- peças comuns ----------
   const col = (h) => new THREE.Color(h);
@@ -36,13 +35,13 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
   const caixa = (a, b, c) => new THREE.BoxGeometry(a, b, c);
 
   // material com luz própria (vértices com `luz`=1 acendem de noite), época por instância e vento opcional
-  function material(nome, { ano = true, luz = true, ...resto } = {}) {
+  function material(nome, { luz = true, ...resto } = {}) {
     const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.25, ...resto });
     m.onBeforeCompile = (s) => {
       Object.assign(s.uniforms, UL);
       s.vertexShader = s.vertexShader
-        .replace('#include <common>', `#include <common>\n${ano ? 'attribute float iAno; uniform float uAno;' : ''}${luz ? 'attribute float luz; varying float vLuz;' : ''}`)
-        .replace('#include <begin_vertex>', `#include <begin_vertex>\n${luz ? 'vLuz = luz;' : ''}${ano ? 'if (uAno < iAno) transformed *= 0.0;' : ''}`);
+        .replace('#include <common>', `#include <common>\n${luz ? 'attribute float luz; varying float vLuz;' : ''}`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>\n${luz ? 'vLuz = luz;' : ''}`);
       if (luz) s.fragmentShader = s.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying float vLuz; uniform float uLuz;')
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.72, 0.38) * vLuz * uLuz;');
@@ -54,28 +53,23 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
     m.onBeforeCompile = (s) => {
       Object.assign(s.uniforms, UL);
-      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float iAno; uniform float uAno;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nif (uAno < iAno) transformed *= 0.0;');
     };
     m.customProgramCacheKey = () => 'det-prof';
     return m;
   }
 
   const q = new THREE.Quaternion(), e = new THREE.Vector3(), esc = new THREE.Vector3(), m4 = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0);
-  // itens: [{ x, y, z, r (rotação em Y), s (escala) ou sx, sy, sz, ano, cor }]
+  // itens: [{ x, y, z, r (rotação em Y), s (escala) ou sx, sy, sz, cor }]
   function instanciar(nome, geo, mat, itens, { sombra = false, recebe = true, cores = false } = {}) {
     if (!itens.length) return null;
     const im = new THREE.InstancedMesh(geo, mat, itens.length);
-    const anos = new Float32Array(itens.length);
     itens.forEach((it, i) => {
       q.setFromAxisAngle(UP, it.r || 0);
       const s = it.s ?? 1;
       m4.compose(e.set(it.x, it.y, it.z), q, esc.set(it.sx ?? s, it.sy ?? s, it.sz ?? s));
       im.setMatrixAt(i, m4);
-      anos[i] = it.ano ?? 0;
       if (cores) im.setColorAt(i, it.cor ?? col(0xffffff));
     });
-    geo.setAttribute('iAno', new THREE.InstancedBufferAttribute(anos, 1));
     im.instanceMatrix.needsUpdate = true;
     im.castShadow = sombra && !leve; im.receiveShadow = recebe && !leve;
     if (im.castShadow) im.customDepthMaterial = profundidade();
@@ -106,9 +100,9 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
   const lamp = D.lampadas.filter((l, i) => !leve || i < 25 || i % 2 === 0);
   const poste = lamp.filter((l) => l[3] === 0), parede = lamp.filter((l) => l[3] === 1);
   const matLamp = material('lamp');
-  const item = (l, ano) => ({ x: l[0], z: l[1], y: noChao(l[0], l[1], l[4]), r: l[2], ano });
-  instanciar('postes', geoPoste, matLamp, poste.map((l) => item(l, 1900)), { sombra: true });
-  instanciar('lampadas-parede', geoParede, matLamp, parede.map((l) => item(l, 1900)), { sombra: false });
+  const item = (l) => ({ x: l[0], z: l[1], y: noChao(l[0], l[1], l[4]), r: l[2] });
+  instanciar('postes', geoPoste, matLamp, poste.map((l) => item(l)), { sombra: true });
+  instanciar('lampadas-parede', geoParede, matLamp, parede.map((l) => item(l)), { sombra: false });
   // poça de luz no chão: disco aditivo com gradiente radial (só de noite; no modo leve fica de fora)
   let pocas = null;
   if (!leve) {
@@ -122,7 +116,7 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
       polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
     const discos = lamp.map((l) => {
       const off = l[3] === 1 ? 1.7 : 0, x = l[0] + Math.sin(l[2]) * off, z = l[1] + Math.cos(l[2]) * off;
-      return { x, z, y: noChao(x, z, l[4]) + 0.12, s: 11, ano: 1900 };
+      return { x, z, y: noChao(x, z, l[4]) + 0.12, s: 11 };
     });
     pocas = instanciar('pocas-de-luz', geoDisco, matDisco, discos, { recebe: false });
     pocas.visible = false;
@@ -135,9 +129,9 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     { g: caixa(0.06, 0.46, 0.4), c: METAL, m: T(-0.75, 0.23, 0) }, { g: caixa(0.06, 0.46, 0.4), c: METAL, m: T(0.75, 0.23, 0) },
   ]);
   const matBanco = material('banco', { luz: false, roughness: 0.78 });
-  instanciar('bancos', geoBanco, matBanco, D.bancos.map((b) => ({ x: b[0], z: b[1], y: altura(b[0], b[1]), r: b[2], ano: 1900 })));
+  instanciar('bancos', geoBanco, matBanco, D.bancos.map((b) => ({ x: b[0], z: b[1], y: altura(b[0], b[1]), r: b[2] })));
   const geoLixo = juntar([{ g: cil(0.22, 0.22, 0.8, 10), c: 0x33473c, m: T(0, 0.4, 0) }, { g: cil(0.24, 0.24, 0.06, 10), c: 0x24302a, m: T(0, 0.83, 0) }]);
-  instanciar('lixeiras', geoLixo, material('lixo', { luz: false }), D.lixeiras.map((b) => ({ x: b[0], z: b[1], y: altura(b[0], b[1]), ano: 1960 })));
+  instanciar('lixeiras', geoLixo, material('lixo', { luz: false }), D.lixeiras.map((b) => ({ x: b[0], z: b[1], y: altura(b[0], b[1]) })));
 
   // ---------- bicicletários (data.bs.ch 100241): um U invertido a cada 0,7 m; cobertos ganham teto ----------
   {
@@ -147,12 +141,12 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
       const voltas = Math.max(1, Math.min(10, Math.round(n / 2))), cx = Math.cos(a), cz = -Math.sin(a), y0 = altura(x, z);
       for (let k = 0; k < voltas; k++) {
         const o = (k - (voltas - 1) / 2) * 0.7;
-        lo.push({ x: x + cx * o, z: z + cz * o, y: y0, r: a + Math.PI / 2, ano: 1980 });
+        lo.push({ x: x + cx * o, z: z + cz * o, y: y0, r: a + Math.PI / 2 });
       }
       if (cob) {
         const L = voltas * 0.7 + 0.6;
-        tetos.push({ x, z, y: y0 + 2.3, r: a, sx: L, sy: 1, sz: 1, ano: 1980 });
-        for (const lado of [-1, 1]) pil.push({ x: x + cx * lado * (L / 2 - 0.1), z: z + cz * lado * (L / 2 - 0.1), y: y0, ano: 1980 });
+        tetos.push({ x, z, y: y0 + 2.3, r: a, sx: L, sy: 1, sz: 1 });
+        for (const lado of [-1, 1]) pil.push({ x: x + cx * lado * (L / 2 - 0.1), z: z + cz * lado * (L / 2 - 0.1), y: y0 });
       }
     }
     instanciar('bicicletario-arcos', arco, material('arco', { luz: false, metalness: 0.7, roughness: 0.4 }), lo);
@@ -172,14 +166,14 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
       { g: cil(0.4, 0.2, 0.16, 10), c: PEDRA, m: T(0, 1.8, 0) },
       { g: new THREE.SphereGeometry(0.17, 8, 6), c: ESCURA, m: T(0, 2.0, 0) },
     ]);
-    const itensF = fontes.map(([x, z, t, a], i) => ({ x, z, y: altura(x, z), r: a, s: t ? 0.62 : 1, ano: 1300 }));
+    const itensF = fontes.map(([x, z, t, a], i) => ({ x, z, y: altura(x, z), r: a, s: t ? 0.62 : 1 }));
     instanciar('fontanarios', geoFonte, material('fonte', { luz: false, roughness: 0.85, metalness: 0 }), itensF, { sombra: true });
     // água: disco no nível da bacia, normal perturbada por ondas (relógio uTempo)
     const agua = new THREE.MeshStandardMaterial({ color: 0x5f95ad, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.88 });
     agua.onBeforeCompile = (s) => {
       Object.assign(s.uniforms, UL);
-      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float iAno; uniform float uAno; varying vec2 vAg;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAg = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xz;\nif (uAno < iAno) transformed *= 0.0;');
+      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vAg;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAg = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xz;');
       s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vAg; uniform float uTempo;')
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   normal = normalize(normal + 0.22 * vec3(sin(vAg.x * 9.0 + uTempo * 2.6) + sin(vAg.y * 7.0 - uTempo * 2.1), 0.0, cos(vAg.y * 8.0 + uTempo * 2.3) + cos(vAg.x * 6.0 - uTempo * 1.7)));`);
@@ -199,8 +193,8 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     const gg = new THREE.BufferGeometry();
     gg.setAttribute('position', new THREE.Float32BufferAttribute(P_, 3)); gg.setAttribute('aBase', new THREE.Float32BufferAttribute(B_, 4)); gg.setAttribute('aSeed', new THREE.Float32BufferAttribute(S_, 4));
     const mj = new THREE.ShaderMaterial({
-      uniforms: { uTempo: UL.uTempo, uPx: UL.uPx, uAno: UL.uAno }, transparent: true, depthWrite: false,
-      vertexShader: `attribute vec4 aBase; attribute vec4 aSeed; uniform float uTempo; uniform float uPx; uniform float uAno; varying float vA;
+      uniforms: { uTempo: UL.uTempo, uPx: UL.uPx }, transparent: true, depthWrite: false,
+      vertexShader: `attribute vec4 aBase; attribute vec4 aSeed; uniform float uTempo; uniform float uPx; varying float vA;
         void main() {
           float u = fract(uTempo * 0.5 + aSeed.y), hs = aSeed.w * aBase.w, vy = 1.9 * aBase.w, vh = aSeed.z * aBase.w;
           float Tf = (vy + sqrt(vy * vy + 19.6 * (hs - 0.62 * aBase.w))) / 9.8, tt = u * Tf;
@@ -208,7 +202,7 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
           gl_PointSize = clamp(uPx * 0.045 * aBase.w / max(1.0, -mv.z) * 6.0, 1.5, 7.0);
-          vA = uAno < 1300.0 ? 0.0 : 0.75 * smoothstep(0.0, 0.1, u) * (1.0 - smoothstep(0.8, 1.0, u));
+          vA = 0.75 * smoothstep(0.0, 0.1, u) * (1.0 - smoothstep(0.8, 1.0, u));
         }`,
       fragmentShader: `varying float vA; void main() { vec2 c = gl_PointCoord - 0.5; float d = dot(c, c); if (d > 0.25) discard; gl_FragColor = vec4(0.82, 0.93, 1.0, vA * (1.0 - d * 3.0)); }`,
     });
@@ -227,13 +221,13 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     const mat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
     mat.onBeforeCompile = (s) => {
       Object.assign(s.uniforms, UL);
-      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float iAno; uniform float uAno; varying float vTira;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTira = position.x * length(instanceMatrix[0].xyz);\nif (uAno < iAno) transformed *= 0.0;');
+      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying float vTira;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTira = position.x * length(instanceMatrix[0].xyz);');
       s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTira;')
         .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.88, 0.82), step(0.5, fract(vTira / 0.36)));');
     };
     mat.customProgramCacheKey = () => 'det-toldo';
-    instanciar('toldos', g, mat, D.toldos.map(([x, z, a, c, bid]) => ({ x, z, y: altura(x, z), r: a, sx: 3.2 + rnd(bid + c) * 1.8, ano: anoDe(bid, 1950), cor: PALETA[c] })), { sombra: true, cores: true });
+    instanciar('toldos', g, mat, D.toldos.map(([x, z, a, c, bid]) => ({ x, z, y: altura(x, z), r: a, sx: 3.2 + rnd(bid + c) * 1.8, cor: PALETA[c] })), { sombra: true, cores: true });
   }
   let guardaSois = null;
   {
@@ -243,14 +237,14 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
         return [{ g: caixa(0.38, 0.04, 0.38), c: 0x45403a, m: T(x, 0.45, z, a) }, { g: caixa(0.38, 0.4, 0.03), c: 0x45403a, m: T(x + Math.sin(a) * 0.19, 0.65, z + Math.cos(a) * 0.19, a) },
           { g: cil(0.015, 0.015, 0.45, 4), c: 0x2a2a2a, m: T(x, 0.22, z) }]; }),
     ]);
-    const itens = D.mesas.map(([x, z, r, c, bid]) => ({ x, z, y: altura(x, z), r, ano: anoDe(bid, 1900) }));
+    const itens = D.mesas.map(([x, z, r, c, bid]) => ({ x, z, y: altura(x, z), r }));
     instanciar('mesas', geoMesa, material('mesa', { luz: false }), itens, { sombra: true });
     // guarda-sol (só de 20 de abril a 10 de outubro, pela data de ceu.estado()): mastro e lona de 8 gomos
     const geoSol = juntar([{ g: cil(0.03, 0.03, 2.5, 6), c: 0x55504a, m: T(0, 1.25, 0) }, { g: new THREE.ConeGeometry(1.35, 0.5, 8, 1, true), c: 0xffffff, m: T(0, 2.55, 0) }]);
     const matSol = material('sol', { luz: false, roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
     // a cor do guarda-sol vem da instância (vertex color branca × instanceColor); mastro fica claro demais, aceitável
     const CORES_SOL = [0xefe6cf, 0xb23a2e, 0x2f6b4a, 0x2a4468, 0xd9b04a, 0xe3d9c2].map(col);
-    guardaSois = instanciar('guarda-sois', geoSol, matSol, itens.map((it, i) => ({ ...it, cor: CORES_SOL[D.mesas[i][3]], ano: Math.max(it.ano, 1950) })),
+    guardaSois = instanciar('guarda-sois', geoSol, matSol, itens.map((it, i) => ({ ...it, cor: CORES_SOL[D.mesas[i][3]] })),
       { sombra: true, cores: true });
   }
   {
@@ -280,14 +274,14 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     const mat = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 0.7, metalness: 0.05 });
     mat.onBeforeCompile = (s) => {
       Object.assign(s.uniforms, UL);
-      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float iAno; attribute float iCat; uniform float uAno;')
+      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float iCat;')
         .replace('#include <uv_vertex>', '#include <uv_vertex>\nvMapUv = (vMapUv + vec2(mod(iCat, 5.0), 4.0 - floor(iCat / 5.0))) / 5.0;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nif (uAno < iAno) transformed *= 0.0;');
+        .replace('#include <begin_vertex>', '#include <begin_vertex>');
       s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNoite;')
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.3 * uNoite;');
     };
     mat.customProgramCacheKey = () => 'det-letreiro';
-    const itens = D.letreiros.map(([x, z, a, cat, bid]) => ({ x, z, y: altura(x, z), r: a, ano: anoDe(bid, 1900) }));
+    const itens = D.letreiros.map(([x, z, a, cat, bid]) => ({ x, z, y: altura(x, z), r: a }));
     const im = instanciar('letreiros', gs, mat, itens, { sombra: false });
     if (im) gs.setAttribute('iCat', new THREE.InstancedBufferAttribute(Float32Array.from(D.letreiros, (l) => l[3]), 1));
   }
@@ -309,17 +303,16 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     // a bandeira pende do mastro: topo em y=0; o mastro está em juntar() abaixo
     const sup = juntar([{ g: cil(0.03, 0.03, 2.1, 6), c: 0x2b2b2b, m: T(0, 0.36, 0.99, 0, Math.PI / 2 - 0.35) }, { g: caixa(0.12, 0.12, 0.06), c: 0x2b2b2b, m: T(0, 0, 0.03) }]);
     const mat = material('mastro', { luz: false });
-    const itens = D.bandeiras.map(([x, z, a, h, bid]) => ({ x, z, y: altura(x, z) + h, r: a, ano: anoDe(bid, 1500) }));
+    const itens = D.bandeiras.map(([x, z, a, h, bid]) => ({ x, z, y: altura(x, z) + h, r: a }));
     instanciar('bandeiras-mastros', sup, mat, itens);
     const mf = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, side: THREE.DoubleSide });
     mf.onBeforeCompile = (s) => {
       Object.assign(s.uniforms, UL);
-      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float iAno; uniform float uAno; uniform float uTempo;')
+      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTempo;')
         .replace('#include <begin_vertex>', `#include <begin_vertex>
   float onda = clamp((position.x - 0.05) / 1.5, 0.0, 1.0);
   transformed.z += sin(position.x * 5.0 - uTempo * 4.5 + instanceMatrix[3].x) * 0.12 * onda;
-  transformed.y -= 0.12 * onda * onda;
-  if (uAno < iAno) transformed *= 0.0;`);
+  transformed.y -= 0.12 * onda * onda;`);
     };
     mf.customProgramCacheKey = () => 'det-bandeira';
     bandeiras = instanciar('bandeiras', pano, mf, itens);
@@ -327,7 +320,7 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
 
   // ---------- balsas do Reno e navios ----------
   const nivel = () => (nivelAgua ? nivelAgua() : 1.95);
-  const matBarco = material('barco', { ano: false, roughness: 0.55 });
+  const matBarco = material('barco', { roughness: 0.55 });
   const rio = D.rio, comp = [0];
   for (let i = 1; i < rio.length; i++) comp.push(comp[i - 1] + Math.hypot(rio[i][0] - rio[i - 1][0], rio[i][1] - rio[i - 1][1]));
   const naRio = (s) => { // posição e rumo (x, z, hx, hz) na linha do rio, parametrizada por comprimento
@@ -464,21 +457,15 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     const t = (agora - t0) / 1000;
     if (agora - ultimo < (leve ? 40 : 15)) return; // no modo leve, ~25 quadros/s para o movimento
     ultimo = agora;
-    const est = ceu.estado(), noite = est.noite, ano = U.uAno.value;
+    const est = ceu.estado(), noite = est.noite;
     UL.uTempo.value = t;
     const ligada = noite < 0.15 ? 0 : Math.min(1, (noite - 0.15) / 0.45);
     UL.uLuz.value = ligada * 4.5; // acima de 1: entra no bloom noturno (limiar 0,9)
     if (pocas) { pocas.visible = ligada > 0.02; matPocas(ligada); }
     UL.uPx.value = renderer.domElement.height * 0.5;
-    if (guardaSois) { const md = mesAno(est.data); guardaSois.visible = md >= 420 && md <= 1010 && ano >= 1950; }
-    const k = ano >= 1854, kn = ano >= 1900;
-    for (const b of balsas) b.o.visible = k;
-    cabos.visible = k;
+    if (guardaSois) { const md = mesAno(est.data); guardaSois.visible = md >= 420 && md <= 1010; }
     moverBalsas(t, noite);
-    for (const n of navios) if (!kn) n.o.visible = false;
-    if (kn) moverNavios(t);
-    if (atracado) atracado.visible = kn;
-    grupo.getObjectByName('jatos').visible = ano >= 1300;
+    moverNavios(t);
   }
   const matPocas = (l) => { if (pocas) pocas.material.color.setRGB(0.5 * l, 0.31 * l, 0.14 * l); };
   requestAnimationFrame(quadro);

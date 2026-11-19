@@ -154,9 +154,6 @@ def main():
     gwr = gwr.join(endereco, on="egid", how="left")
     no_recorte = gwr.filter(pl.col("gkode").is_between(E0, E1) & pl.col("gkodn").is_between(N0, N1))
     vivos = no_recorte.filter(pl.col("gstat_decoded").is_in(["Gebäude bestehend", "Gebäude im Bau"]))
-    demolidos = no_recorte.filter(
-        (pl.col("gstat_decoded") == "Gebäude abgebrochen") & pl.col("gabbj").is_not_null()
-    )
     por_egid = {r["egid"]: r for r in vivos.iter_rows(named=True)}
 
     # pegada 2D de cada prédio, para casar pontos do GWR sem EGID igual
@@ -284,13 +281,6 @@ def main():
             linhas.append({"t": tg["highway"], "c": coords, **({"n": tg["name"]} if "name" in tg else {}),
                            **({"ponte": 1} if tg.get("bridge") else {})})
 
-    dem = []
-    for r in demolidos.iter_rows(named=True):
-        dem.append({
-            "x": round(r["gkode"] - ORIGEM_E, 1), "z": round(-(r["gkodn"] - ORIGEM_N), 1),
-            "ano": r["gbauj"], "fim": int(r["gabbj"]), **({"end": r["endereco"]} if r["endereco"] else {}),
-        })
-
     meio_fio, est_ruas = chao.mascaras(osm, pegadas, ORIGEM_E, ORIGEM_N, E0, N0, E1, N1, SAIDA)
     print("ruas como áreas:", est_ruas)
     meta = {
@@ -300,7 +290,6 @@ def main():
         "relevo": {"nx": 220, "ny": 230, "passo": 5, "x0": E0 - ORIGEM_E, "z0": -(N1 - ORIGEM_N)},
         "n_tris": int(n_tris),
         "predios": atributos,
-        "demolidos": dem,
     }
     (SAIDA / "predios.json").write_text(json.dumps(meta, ensure_ascii=False, separators=(",", ":")))
     (SAIDA / "ruas.json").write_text(
@@ -312,7 +301,7 @@ def main():
     print(f"casados por EGID: {casados_egid} ({casados_egid / n:.1%}); por ponto na pegada: {casados_ponto}; "
           f"sem GWR: {sem} ({sem / n:.1%})")
     print(f"ano exato (gbauj): {com_gbauj} ({com_gbauj / n:.1%}); ano sorteado na época (gbaup): {com_periodo}")
-    print(f"GWR vivos no recorte: {vivos.height}, demolidos com ano: {len(dem)}")
+    print(f"GWR vivos no recorte: {vivos.height}")
     from collections import Counter
     print("material:", dict(Counter(a["mat"] for a in atributos)), "lojas:", dict(Counter(a.get("lj", 0) for a in atributos)))
     print(f"triângulos: {n_tris}; predios.v2.bin {(SAIDA / 'predios.v2.bin').stat().st_size / 1e6:.1f} MB")

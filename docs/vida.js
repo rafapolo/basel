@@ -6,7 +6,7 @@
 //    pedestres; mais densos onde a contagem 100013 (data.bs.ch) indica, no ritmo da hora, do dia da semana e do mês
 //  - bicicletas e alguns carros (fora da zona de pedestres, mão direita), gaivotas sobre o Reno, nadadores com a boia
 //    "Wickelfisch" no verão (zonas 100270), arrastados pela corrente
-// A densidade segue ceu.estado() (hora e data) e o ano da máquina do tempo. O relógio dos bondes parte da hora do céu e
+// A densidade segue ceu.estado() (hora e data) e a estação. O relógio dos bondes parte da hora do céu e
 // corre em tempo real; com prefers-reduced-motion nada anda (tudo parado, mas presente). Modo leve (ceu.leve): bem menos
 // gente, sem sombras. Ganchos de som: window.ambiente (docs/ambiente-som.js).
 import { cotaPonta } from './chao.js';
@@ -16,7 +16,7 @@ const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 const suave = (a, b, v) => { const t = lim((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const mulberry = (s) => () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 
-export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, ano = () => 2026, nivelRio = 1.95, nivelReno = 2.3, leve = false, cotaPonte = () => null, ponte = null, base = 'data/' }) {
+export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelRio = 1.95, nivelReno = 2.3, leve = false, cotaPonte = () => null, ponte = null, base = 'data/' }) {
   const V = await fetch(base + 'vida.json').then((r) => r.json());
   // lugares onde a gente para (script/pontos.py): rodinhas, Rheinbord, paradas de bonde e focos de quem anda
   const PT = await fetch(base + 'pontos.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -365,7 +365,7 @@ uniform float uVidaT; uniform float uAnima;`)
   for (const p of [bici, carro]) { const A = p.im.geometry.attributes.aAnim; for (let i = 0; i < p.n; i++) A.setY(i, 0); A.needsUpdate = true; }
 
   // ---------- gente parada: rodinhas nas praças, sentados no Rheinbord, debruçados na Mittlere, à espera do bonde ----------
-  // Cada lugar ganha um limiar sorteado; aparece quando a lotação do tipo (hora, dia, estação, ano) passa dele.
+  // Cada lugar ganha um limiar sorteado; aparece quando a lotação do tipo (hora, dia, estação) passa dele.
   const geoSentado = () => {
     const partes = [], dy = -0.78; // tronco e cabeça como os de quem anda, baixados até o chão
     for (const l of [-1, 1]) {
@@ -425,7 +425,7 @@ uniform float uVidaT; uniform float uAnima;`)
   pintarParados();
   const ESTACAO_RIO = { verao: 1, meia: 0.4, inverno: 0.1 };
   let tParados = -1e9;
-  function parados(agora, fp, a, h) {
+  function parados(agora, fp, h) {
     if (agora - tParados < 900) return; // muda pouco: uma vez por segundo
     tParados = agora;
     const f = lim(fp, 0, 1);
@@ -433,11 +433,11 @@ uniform float uVidaT; uniform float uAnima;`)
     const dens = [
       0.6 * lim(0.12 + 0.95 * f, 0, 1),                                        // rodinhas
       0,
-      0.6 * lim(0.15 + 0.9 * f, 0, 1) * (a < 1850 ? 0.3 : 1),                  // parapeito da ponte
-      a < 1895 ? 0 : 0.5 * lim(0.1 + 0.9 * f, 0, 1),                           // paradas de bonde
+      0.6 * lim(0.15 + 0.9 * f, 0, 1),                                         // parapeito da ponte
+      0.5 * lim(0.1 + 0.9 * f, 0, 1),                                          // paradas de bonde
     ];
-    // Rheinbord: tardes e começo de noite, sobretudo no verão; antes de 1900 quase ninguém
-    const dRio = 0.5 * lim(f * 1.2, 0, 1) * suave(10, 15, h) * (1 - 0.7 * suave(21, 24, h)) * ESTACAO_RIO[S.estacao] * (a < 1900 ? 0.15 : 1);
+    // Rheinbord: tardes e começo de noite, sobretudo no verão
+    const dRio = 0.5 * lim(f * 1.2, 0, 1) * suave(10, 15, h) * (1 - 0.7 * suave(21, 24, h)) * ESTACAO_RIO[S.estacao];
     let n = 0;
     if (imPar) {
       const m = imPar.instanceMatrix.array;
@@ -574,7 +574,6 @@ uniform float uVidaT; uniform float uAnima;`)
     let nB = 0, nL = 0; const visto = new Set();
     bondeInfo.perto = 1e9; bondeInfo.vel = 0;
     const alvoCam = controls?.target;
-    if (ano() < 1895) { mBVB.count = mBLT.count = 0; return; }
     const diaCh = `i_${S.dia}`;
     for (let pi = 0; pi < trilhos.length; pi++) {
       const tr = trilhos[pi], ini = tr.p[diaCh];
@@ -714,7 +713,6 @@ uniform float uVidaT; uniform float uAnima;`)
     s.vida = 0;
   }
   const nadoQuer = () => {
-    if (ano() < 1950) return 0;
     const dia = S.diaAno, verao = suave(170, 190, dia) * (1 - suave(300, 320, dia)); // meados de maio a fim de setembro (dia = mês·31 + dia)
     return verao * suave(8, 11, hora()) * (1 - suave(19, 21.5, hora())) * suave(18, 30, S.alt ?? 40) * (S.dia === 'util' ? 0.75 : 1);
   };
@@ -748,17 +746,15 @@ uniform float uVidaT; uniform float uAnima;`)
     S.simT = S.base + (parado ? 0 : seg);
     UV.uVidaT.value = S.relogio; UV.uVidaNoite.value = S.noite; matAve.emissiveIntensity = 0.55 * (1 - S.noite);
     if (recolorir) { recolorir = false; pintar(); pintarParados(); }
-    const a = ano();
     const h = hora();
     const fp = perfil(V.contagem.ped.hora[S.dia], h) * (0.55 + 0.45 * V.contagem.ped.mes[S.mes]);
     const fv = perfil(V.contagem.velo.hora[S.dia], h) * (0.45 + 0.55 * V.contagem.velo.mes[S.mes]) * (1 - 0.35 * S.noite);
-    const fAno = a >= 1900 ? 1 : 0.12 + 0.88 * lim((a - 1100) / 800, 0, 1);
-    const nPed = Math.round(NPED * lim(0.04 + 1.0 * fp, 0, 1) * fAno);
-    const nBici = a < 1890 ? 0 : Math.round(NBIKE * lim(0.03 + 1.1 * fv, 0, 1) * (a < 1960 ? 0.5 : 1));
+    const nPed = Math.round(NPED * lim(0.04 + 1.0 * fp, 0, 1));
+    const nBici = Math.round(NBIKE * lim(0.03 + 1.1 * fv, 0, 1));
     const fc = lim(0.05 + 0.6 * fv + 0.25 * suave(6, 9, h) * (1 - suave(19, 23, h)), 0, 1) * (S.dia === 'dom' ? 0.55 : 1);
-    const nCarro = a < 1910 ? 0 : Math.round(NCARRO * fc * (a < 1970 ? 0.4 : 1));
+    const nCarro = Math.round(NCARRO * fc);
     ped.atualizar(sd, nPed, alvoCam); bici.atualizar(sd, nBici, alvoCam); carro.atualizar(sd, nCarro, alvoCam);
-    parados(agora, fp * fAno, a, h);
+    parados(agora, fp, h);
     bondes(sd);
     const nAve = Math.round(NAVE * suave(-4, 8, S.alt ?? 40) * (S.noite > 0.9 ? 0 : 1));
     gaivotas(sd, nAve);
@@ -770,10 +766,10 @@ uniform float uVidaT; uniform float uAnima;`)
       let na = 0, nt = 0;
       if (alvoCam) for (let dz = -120; dz <= 120; dz += 24) for (let dx = -120; dx <= 120; dx += 24) { nt++; if (ehAgua(alvoCam.x + dx, alvoCam.z + dz)) na++; }
       window.ambiente?.contexto({ agua: nt ? na / nt : 0, gente: lim(ped.perto() / 45, 0, 1) * lim(nPed / NPED * 2, 0, 1), bonde: bondeInfo.perto, bondeVel: bondeInfo.vel, gaivotas: nAve / NAVE, nadadores: nNad,
-        noite: S.noite, dia: S.dia01, carros: carro.perto(), hora: h, ano: a, simT: S.simT });
+        noite: S.noite, dia: S.dia01, carros: carro.perto(), hora: h, simT: S.simT });
     }
   }
-  function ligar(on) { ligado = on; grupo.visible = on; if (on) ultimo = null; if (!on) window.ambiente?.contexto?.({ agua: 0, gente: 0, bonde: 1e9, bondeVel: 0, gaivotas: 0, nadadores: 0, noite: S.noite, dia: S.dia01, carros: 0, hora: hora(), ano: ano(), simT: S.simT }); }
+  function ligar(on) { ligado = on; grupo.visible = on; if (on) ultimo = null; if (!on) window.ambiente?.contexto?.({ agua: 0, gente: 0, bonde: 1e9, bondeVel: 0, gaivotas: 0, nadadores: 0, noite: S.noite, dia: S.dia01, carros: 0, hora: hora(), simT: S.simT }); }
   const api = { grupo, atualizar, ligar, info, S, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
   window.vida = api;
   return api;

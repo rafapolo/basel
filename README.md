@@ -1,6 +1,6 @@
 # Basel
 
-Basel in 3D, building by building, with a time machine driven by each building's year of construction.
+Basel's old town in 3D, building by building, as it is now: at Basel's current time, date and season, with people, trams and the Rhine.
 The idea comes from [View of Delft](https://delft.meuleman.org/) (Wouter Meuleman), but the code, the look and the
 mechanics are our own. It is not a copy of his interface.
 
@@ -21,14 +21,16 @@ mechanics are our own. It is not a copy of his interface.
 
 - **The Altstadt in 3D** (`docs/`): 1,739 buildings (1,892 swissBUILDINGS3D solids), 94.1% with the exact GWR year,
   terrain, the Rhine, streets and trams. Click a building to see its address, year, floors, flats and use.
-- **Time machine** from 1100 to 2026: each building rises in its year; pale lots where today's building did not exist
-  yet; red pins for the demolished buildings the register knows. Colour by period, and night with lit windows.
+- **Now, not then:** the city opens at the current time and date in Basel and follows the clock (the panel shows the time
+  and the season); the season drives the trees, clothes, light and who is out. Night with lit windows. The old time machine
+  (1100–2026, pale lots, demolished-building pins, colour by era) was removed on 2026-11-19 to focus on the present.
 - **Procedural façades** (`docs/fachadas.js`): floors from the GWR, windows, doors and shop fronts, render, red
   sandstone or concrete and glass by age and use, plinths, tiled roofs, chimneys and dormers — all in the shader.
 - **Aerial photo** on the ground and the roofs (`docs/ortofoto.js`): opens with a 68 KB overview and streams the 16
   tiles in the background, nearest to the camera first.
-- **One-minute tour** with music generated in the browser (fife, Basel drum and bells): button at the top or
-  `?tour=1` (`?tour=en`, `?tour=de`). Script, captions and sound in [design/tour.md](design/tour.md) (Portuguese).
+- **90-second tour** with music generated in the browser (fife, Basel drum and bells), ending with a year in 40 seconds
+  (the date runs January → December while the camera circles the Münster and the Rhine): button at the top or `?tour=1`
+  (`?tour=de`). Script, captions and sound in [design/tour.md](design/tour.md) (Portuguese).
 - **Fixed cameras** to compare with the real city: `?cam=pfalz|munster|reno|rathaus|marktplatz|rheinsprung`.
   The side-by-side comparison with openly licensed photos is in [design/comparacao/](design/comparacao/).
 - **The Rhine** (`docs/agua.js`, data from `script/reno.py` -> `docs/data/reno.json`): OSM river polygon (way 1467859273, ODbL) instead of a height threshold, planar reflection of the buildings plus Preetham sky colours (off in light mode), waves travelling north-west (downstream), foam along the banks and around the bridge piers, water colour from the live data.bs.ch temperature (100046, CC BY 4.0) and turbidity (100323, CC0) with an offline snapshot, sandstone quay walls, bridge piers and bank stairs as geometry.
@@ -40,7 +42,7 @@ mechanics are our own. It is not a copy of his interface.
 - **Street details** (`docs/detalhes.js`, positions in `docs/data/detalhes.json` from `script/detalhes.py`): fountains with water and jets,
   street lamps that light up at night (glow in the bloom plus a light pool on the ground), benches, bins, bike racks, café awnings,
   tables with parasols (20 April to 10 October, from the date of `ceu.estado()`), generic shop signs, Basel flags on public buildings,
-  the Rhine cable ferries and ships. All instanced, hidden by the time machine according to era or the building's year; `?detalhes=0` turns it off.
+  the Rhine cable ferries and ships. All instanced; `?detalhes=0` turns it off.
   Sources: OpenStreetMap (ODbL), data.bs.ch 100008 (fountains, IWB, free use with attribution) and 100241 (bike racks, CC BY 4.0).
 - **People and motion** (`docs/vida.js`, `docs/ambiente-som.js`, data by `script/vida.py` → `docs/data/vida.json`): BVB (green) and BLT (yellow) trams run on the OSM rails by the Swiss static GTFS timetable (opentransportdata.swiss; weekday/Saturday/Sunday reference days), instanced pedestrians (leg and arm swing in the shader) on streets and squares, denser near the data.bs.ch 100013 counters and following their hourly/weekly/monthly profile, bicycles, a few cars outside the pedestrian zone, gulls over the Rhine, and Wickelfisch swimmers in summer (zones 100270). Density follows `ceu.estado()` and the time-machine year (no trams before 1895, bikes 1890, cars 1910). Ambient sound (water, crowd, trams, hourly church bells, gulls; Web Audio, no files) has its own switch; `?vida=0` hides everything. Respects `ceu.leve` and `prefers-reduced-motion`.
 - **Two languages:** English (default) and German, from the selector at the top or `?lang=de`.

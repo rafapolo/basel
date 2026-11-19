@@ -202,17 +202,10 @@ const q16 = new Int16Array(nVert * 3), ids16 = new Uint16Array(nVert);
 const posicoes = new Float32Array(nVert * 3);
 for (let i = 0; i < q16.length; i++) posicoes[i] = q16[i] / meta.escala;
 for (let v = 0; v < nVert; v++) { const dz = P[ids16[v]].dz; if (dz) posicoes[v * 3 + 1] -= dz; } // base flutuando sobre o relevo fino (chao.py)
-const base = new Float32Array(P.length).fill(1e9);
-for (let v = 0; v < nVert; v++) base[ids16[v]] = Math.min(base[ids16[v]], posicoes[v * 3 + 1]);
-const aAno = new Float32Array(nVert), aBase = new Float32Array(nVert), aPid = new Float32Array(nVert);
-for (let v = 0; v < nVert; v++) {
-  const id = ids16[v];
-  aAno[v] = P[id].ano ?? -1; aBase[v] = base[id]; aPid[v] = id;
-}
+const aPid = new Float32Array(nVert);
+for (let v = 0; v < nVert; v++) aPid[v] = ids16[v];
 const geo = new THREE.BufferGeometry();
 geo.setAttribute('position', new THREE.BufferAttribute(posicoes, 3));
-geo.setAttribute('ano', new THREE.BufferAttribute(aAno, 1));
-geo.setAttribute('base', new THREE.BufferAttribute(aBase, 1));
 geo.setAttribute('pid', new THREE.BufferAttribute(aPid, 1));
 const cores = new Float32Array(nVert * 3);
 geo.setAttribute('color', new THREE.BufferAttribute(cores, 3));
@@ -229,63 +222,36 @@ const ehTelhado = new Uint8Array(meta.n_tris);
   }
 }
 
-export const EPOCAS = [
-  { ate: 1499, cor: '#7a1f1a', nome: t('antes de 1500', 'before 1500', 'vor 1500') },
-  { ate: 1799, cor: '#b5542c', nome: '1500–1799' },
-  { ate: 1899, cor: '#d9a441', nome: '1800–1899' },
-  { ate: 1945, cor: '#8aa36b', nome: '1900–1945' },
-  { ate: 1999, cor: '#4f7f8f', nome: '1946–1999' },
-  { ate: 9999, cor: '#2c3e73', nome: t('2000 em diante', '2000 onwards', 'ab 2000') },
-];
-const SEM_ANO = '#b9b2a4';
 const hash = (i) => { let x = Math.imul(i ^ 0x9e3779b9, 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
-let modo = 'gravura';
 function colorir() {
   // reboco de Basel: ocres, rosados, cinzas e areias, alguns tons mais fortes; a paleta antiga era quase toda branca
   // (#f6efe0, #faf4e8…) e, com o sol do ACES, as fachadas viravam papel branco
   const parede = ['#e6d6b8', '#dcc59c', '#e8dccb', '#d7c7a6', '#d2c8b6', '#e2c7a2', '#d9b9a6', '#c9ccbb', '#d8b07e', '#c99f93', '#b9c1b2', '#ece3d2'].map((c) => new THREE.Color(c));
   const telhas = ['#9c4f35', '#8e4a33', '#a85d3d', '#7f4636', '#6e5a4e'].map((c) => new THREE.Color(c));
-  const epocas = EPOCAS.map((e) => new THREE.Color(e.cor)), sem = new THREE.Color(SEM_ANO);
   const c = new THREE.Color();
   for (let t = 0; t < meta.n_tris; t++) {
     const id = ids16[t * 3], h = hash(id), p = P[id];
-    if (modo === 'epoca') {
-      c.copy(p.ano ? epocas[EPOCAS.findIndex((e) => p.ano <= e.ate)] : sem);
-      if (ehTelhado[t]) c.multiplyScalar(0.72);
-    } else {
-      // telhados planos (modernos) ficam cinza; inclinados, de telha
-      c.copy(ehTelhado[t] ? telhas[Math.floor(h * telhas.length)] : parede[Math.floor(h * parede.length)]);
-      if (ehTelhado[t] && (p.ano ?? 0) > 1945) c.set('#8c8578');
-    }
+    // telhados planos (modernos) ficam cinza; inclinados, de telha
+    c.copy(ehTelhado[t] ? telhas[Math.floor(h * telhas.length)] : parede[Math.floor(h * parede.length)]);
+    if (ehTelhado[t] && (p.ano ?? 0) > 1945) c.set('#8c8578');
     for (let k = 0; k < 3; k++) c.toArray(cores, (t * 3 + k) * 3);
   }
   geo.attributes.color.needsUpdate = true;
 }
 colorir();
 
-// máquina do tempo e destaque no shader: cada prédio cresce nos 12 anos antes do ano de construção;
-// antes disso vira um lote pálido de 1,5 m (ou some, sem os lotes pálidos)
-const U = {
-  uAno: { value: 2026 }, uPalido: { value: 1 }, uSel: { value: -1 }, uNoite: { value: 0 },
-};
+// destaque do prédio da ficha e noite, no shader (a cidade é a de hoje: sem máquina do tempo)
+const U = { uSel: { value: -1 }, uNoite: { value: 0 } };
 const FACH = criarFachadas({ cena, meta, posicoes, ids16, U });
 geo.setAttribute('fa', FACH.atributos.fa);
 geo.setAttribute('fb', FACH.atributos.fb);
 const VERT_DECL = `
-attribute float ano; attribute float base; attribute float pid;
-uniform float uAno; uniform float uPalido; uniform float uSel;
+attribute float pid;
+uniform float uSel;
 varying float vEstado; varying float vSel; varying vec3 vMundo; varying float vPid;`;
 const VERT_CORPO = `
   vec3 transformed = vec3(position);
-  // sem ano: de pé só em 2026; no passado, lote pálido (não se sabe desde quando existe)
-  float sobe = ano < 0.0 ? (uAno > 2025.5 ? 1.0 : 0.0) : clamp((uAno - ano + 12.0) / 12.0, 0.0, 1.0);
-  vEstado = 0.0;
-  if (sobe <= 0.0) {
-    vEstado = uPalido > 0.5 ? 1.0 : 2.0;
-    transformed.y = base + min(position.y - base, 1.5);
-  } else {
-    transformed.y = base + (position.y - base) * sobe;
-  }
+  vEstado = 0.0; // (era o estado na máquina do tempo; fica 0 para os shaders encadeados que ainda o leem)
   vSel = abs(pid - uSel) < 0.5 ? 1.0 : 0.0;
   vPid = pid;
   vMundo = (modelMatrix * vec4(transformed, 1.0)).xyz;`;
@@ -296,15 +262,14 @@ function injetar(shader, cheio) {
     .replace('#include <begin_vertex>', VERT_CORPO);
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', `#include <common>\nvarying float vEstado; varying float vSel; varying vec3 vMundo; varying float vPid; uniform float uNoite;`)
-    .replace('void main() {', 'void main() {\n  if (vEstado > 1.5) discard;');
+
   if (!cheio) return;
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <color_fragment>', `#include <color_fragment>
-  if (vEstado > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.9, 0.84), 0.75);
   if (vSel > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.70, 0.15, 0.12), 0.65);`)
     .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
   // noite: janelas acesas nas paredes, em andares de 3,2 m, sorteadas por prédio e por janela
-  if (uNoite > 0.01 && vEstado < 0.5) {
+  if (uNoite > 0.01) {
     vec3 nW = normalize(cross(dFdx(vMundo), dFdy(vMundo)));
     if (abs(nW.y) < 0.3) {
       vec2 tg = normalize(vec2(-nW.z, nW.x));
@@ -329,7 +294,7 @@ cena.add(predios);
 // luz e céu (sol real, CSM, GTAO, bloom): ver ceu.js. Modo leve: ?leve=1, ou automático em celular
 const leve = q.get('leve') === '1' || (q.get('leve') !== '0' && (matchMedia('(pointer:coarse)').matches || innerWidth < 700 || (navigator.deviceMemory || 8) <= 4));
 let arvores; // árvores (arvores.js): o G-buffer do GTAO precisa do recorte de folhas delas
-const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f.replace('void main() {', 'varying float vEstado;\nvoid main() {\n  if (vEstado > 1.5) discard;'); arvores?.patchNormal(s); } });
+const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f; arvores?.patchNormal(s); } });
 arvores = q.get('arvores') === '0' ? null : await criarArvores({ THREE, cena, camera, altura, dentro: CH.dentro, ceu }); // cadastro de árvores e gramados (tarefa 16)
 // marcos em alta definição (docs/marcos.js): substituem o sólido LOD2 pelo mesmo EGID
 const MARC = criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, nivelReno: NIVEL_RENO, U });
@@ -339,78 +304,14 @@ AGUA.iniciar({ leve }); // superfície do Reno, depois do céu (usa o sol e a n�
 // detalhes de rua (tarefa 17): fontes, postes, bancos, toldos, bandeiras, balsas e navios; antes do 1º render, para a sombra em cascata pegar
 if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel, cotaPonte: MARC.cotaPonte });
 
-// prédios demolidos que o GWR registra: pinos vermelhos enquanto existiam
-const pinos = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 0.2, 9, 8).translate(0, 4.5, 0),
-  new THREE.MeshLambertMaterial({ color: 0xb3261e }), meta.demolidos.length);
-pinos.castShadow = true;
-cena.add(pinos);
-const m4 = new THREE.Matrix4();
-function atualizarPinos(ano) {
-  meta.demolidos.forEach((d, i) => {
-    const vivo = d.ano && d.ano <= ano && ano < d.fim;
-    m4.makeScale(vivo ? 1 : 0, vivo ? 1 : 0, vivo ? 1 : 0).setPosition(d.x, altura(d.x, d.z), d.z);
-    pinos.setMatrixAt(i, m4);
-  });
-  pinos.instanceMatrix.needsUpdate = true;
+// relógio e estação no painel: a hora de Basel (ceu.js segue o relógio real até alguém mexer)
+const ESTACAO = { inverno: ['inverno', 'winter', 'Winter'], primavera: ['primavera', 'spring', 'Frühling'], verao: ['verão', 'summer', 'Sommer'], outono: ['outono', 'autumn', 'Herbst'] };
+const estacaoDe = (data) => { const [, m, d] = data.split('-').map(Number), x = m * 100 + d; return x < 320 || x >= 1221 ? 'inverno' : x < 621 ? 'primavera' : x < 923 ? 'verao' : x < 1221 ? 'outono' : 'inverno'; };
+function relogio(e) {
+  $('relogio').textContent = `${String(Math.floor(e.hora)).padStart(2, '0')}:${String(Math.floor((e.hora % 1) * 60)).padStart(2, '0')}`;
+  $('estacao').textContent = `${t(...ESTACAO[estacaoDe(e.data)])}${ceu.aoVivo ? t(' · agora', ' · live', ' · live') : ''}`;
 }
-
-// ---------- ano: régua não linear (mais espaço para os séculos com mais prédios) ----------
-const NOS = [[0, 1100], [250, 1500], [450, 1800], [700, 1900], [1000, 2026]];
-const reguaParaAno = (v) => {
-  for (let i = 1; i < NOS.length; i++) if (v <= NOS[i][0]) {
-    const [a, ya] = NOS[i - 1], [b, yb] = NOS[i];
-    return Math.round(ya + ((v - a) / (b - a)) * (yb - ya));
-  }
-  return 2026;
-};
-const anoParaRegua = (y) => {
-  for (let i = 1; i < NOS.length; i++) if (y <= NOS[i][1]) {
-    const [a, ya] = NOS[i - 1], [b, yb] = NOS[i];
-    return a + ((y - ya) / (yb - ya)) * (b - a);
-  }
-  return 1000;
-};
-document.querySelectorAll('.marcas span').forEach((s, i) => {
-  s.style.cssText = `position:absolute;left:${NOS[i][0] / 10}%;transform:translateX(${i === 0 ? 0 : i === NOS.length - 1 ? -100 : -50}%)`;
-});
-document.querySelector('.marcas').style.cssText = 'position:relative;height:16px';
-
-// o swissBUILDINGS3D parte um prédio em vários sólidos (o Museum der Kulturen são 8): as contagens são por prédio
-// (EGID do GWR; sólido sem EGID conta sozinho)
-const unicos = [...new Map(P.map((p, i) => [p.egid ?? `s${i}`, p])).values()];
-const anosOrdenados = unicos.map((p) => p.ano).filter(Boolean).sort((a, b) => a - b);
-const existentes = (ano) => { let lo = 0, hi = anosOrdenados.length; while (lo < hi) { const m = (lo + hi) >> 1; if (anosOrdenados[m] <= ano) lo = m + 1; else hi = m; } return lo; };
-let anoAtual = 2026;
-// infraestrutura moderna some no passado: bonde elétrico desde 1895, cais de pedra do Rheinweg ~1850
-function anoDaInfra(a) {
-  for (const n of ['trilhos', 'fio', 'postes']) { const o = CH?.grupo?.getObjectByName(n); if (o) o.visible = a >= 1895; }
-  const cais = AGUA?.grupo?.getObjectByName('muros-de-cais'); if (cais) cais.visible = a >= 1850;
-}
-function definirAno(ano, deRegua = false) {
-  anoAtual = Math.round(Math.max(1100, Math.min(2026, ano)));
-  U.uAno.value = ano; // o shader recebe o valor contínuo, para o crescimento ficar liso no tour
-  $('ano-num').textContent = anoAtual;
-  if (!deRegua) $('regua').value = anoParaRegua(anoAtual);
-  const n = existentes(anoAtual);
-  $('contagem').textContent = t(`${fmt(n)} de ${fmt(anosOrdenados.length)} prédios de hoje (com ano) já estavam de pé`,
-    `${fmt(n)} of today’s ${fmt(anosOrdenados.length)} dated buildings were already standing`,
-    `${fmt(n)} von ${fmt(anosOrdenados.length)} heutigen Häusern (mit Baujahr) standen schon`);
-  atualizarPinos(anoAtual);
-  anoDaInfra(anoAtual);
-}
-$('regua').addEventListener('input', (e) => definirAno(reguaParaAno(+e.target.value), true));
-document.querySelector('.nota').innerHTML = document.querySelector('.nota').innerHTML.replace('{d}', meta.demolidos.length);
-
 // ---------- chaves ----------
-function definirModo(m) {
-  modo = m; orto.modo(m); $('c-epoca').checked = m === 'epoca';
-  U.uFachada.value = U.uFotoTelhado.value = m === 'epoca' ? 0 : 1; colorir();
-  const leg = $('legenda');
-  leg.classList.toggle('on', m === 'epoca');
-  leg.innerHTML = EPOCAS.map((e) => `<span><i style="background:${e.cor}"></i>${e.nome}</span>`).join('') + `<span><i style="background:${SEM_ANO}"></i>${t('sem ano', 'no year', 'ohne Jahr')}</span>`;
-}
-$('c-epoca').addEventListener('change', (e) => definirModo(e.target.checked ? 'epoca' : 'gravura'));
-$('c-palidos').addEventListener('change', (e) => { U.uPalido.value = e.target.checked ? 1 : 0; });
 $('c-ruas').addEventListener('change', (e) => { ruasObj.visible = e.target.checked; CH.ruas(e.target.checked); });
 let noiteAlvo = 0;
 function definirNoite(on) { noiteAlvo = on ? 1 : 0; ceu.noite(on); $('c-noite').checked = on; document.body.classList.toggle('noite', on); }
@@ -452,7 +353,6 @@ function abrirFicha(id) {
   if (p.alt) linhas.push([t('Altura', 'Height', 'Höhe'), `${fmt(p.alt)} m`]);
   if (p.cls) linhas.push([t('Uso', 'Use', 'Nutzung'), uso(p.cls)]);
   if (p.prot) linhas.push([t('Proteção', 'Protection', 'Schutz'), t('patrimônio protegido', 'listed heritage', 'geschützt')]);
-  if (p.ano && p.ano > anoAtual) linhas.push([t('Em ', 'In ', 'Im Jahr ') + anoAtual, t('ainda não existia', 'not yet built', 'noch nicht gebaut')]);
   if (p.egid) linhas.push(['EGID', `<a href="https://map.geo.admin.ch/?lang=${LANG}&layers=ch.bfs.gebaeude_wohnungs_register&swisssearch=${p.egid}" target="_blank" rel="noopener">${p.egid}</a>`]);
   $('f-dl').innerHTML = linhas.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
   $('ficha').hidden = false;
@@ -469,8 +369,7 @@ canvas.addEventListener('pointerup', (e) => {
   const r = canvas.getBoundingClientRect();
   raio.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
   const hits = raio.intersectObject(predios, false);
-  // o raio vê a geometria inteira; ignora prédios escondidos pela máquina do tempo
-  const hit = hits.find((h) => { const p = P[ids16[h.face.a]]; return (p.ano ? p.ano <= anoAtual : anoAtual >= 2026) || U.uPalido.value > 0.5; });
+  const hit = hits[0];
   const hm = MARC.acerta(raio);
   if (hm && (!hit || hm.distance < hit.distance)) abrirFicha(hm.pid);
   else if (hit) abrirFicha(ids16[hit.face.a]); else fecharFicha();
@@ -535,19 +434,17 @@ function quadro(agora) {
   }
   ant = { ...c, t: agora };
   Object.assign(camSom, { dist: c.dist, polar: c.polar, az: c.az });
-  MARC.atualiza(U.uAno.value, U.uSel.value);
+  MARC.atualiza(U.uSel.value);
   VIDA.atualizar(agora);
   ceu.atualizar(agora);
   AGUA.atualizar(agora);
   ceu.render();
 }
 // gente e movimento (tarefa 19, docs/vida.js): bondes pelo horário do GTFS, pedestres, bicicletas, carros, gaivotas e nadadores
-const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, ano: () => U.uAno.value, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE });
+const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE });
 $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
 if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
-const ini = +(q.get('ano') || 2026);
-definirAno(ini);
-definirModo(q.get('epoca') ? 'epoca' : 'gravura');
+relogio(ceu.estado()); ceu.aoMudar(relogio);
 if (q.get('noite')) definirNoite(true);
 if (CAM) {
   const a = typeof CAM.alvo === 'string' ? centro(CAM.alvo) : [...CAM.alvo];
@@ -560,15 +457,8 @@ orto.carrega(); // tiles chegam depois da abertura
 $('carregando').classList.add('fora');
 
 // ---------- estatística para o tour (contada dos dados) ----------
-const estat = (() => {
-  const comAno = unicos.filter((p) => p.ano);
-  const minimo = Math.min(...comAno.map((p) => p.ano));
-  const maisAntigos = [...new Set(comAno.filter((p) => p.ano === minimo).map((p) => p.nome).filter(Boolean))];
-  const porEpoca = EPOCAS.map((e, i) => comAno.filter((p) => p.ano <= e.ate && (i === 0 || p.ano > EPOCAS[i - 1].ate)).length);
-  const sec19 = comAno.filter((p) => p.ano >= 1800 && p.ano < 1900).length;
-  const rathaus = P.find((p) => p.nome === 'Rathaus');
-  return { total: unicos.length, solidos: P.length, comAno: comAno.length, minimo, maisAntigos, porEpoca, sec19, rathaus, demolidos: meta.demolidos.length };
-})();
+// o swissBUILDINGS3D parte um prédio em vários sólidos (o Museum der Kulturen são 8): a contagem é por prédio (EGID)
+const estat = { total: new Set(P.map((p, i) => p.egid ?? `s${i}`)).size, solidos: P.length };
 
 // centro e topo de um prédio pelo nome (para o tour mirar em marcos sem coordenadas fixas)
 function centro(nome) {
@@ -581,9 +471,7 @@ function centro(nome) {
 }
 
 window.cidade = {
-  THREE, FACH, MARC, U, camera, arvores, centro, controls, lerCamera, porCamera, definirAno, definirModo, definirNoite, fecharFicha, abrirFicha,
-  ano: () => U.uAno.value, modo: () => modo, noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura,
-  temPalidos: () => U.uPalido.value > 0.5,
-  palidos: (on) => { U.uPalido.value = on ? 1 : 0; $('c-palidos').checked = on; },
+  THREE, FACH, MARC, U, camera, arvores, centro, controls, lerCamera, porCamera, definirNoite, fecharFicha, abrirFicha,
+  noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura, ceu,
 };
 await import('./tour.js');

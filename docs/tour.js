@@ -1,6 +1,6 @@
-// Tour de 1 minuto pela Altstadt, no estilo de cinema (faixas 2.39:1, legenda com kicker e frase),
-// com a música de som.js. Abre pelo botão "Tour de 1 min" ou por ?tour=1 (?tour=en|de muda a língua).
-// Esc ou "✕ esc" param e deixam a câmera onde estava; a cidade volta ao ano, cor e hora de antes.
+// Tour de 90 s pela Altstadt de hoje, no estilo de cinema (faixas 2.39:1, legenda com kicker e frase), com a música de
+// som.js e 40 s em que as estações passam enquanto a câmera gira. Abre pelo botão do tour ou por ?tour=1 (?tour=de muda a
+// língua). Esc ou "✕ esc" param e deixam a câmera onde estava; a cidade volta à data, hora e noite de antes.
 // Todos os números das legendas são contados dos dados carregados (cidade.estat).
 // Roteiro, legendas e música descritos em design/tour.md.
 const $ = (id) => document.getElementById(id);
@@ -9,7 +9,7 @@ const { THREE } = C;
 const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rad = THREE.MathUtils.degToRad;
 
-let ativo = false, inicio = 0, raf = 0, anim = 0, salvo = null, cenaAtual = 0, TOTAL = 60000, t0Cena = 0;
+let ativo = false, inicio = 0, raf = 0, anim = 0, salvo = null, cenaAtual = 0, TOTAL = 88000, t0Cena = 0;
 const pendentes = new Set();
 class Parado extends Error {}
 const espera = (ms) => new Promise((ok, falha) => {
@@ -47,26 +47,26 @@ function mover(alvo, ms, { arco = 0, giro } = {}) {
   anim = requestAnimationFrame(passo);
 }
 
-// varredura da máquina do tempo: de um ano a outro em ms, lisa na régua não linear do painel
-// (1100–1500 e 1800–1900 com o mesmo tempo de tela), mostrando o ano grande no canto
-function varrer(de, ate, ms) {
+// um ano em ms: a data corre de meados de janeiro ao fim de dezembro (ceu.js muda sol, árvores, roupas e quem está
+// na rua), com o mês grande no canto; devolve uma promessa que resolve no fim
+function estacoes(ms, ano) {
   const rotulo = $('tour-ano');
   rotulo.classList.add('on');
-  const NOS = [[0, 1100], [0.22, 1500], [0.4, 1800], [0.72, 1900], [1, 2026]];
-  const ano = (x) => { for (let i = 1; i < NOS.length; i++) if (x <= NOS[i][0]) { const [a, ya] = NOS[i - 1], [b, yb] = NOS[i]; return ya + ((x - a) / (b - a)) * (yb - ya); } return 2026; };
-  const x0 = NOS.findLast(([, y]) => y <= de)[0], x1 = 1;
-  const t0 = performance.now();
-  let antes = de, tAntes = t0;
+  const mes = new Intl.DateTimeFormat(document.documentElement.lang, { month: 'long', timeZone: 'UTC' });
+  const t0 = performance.now(), d0 = Date.UTC(ano, 0, 15), d1 = Date.UTC(ano, 11, 28);
+  let ult = 0;
   return new Promise((ok) => {
     const passo = (agora) => {
       if (!ativo) return ok();
-      const t = Math.min(1, (agora - t0) / ms), y = ano(x0 + (x1 - x0) * suave(t));
-      C.definirAno(Math.min(y, ate));
-      rotulo.textContent = Math.round(Math.min(y, ate));
-      const dt = (agora - tAntes) / 1000;
-      if (dt > 0.1) { somTour.varredura(Math.abs(y - antes) / dt); antes = y; tAntes = agora; }
+      const t = Math.min(1, (agora - t0) / ms);
+      if (agora - ult > 120 || t >= 1) { // ~8 vezes por segundo basta: cada troca de data recalcula sol e árvores
+        ult = agora;
+        const d = new Date(d0 + (d1 - d0) * t);
+        C.ceu.definirData(d.toISOString().slice(0, 10));
+        rotulo.textContent = mes.format(d).replace(/^\p{Ll}/u, (c) => c.toUpperCase());
+      }
       if (t < 1) requestAnimationFrame(passo);
-      else { somTour.varredura(0); setTimeout(() => rotulo.classList.remove('on'), 1600); ok(); }
+      else { setTimeout(() => rotulo.classList.remove('on'), 1200); ok(); }
     };
     requestAnimationFrame(passo);
   });
@@ -84,76 +84,75 @@ async function legenda(kicker, linha) {
 
 function cenas() {
   const E = C.estat, munster = C.centro('Münster'), rathaus = C.centro('Rathaus');
-  const antigos = E.maisAntigos;
-  const lista = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} ${t('e', 'and', 'und')} ${xs.at(-1)}`);
+  const ano = +C.ceu.estado().data.slice(0, 4);
   return [
     // 0 · abertura: do alto, a cidade inteira girando, descendo para a vista da Pfalz sobre o Reno
-    { dur: 9000, run: async () => {
-      C.definirAno(2026); C.definirModo('gravura'); C.definirNoite(false);
+    { dur: 10000, run: async () => {
+      C.definirNoite(false); C.ceu.definirHora(15);
       C.porCamera({ alvo: [0, 0, 0], dist: 1900, az: rad(230), polar: rad(28) });
-      mover(C.VISTA_PFALZ, 9000, { giro: -80 + 0 });
+      mover(C.VISTA_PFALZ, 10000, { giro: -80 });
       await legenda('Basel · Altstadt', t(
-        `${fmt(E.total)} prédios, um por um: a forma vem da swisstopo e o ano de cada um, do registro federal de prédios.`,
-        `${fmt(E.total)} buildings, one by one: the shape from swisstopo, and each one’s year from the federal building register.`,
-        `${fmt(E.total)} Häuser, eines nach dem anderen: die Form von swisstopo, das Baujahr aus dem eidgenössischen Gebäuderegister.`));
+        `${fmt(E.total)} prédios, um por um: a forma vem da swisstopo; andares e uso, do registro federal de prédios.`,
+        `${fmt(E.total)} buildings, one by one: the shape from swisstopo, floors and use from the federal building register.`,
+        `${fmt(E.total)} Häuser, eines nach dem anderen: die Form von swisstopo, Geschosse und Nutzung aus dem eidgenössischen Gebäuderegister.`));
     } },
-    // 1 · o Münster: o ano mais antigo do registro
+    // 1 · o Münster e a Pfalz
     { dur: 10000, run: async () => {
       mover({ alvo: munster, dist: 210, polar: rad(64), az: rad(200) }, 3500, { arco: 0.25 });
       await em(3500);
       mover({}, 6500, { giro: 110 });
-      await legenda(`Münster · ${E.minimo}`, t(
-        `O ano mais antigo do registro: ${lista(antigos)} constam como de ${E.minimo}.`,
-        `The oldest year in the register: ${lista(antigos)} are listed as built in ${E.minimo}.`,
-        `Das älteste Jahr im Register: ${lista(antigos)} sind mit ${E.minimo} eingetragen.`));
+      await legenda('Münster · Pfalz', t(
+        'O Münster de arenito vermelho e o terraço da Pfalz, uns 20 m acima do Reno.',
+        'The red sandstone Münster and the Pfalz terrace, some 20 m above the Rhine.',
+        'Das Münster aus rotem Sandstein und die Pfalz, rund 20 m über dem Rhein.'));
     } },
-    // 2 · a máquina do tempo: 1100 → 2026, cada prédio sobe no seu ano, com o rufo do tambor
-    { dur: 15000, run: async () => {
-      C.palidos(true);
-      C.definirAno(1100);
-      mover({ alvo: [20, 0, 20], dist: 900, polar: rad(54), az: rad(170) }, 2500, { arco: 0.15 });
-      await legenda('1100 → 2026', t(
-        'Cada prédio sobe no ano que o registro lhe dá. Pálidos, os lotes cujo prédio de hoje ainda não existia.',
-        'Each building rises in the year the register gives it. Pale: plots whose present building did not exist yet.',
-        'Jedes Haus wächst im Jahr, das ihm das Register gibt. Blass: Parzellen, deren heutiges Haus noch nicht stand.'));
-      await em(2500);
-      mover({ dist: 760 }, 12500, { giro: 50 });
-      await em(3000);
-      const v = varrer(1100, 2026, 10500);
-      await em(8200);
-      await legenda(t('Século XIX', '19th century', '19. Jahrhundert'), t(
-        `${fmt(E.sec19)} dos ${fmt(E.comAno)} prédios com ano têm data entre 1800 e 1899 no registro.`,
-        `${fmt(E.sec19)} of the ${fmt(E.comAno)} dated buildings carry a year between 1800 and 1899 in the register.`,
-        `${fmt(E.sec19)} der ${fmt(E.comAno)} Häuser mit Baujahr tragen im Register ein Jahr zwischen 1800 und 1899.`));
-      await v;
-    } },
-    // 3 · cor por época: voo baixo ao longo do Reno até a Mittlere Brücke
+    // 2 · voo baixo pelo Reno até a Mittlere Brücke
     { dur: 10000, run: async () => {
-      C.definirModo('epoca');
-      C.definirAno(2026);
       mover({ alvo: [330, 0, -60], dist: 330, polar: rad(70), az: rad(120) }, 2500);
-      await legenda(t('Cor por época', 'Colour by era', 'Farbe nach Epoche'), t(
-        `Do vermelho-escuro dos ${fmt(E.porEpoca[0])} anteriores a 1500 ao azul dos ${fmt(E.porEpoca[5])} deste século.`,
-        `From the dark red of the ${fmt(E.porEpoca[0])} built before 1500 to the blue of the ${fmt(E.porEpoca[5])} from this century.`,
-        `Vom Dunkelrot der ${fmt(E.porEpoca[0])} Häuser vor 1500 bis zum Blau der ${fmt(E.porEpoca[5])} aus diesem Jahrhundert.`));
+      await legenda('Rhein · Mittlere Brücke', t(
+        'A Mittlere Brücke e o Käppelijoch; os bondes verdes e amarelos rodam pelo horário de verdade.',
+        'The Mittlere Brücke and the Käppelijoch; the green and yellow trams run on the real timetable.',
+        'Die Mittlere Brücke und das Käppelijoch; die grünen und gelben Trams fahren nach dem echten Fahrplan.'));
       await em(2500);
       mover({ alvo: [-80, 0, -150], dist: 260, polar: rad(72), az: rad(150) }, 7500);
     } },
-    // 4 · Rathaus: o ano do registro nem sempre é o da primeira pedra
+    // 3 · Rathaus e Marktplatz: a gente nas praças
     { dur: 8000, run: async () => {
-      C.definirModo('gravura');
       mover({ alvo: rathaus, dist: 280, polar: rad(55), az: rad(250) }, 3000, { arco: 0.2 });
-      await legenda(t('Rathaus · Marktplatz', 'Rathaus · Marktplatz', 'Rathaus · Marktplatz'), t(
-        `O registro dá ${E.rathaus?.ano} à prefeitura, construída entre 1504 e 1514: o ano do GWR nem sempre é o da primeira pedra.`,
-        `The register gives the town hall ${E.rathaus?.ano}, though it was built in 1504–1514: the GWR year is not always that of the first stone.`,
-        `Das Register gibt dem Rathaus ${E.rathaus?.ano}, gebaut wurde es 1504–1514: Das GWR-Jahr ist nicht immer das des Grundsteins.`));
+      await legenda('Rathaus · Marktplatz', t(
+        'Gente onde Basel se encontra: nas praças, na Clarastrasse, no Rheinbord e à espera do bonde.',
+        'People where Basel meets: on the squares, along Clarastrasse, on the Rheinbord and waiting for the tram.',
+        'Menschen, wo Basel sich trifft: auf den Plätzen, an der Clarastrasse, am Rheinbord und an der Tramhaltestelle.'));
       await em(3000);
       mover({}, 5000, { giro: 70 });
     } },
+    // 4 · as estações: um ano em 40 s, câmera em volta do Münster e do Reno, alta e baixa como um drone
+    { dur: 40000, run: async () => {
+      C.ceu.definirHora(14);
+      mover({ alvo: [110, 6, 10], dist: 620, polar: rad(60), az: rad(300) }, 3000, { arco: 0.15 });
+      await legenda(t('Um ano em 40 segundos', 'A year in 40 seconds', 'Ein Jahr in 40 Sekunden'), t(
+        'O sol, as árvores, as roupas e a gente na rua seguem a data.',
+        'The sun, the trees, the clothes and the people out of doors follow the date.',
+        'Sonne, Bäume, Kleidung und die Menschen draussen folgen dem Datum.'));
+      const ano40 = estacoes(38000, ano);
+      await em(3000);
+      mover({ dist: 380, polar: rad(66) }, 17000, { giro: 150 });
+      await em(9000);
+      await legenda(t('Primavera', 'Spring', 'Frühling'), t('As tílias e os castanheiros brotam em abril.', 'The limes and chestnuts come into leaf in April.', 'Linden und Kastanien schlagen im April aus.'));
+      await em(16000);
+      await legenda(t('Verão', 'Summer', 'Sommer'), t('O Rheinbord enche e há quem desça o Reno nadando.', 'The Rheinbord fills up and swimmers drift down the Rhine.', 'Das Rheinbord füllt sich, und man schwimmt den Rhein hinunter.'));
+      await em(20000);
+      mover({ dist: 560, polar: rad(58) }, 18000, { giro: 140 });
+      await em(26000);
+      await legenda(t('Outono', 'Autumn', 'Herbst'), t('As copas ficam amarelas, laranja e marrons, e caem até o fim de novembro.', 'The crowns turn yellow, orange and brown, and fall by the end of November.', 'Die Kronen werden gelb, orange und braun und fallen bis Ende November.'));
+      await em(34000);
+      await legenda(t('Inverno', 'Winter', 'Winter'), t('Galhos nus, sol baixo e pouca gente na rua.', 'Bare branches, a low sun and few people out.', 'Kahle Äste, tiefe Sonne und wenige Menschen draussen.'));
+      await ano40;
+    } },
     // 5 · noite: as janelas acendem e a câmera volta à vista da Pfalz
-    { dur: 8000, run: async () => {
+    { dur: 10000, run: async () => {
       C.definirNoite(true);
-      mover(C.VISTA_PFALZ, 7500, { arco: 0.2 });
+      mover(C.VISTA_PFALZ, 9000, { arco: 0.2 });
       await legenda(t('Basel · dados abertos', 'Basel · open data', 'Basel · offene Daten'), t(
         'swisstopo, o registro federal de prédios via data.bs.ch e o OpenStreetMap. Clique em qualquer prédio.',
         'swisstopo, the federal building register via data.bs.ch, and OpenStreetMap. Click any building.',
@@ -173,7 +172,8 @@ function progresso() {
 async function iniciar() {
   if (ativo) return;
   ativo = true;
-  salvo = { ano: C.ano(), modo: C.modo(), noite: C.noite(), palidos: C.temPalidos() };
+  const e0 = C.ceu.estado();
+  salvo = { noite: C.noite(), data: e0.data, hora: e0.hora, vivo: C.ceu.aoVivo };
   C.fecharFicha();
   C.controls.enabled = false;
   document.body.classList.add('touring');
@@ -209,15 +209,16 @@ async function iniciar() {
 function parar(voltar = true) {
   if (!ativo) return;
   ativo = false;
-  somTour.varredura(0);
   somTour.parar(!voltar);
   cancelAnimationFrame(raf); cancelAnimationFrame(anim);
   for (const p of pendentes) { clearTimeout(p.id); p.falha(new Parado()); }
   pendentes.clear();
   $('tour').classList.add('saindo');
   $('tour-ano').classList.remove('on');
-  if (voltar) { C.definirAno(salvo.ano); C.definirModo(salvo.modo); C.definirNoite(salvo.noite); C.palidos(salvo.palidos); }
-  else C.definirAno(2026);
+  // a data e a hora voltam às de antes (e o relógio ao vivo, se estava); no fim natural fica a noite do tour
+  C.ceu.definirData(salvo.data); C.ceu.definirHora(salvo.hora);
+  if (voltar) C.definirNoite(salvo.noite);
+  C.ceu.aoVivo = salvo.vivo;
   C.controls.enabled = true;
   C.controls.update();
   $('tour').classList.remove('on');

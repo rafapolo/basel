@@ -148,14 +148,14 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
     const alto = gs[0];
     const topo = bTopo[id];
     const q = pontoNoPlano(alto, (k) => hash2(id * 131 + 3, k), 0.45);
-    chamines.push({ x: q.x, y: q.y, z: q.z, topo: Math.min(topo + 0.9 + hash(id) * 0.5, q.y + 2.4 + hash(id) * 0.8), ano: p.ano ?? 2026, id, cor: hash(id + 5) });
+    chamines.push({ x: q.x, y: q.y, z: q.z, topo: Math.min(topo + 0.9 + hash(id) * 0.5, q.y + 2.4 + hash(id) * 0.8), id, cor: hash(id + 5) });
     const grande = gs.filter((g) => g.area > 22);
     const nT = Math.min(3, Math.floor(grande.reduce((s, g) => s + g.area, 0) / 90));
     for (let k = 0; k < nT; k++) {
       const g = grande[Math.floor(hash2(id, k + 40) * grande.length)];
       if (g.ny > 0.86) continue;
       const q2 = pontoNoPlano(g, (j) => hash2(id * 17 + k, j + 90), 0.5);
-      trapeiras.push({ x: q2.x, y: q2.y, z: q2.z, fx: g.nx, fz: g.nz, ano: p.ano ?? 2026, id, cor: hash2(id, k) });
+      trapeiras.push({ x: q2.x, y: q2.y, z: q2.z, fx: g.nx, fz: g.nz, id, cor: hash2(id, k) });
     }
   }
 
@@ -164,10 +164,10 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
   const matInst = (chop) => {
     const m = chop ? new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }) : new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     m.onBeforeCompile = (s) => {
-      s.uniforms.uAno = U.uAno; s.uniforms.uTelhaDetalhe = U.uTelhaDetalhe;
+      s.uniforms.uTelhaDetalhe = U.uTelhaDetalhe;
       s.vertexShader = s.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float iAno; uniform float uAno; uniform float uTelhaDetalhe;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  if (uAno < iAno || uTelhaDetalhe < 0.5) transformed = vec3(0.0);');
+        .replace('#include <common>', '#include <common>\nuniform float uTelhaDetalhe;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  if (uTelhaDetalhe < 0.5) transformed = vec3(0.0);');
     };
     return m;
   };
@@ -215,9 +215,8 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
   }
   const malhas = instancias.map(({ lista, geo, cor, matriz }) => {
     const mesh = new THREE.InstancedMesh(geo, matInst(false), lista.length);
-    const iAno = new Float32Array(lista.length), m = new THREE.Matrix4();
-    lista.forEach((d, i) => { matriz(d, m); mesh.setMatrixAt(i, m); mesh.setColorAt(i, cor(d)); iAno[i] = d.ano > 0 ? d.ano : 2026; });
-    geo.setAttribute('iAno', new THREE.InstancedBufferAttribute(iAno, 1));
+    const m = new THREE.Matrix4();
+    lista.forEach((d, i) => { matriz(d, m); mesh.setMatrixAt(i, m); mesh.setColorAt(i, cor(d)); });
     mesh.customDepthMaterial = matInst(true);
     mesh.castShadow = mesh.receiveShadow = true;
     mesh.frustumCulled = false;
@@ -388,7 +387,7 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
   }`;
 
   const GLSL_NOITE = `#include <emissivemap_fragment>
-  if (uNoite > 0.01 && vEstado < 0.5 && fachJan > 0.0) {
+  if (uNoite > 0.01 && fachJan > 0.0) {
     totalEmissiveRadiance += vec3(1.0, 0.72, 0.38) * fachJan * fachAcesa * uNoite * 1.5;
   }`;
 

@@ -12,7 +12,7 @@
   const CHAVE = 'basel-ambiente';
   const lim = (v, a, b) => Math.max(a, Math.min(b, v));
   let ctx = null, mestre, comp, ligado = true, ativo = false, noTour = false, suspenso = false, ultimaHora = null, tRuf = 0, tGaiv = 0, ultimoSimT = null;
-  const bus = {}, alvo = { agua: 0, gente: 0, bonde: 1e9, bondeVel: 0, gaivotas: 0, noite: 0, dia: 1, hora: 15, ano: 2026, carros: 0, nadadores: 0 };
+  const bus = {}, alvo = { agua: 0, gente: 0, bonde: 1e9, bondeVel: 0, gaivotas: 0, noite: 0, dia: 1, hora: 15, carros: 0, nadadores: 0 };
   try { ligado = localStorage.getItem(CHAVE) !== 'off'; } catch {}
 
   function ruido(tipo) {
@@ -119,10 +119,10 @@
     suavizar(bus.agua.gain, 0.03 + 0.55 * alvo.agua + 0.04 * alvo.nadadores / 30, 1.2);
     // zumbido de trânsito: cai de madrugada (3 h) e sobe nas horas de pico
     const h = alvo.hora, transito = 0.25 + 0.75 * Math.max(0, Math.sin(((h - 4) / 20) * Math.PI)) ** 0.6;
-    suavizar(bus.cidade.gain, 0.16 * transito * (alvo.ano >= 1925 ? 1 : 0.2), 1.5);
-    suavizar(bus.gente.gain, 0.2 * alvo.gente * (alvo.ano >= 1500 ? 1 : 0.5), 1);
+    suavizar(bus.cidade.gain, 0.16 * transito, 1.5);
+    suavizar(bus.gente.gain, 0.2 * alvo.gente, 1);
     const d = alvo.bonde, vel = lim(alvo.bondeVel / 8, 0, 1);
-    suavizar(bus.bonde.gain, d < 1e8 ? 0.55 * Math.exp(-d / 70) * (0.3 + 0.7 * vel) * (alvo.ano >= 1895 ? 1 : 0) : 0, 0.4);
+    suavizar(bus.bonde.gain, d < 1e8 ? 0.55 * Math.exp(-d / 70) * (0.3 + 0.7 * vel) : 0, 0.4);
     suavizar(bus.chiado.gain, 0.04 + 0.1 * vel, 0.5);
   }
 

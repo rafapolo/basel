@@ -1,5 +1,7 @@
 # Tour: o roteiro
 
+> **2026-11-19:** a máquina do tempo saiu do site; o tour agora tem 90 s (abertura, Münster e Pfalz, Reno e Mittlere Brücke, Rathaus e Marktplatz, **um ano em 40 s** com a data correndo de janeiro a dezembro enquanto a câmera gira, e noite). O roteiro abaixo descreve a versão antiga; o atual está em `cenas()` de `docs/tour.js`.
+
 O tour é um passeio de câmera de 1 minuto pela Altstadt de Basel, no estilo de cinema. Abre pelo botão **Tour de 1 min** no topo ou por `?tour=1`, que mostra um convite (**Começar o tour**) sobre a cidade: o clique começa o tour e libera o som, que o navegador não toca sem um gesto. `?tour=en` e `?tour=de` fazem o mesmo em inglês e em alemão. **Esc** ou **✕ esc** param o tour no meio: a câmera fica onde estava e a cidade volta ao ano, à cor e à hora de antes. Visto até o fim, o tour termina de noite, na vista do Reno.
 
 A estrutura (faixas, legenda, câmera que toca a música) vem do tour do [geoglifos-amazonia](../../geoglifos-amazonia/design/tour.md); o som e o roteiro são de Basel. As cenas ficam em `cenas()`, em `docs/tour.js`; a música em `docs/som.js`.

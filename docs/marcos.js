@@ -5,8 +5,8 @@
 //   - Rathaus e igrejas: os triângulos do LOD2 do mesmo EGID são copiados para uma malha nova com material de pedra/
 //     pintura, e as torres (blocos do LOD2) são trocadas por torres com fuste, galeria, tambor e flecha;
 //   - Mittlere Brücke: arcos extrudados ao longo do eixo da ponte do OSM (way "Mittlere Rheinbrücke").
-// Os triângulos originais desses prédios são colapsados em cidade.js (esconde()), então ficha, ano e máquina do tempo
-// continuam valendo: o grupo de cada marco sobe no mesmo ano do prédio (id do predios.json) e responde ao clique.
+// Os triângulos originais desses prédios são colapsados em cidade.js (esconde()); a ficha continua valendo: cada marco
+// guarda o id do prédio no predios.json e responde ao clique.
 // Materiais (design/realismo-tocador-sim.md): MeshStandardMaterial com roughnessMap de ruído de valor em duas oitavas,
 // envMap (PMREM de estúdio neutro) só no telhado vidrado do Münster e no ouro.
 import * as THREE from 'three';
@@ -500,13 +500,9 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
   const alvos = new Map(); // pid -> pids irmãos (sólidos do mesmo EGID)
   alvos.set(1536, 1535);
   alvos.set(505, 504);
-  const crescimento = (ano, uAno) => (ano == null ? 1 : Math.min(1, Math.max(0, (uAno - ano + 12) / 12)));
-  // chamado a cada quadro: máquina do tempo (sobe nos 12 anos antes do ano do prédio) e destaque da ficha
-  function atualiza(uAno, uSel) {
+  // chamado a cada quadro: destaque do marco da ficha
+  function atualiza(uSel) {
     for (const m of lista) {
-      const s = crescimento(m.ano, uAno);
-      m.grupo.visible = s > 0.001 || (m.ano != null && U.uPalido.value > 0.5 && false);
-      if (m.grupo.visible) { m.grupo.scale.y = s; m.grupo.position.y = m.base * (1 - s); }
       const sel = m.pid >= 0 && m.pid === uSel || alvos.get(uSel) === m.pid ? 1 : 0;
       for (const c of m.grupo.children) { const mt = c.material; if (mt.emissive) { mt.emissive.setRGB(0.5 * sel, 0.06 * sel, 0.04 * sel); } }
     }
