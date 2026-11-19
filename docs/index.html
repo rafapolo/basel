@@ -37,6 +37,10 @@
     radial-gradient(circle at 16px 7px, transparent 2.2px, #fff 2.6px, #fff 3.6px, transparent 4px),
     linear-gradient(-28deg, transparent 44%, #fff 45%, #fff 55%, transparent 56%) 5px 1px / 10px 7px no-repeat; }
   #jogo-abrir:hover { background: #8f0f14; }
+  @media (max-width: 560px) { /* no telefone a bici fica só com o ícone: três pílulas não cabem ao lado da marca */
+    #jogo-abrir { font-size: 0; padding: 7px 11px; gap: 0; }
+    #topo .acoes { gap: 6px; }
+  }
   #linguas { display: inline-flex; border: 1px solid var(--linha); border-radius: 999px; overflow: hidden; background: rgba(239,230,210,.9); }
   #linguas button { border: 0; background: none; padding: 7px 10px; font: 600 12px Inter, sans-serif; cursor: pointer; color: var(--suave); }
   #linguas button[aria-pressed="true"] { background: var(--tinta); color: var(--papel); }

@@ -1,7 +1,7 @@
 // Torres da Roche e o campus da Grenzacherstrasse (2026-11-19), fora do recorte a leste: Bau 1 (178 m, 2015) e Bau 2
 // (205 m, 2022, o prédio mais alto da Suíça), de Herzog & de Meuron, com os terraços em degraus e as faixas brancas de
 // cada andar. Sólidos do swissBUILDINGS3D (script/roche.py → data/roche.json, em decímetros, coordenadas da cidade).
-// Em volta, um chão neutro até o horizonte, para as torres não flutuarem no vazio além do recorte.
+// Embaixo, um disco de chão que se desfaz na névoa, para as torres não flutuarem no vazio além do recorte.
 import * as THREE from 'three';
 
 export async function criarRoche({ cena, U, recorte }) {
@@ -58,15 +58,21 @@ export async function criarRoche({ cena, U, recorte }) {
   m.name = 'roche';
   cena.add(m);
 
-  // chão até o horizonte, com um buraco do tamanho do recorte (o relevo fica por cima, a borda some na névoa)
-  const { x0, x1, z0, z1, y } = recorte, R = 9000;
-  const sh = new THREE.Shape([new THREE.Vector2(-R, -R), new THREE.Vector2(R, -R), new THREE.Vector2(R, R), new THREE.Vector2(-R, R)]);
-  // o plano da Shape é xy; depois de girar −90° em x, y vira −z: o buraco vai com z trocado de sinal
-  sh.holes.push(new THREE.Path([new THREE.Vector2(x0, -z1), new THREE.Vector2(x0, -z0), new THREE.Vector2(x1, -z0), new THREE.Vector2(x1, -z1)]));
-  const gc = new THREE.ShapeGeometry(sh).rotateX(-Math.PI / 2).translate(0, y, 0);
-  const chao = new THREE.Mesh(gc, new THREE.MeshLambertMaterial({ color: 0x7f7a6c }));
-  chao.receiveShadow = true;
-  chao.name = 'chão de fora';
+  // chão sob o campus: um disco que se desfaz nas bordas (a placa até o horizonte cobria o Reno onde ele sai do recorte
+  // e virava uma laje clara na ponta do rio); fica ao norte do Reno, que passa a ~400 m do centro
+  const C0 = new THREE.Vector2(1300, -180), R0 = 260, R1 = 380;
+  const gc = new THREE.CircleGeometry(R1, 64).rotateX(-Math.PI / 2).translate(C0.x, recorte.y, C0.y);
+  const mc = new THREE.MeshLambertMaterial({ color: 0x8a8577, transparent: true, depthWrite: false });
+  mc.onBeforeCompile = (s) => {
+    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vDisco;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvDisco = position.xz;');
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vDisco;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  diffuseColor.a *= 1.0 - smoothstep(${R0.toFixed(1)}, ${R1.toFixed(1)}, length(vDisco - vec2(${C0.x.toFixed(1)}, ${C0.y.toFixed(1)})));`);
+  };
+  mc.customProgramCacheKey = () => 'roche-disco';
+  const chao = new THREE.Mesh(gc, mc);
+  chao.receiveShadow = true; chao.renderOrder = -1;
+  chao.name = 'chão da Roche';
   cena.add(chao);
   return { malha: m, chao };
 }
