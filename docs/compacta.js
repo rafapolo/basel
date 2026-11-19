@@ -28,12 +28,21 @@ export function decodifica(buf, ncol, nbIndice) {
 
 // baixa uma malha: no site publicado (script/build.js põe window.BASEL_GZ) vem a cópia .gz feita com zopfli, ~4% menor
 // que o gzip do GitHub Pages, aberta aqui; em desenvolvimento, o arquivo como está em docs/data
+// conta os bytes que chegam (barra da abertura, window.carga em index.html); o total vem do Content-Length, quando há
+function contando(r, url) {
+  const total = +r.headers.get('content-length') || 0;
+  if (!globalThis.carga || !r.body) return r.body;
+  let n = 0;
+  globalThis.carga.bytes(url, 0, total);
+  return r.body.pipeThrough(new TransformStream({ transform(ch, c) { n += ch.byteLength; globalThis.carga.bytes(url, n, total); c.enqueue(ch); } }));
+}
 export async function baixaBin(url) {
   if (globalThis.BASEL_GZ && typeof DecompressionStream === 'function') {
     try {
       const r = await fetch(url + '.gz');
-      if (r.ok) return await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+      if (r.ok) return await new Response(contando(r, url).pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
     } catch { /* cai no arquivo sem .gz */ }
   }
-  return (await fetch(url)).arrayBuffer();
+  const r = await fetch(url);
+  return new Response(contando(r, url)).arrayBuffer();
 }

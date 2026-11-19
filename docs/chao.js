@@ -14,11 +14,11 @@ export function cotaPonta(altura, x, z, xi, zi) {
   return Math.max(altura(x, z), altura(x + (dx / L) * 2, z + (dz / L) * 2));
 }
 
-export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, base = 'data/' }) {
+export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, base = 'data/', binTerreno = null }) {
   const T = meta.terreno;
   const REC = (() => { const [e0, n0, e1, n1] = meta.recorte_lv95, [oe, on] = meta.origem_lv95; return { x0: e0 - oe, x1: e1 - oe, z0: -(n1 - on), z1: -(n0 - on) }; })();
   // terreno.v2.bin (script/compacta.py): mesmos vértices e triângulos do terreno.bin.gz, em ~55% dos bytes
-  const { cols, idx } = decodifica(await baixaBin(base + 'terreno.v2.bin'), 3, 3);
+  const { cols, idx } = decodifica(await (binTerreno ?? baixaBin(base + 'terreno.v2.bin')), 3, 3); // binTerreno: já pedido no começo (cidade.js), junto com os prédios
   const nv = cols[0].length, nt = idx.length / 3;
   const [col, lin, hh] = cols.map((c) => new Uint16Array(c.buffer));
   const pos = new Float32Array(nv * 3), cores = new Float32Array(nv * 3);

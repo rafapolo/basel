@@ -86,6 +86,10 @@
   #creditos a { color: inherit; }
   #carregando { position: fixed; inset: 0; display: grid; place-items: center; z-index: 50; background: var(--papel); font: italic 22px 'IM Fell English', Georgia, serif; transition: opacity .6s; }
   #carregando.fora { opacity: 0; pointer-events: none; }
+  #carregando .caixa { display: grid; justify-items: center; gap: 14px; padding: 0 16px; }
+  #carregando .barra { width: min(280px, 70vw); height: 4px; border-radius: 2px; background: rgba(40,30,20,.14); overflow: hidden; }
+  #carregando .barra i { display: block; height: 100%; background: var(--ouro); transform: scaleX(0); transform-origin: left; transition: transform .35s ease-out; }
+  #carregando small { font: 500 12px system-ui, sans-serif; font-style: normal; opacity: .6; min-height: 1.2em; }
 
   body.noite #marca, body.noite #painel { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
   body.noite .chave { border-color: rgba(232,225,208,.18); }
@@ -139,7 +143,29 @@
 </head>
 <body>
 <canvas id="cena"></canvas>
-<div id="carregando" data-i18n="carregando">Desenhando a cidade…</div>
+<div id="carregando"><div class="caixa"><span data-i18n="carregando">Desenhando a cidade…</span><div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div><small id="carga-etapa"></small></div></div>
+<script>
+// barra de progresso da abertura: os bytes das malhas grandes (compacta.js) levam até 68%; as etapas de montagem
+// (cidade.js, carga.etapa) o resto. Nunca anda para trás.
+(() => {
+  const arq = new Map(); let feito = 0;
+  const pinta = (f) => {
+    feito = Math.max(feito, Math.min(1, f));
+    const el = document.querySelector('#carregando .barra');
+    if (!el) return;
+    el.firstElementChild.style.transform = `scaleX(${feito})`;
+    el.setAttribute('aria-valuenow', Math.round(feito * 100));
+  };
+  window.carga = {
+    bytes(url, n, total) {
+      arq.set(url, [n, total || arq.get(url)?.[1] || 0]);
+      let a = 0, b = 0; for (const [x, y] of arq.values()) { a += x; b += Math.max(x, y); }
+      if (b) pinta(0.04 + 0.64 * a / b);
+    },
+    etapa(f, txt) { pinta(f); const e = document.getElementById('carga-etapa'); if (e && txt) e.textContent = txt; },
+  };
+})();
+</script>
 
 <header id="topo">
   <div id="marca"><h1>Basel</h1><p data-i18n="sub"></p></div>

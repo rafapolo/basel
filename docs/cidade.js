@@ -19,6 +19,9 @@ import { criarRoche } from './roche.js';
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
 
+const carga = window.carga;
+carga?.etapa(0.03, t('baixando os dados…', 'downloading the data…', 'Daten werden geladen…'));
+const binTerreno = baixaBin('data/terreno.v2.bin'); // em paralelo com os prédios: a barra da abertura conta os dois
 const [meta, ruas, bin, rel] = await Promise.all([
   fetch('data/predios.json').then((r) => r.json()),
   fetch('data/ruas.json').then((r) => r.json()),
@@ -78,11 +81,12 @@ const altura0 = (x, z) => {
   const h = (a, b) => alturas[b * R.nx + a] / 100;
   return (h(i, j) * (1 - u) + h(i + 1, j) * u) * (1 - v) + (h(i, j + 1) * (1 - u) + h(i + 1, j + 1) * u) * v;
 };
+carga?.etapa(0.7, t('o Reno…', 'the Rhine…', 'der Rhein…'));
 const AGUA = await criaAgua({ THREE, cena, renderer, camera, meta, altura, ruas, q });
 {
   const larg = (R.nx - 1) * R.passo, prof = (R.ny - 1) * R.passo;
   // relevo fino e ruas como áreas: docs/chao.js (tarefa 15); o relevo de 5 m (relevo.bin) fica só como reserva
-  CH = await criarChao(THREE, { meta, ruas, orto, nivelReno: NIVEL_RENO, ajuste: AGUA.relevo }); // ajuste: leito e margem do Reno (agua.js)
+  CH = await criarChao(THREE, { meta, ruas, orto, nivelReno: NIVEL_RENO, ajuste: AGUA.relevo, binTerreno }); // ajuste: leito e margem do Reno (agua.js)
   cena.add(CH.malha);
 }
 
@@ -186,6 +190,7 @@ const ruasObj = new THREE.Group();
 }
 
 // ---------- prédios ----------
+carga?.etapa(0.76, t('os prédios…', 'the buildings…', 'die Häuser…'));
 const nVert = meta.n_tris * 3;
 // predios.v2.bin (script/compacta.py): vértices únicos + índice; aqui volta à sopa de triângulos de sempre
 const q16 = new Int16Array(nVert * 3), ids16 = new Uint16Array(nVert);
@@ -300,14 +305,17 @@ cena.add(predios);
 // luz e céu (sol real, CSM, GTAO, bloom): ver ceu.js. Modo leve: ?leve=1, ou automático em celular
 const leve = q.get('leve') === '1' || (q.get('leve') !== '0' && (matchMedia('(pointer:coarse)').matches || innerWidth < 700 || (navigator.deviceMemory || 8) <= 4));
 let arvores; // árvores (arvores.js): o G-buffer do GTAO precisa do recorte de folhas delas
+carga?.etapa(0.82, t('o céu e a luz…', 'sky and light…', 'Himmel und Licht…'));
 const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f; arvores?.patchNormal(s); } });
 arvores = q.get('arvores') === '0' ? null : await criarArvores({ THREE, cena, camera, altura, dentro: CH.dentro, ceu }); // cadastro de árvores e gramados (tarefa 16)
 // marcos em alta definição (docs/marcos.js): substituem o sólido LOD2 pelo mesmo EGID
+carga?.etapa(0.88, t('o Münster, o Rathaus e as pontes…', 'the Münster, the Rathaus and the bridges…', 'Münster, Rathaus und Brücken…'));
 const MARC = criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, nivelReno: NIVEL_RENO, U });
 MARC.esconde(geo);
 
 AGUA.iniciar({ leve }); // superfície do Reno, depois do céu (usa o sol e a névoa dele)
 // detalhes de rua (tarefa 17): fontes, postes, bancos, toldos, bandeiras, balsas e navios; antes do 1º render, para a sombra em cascata pegar
+carga?.etapa(0.92, t('fontes, postes e bancos…', 'fountains, lamps and benches…', 'Brunnen, Laternen und Bänke…'));
 if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel, cotaPonte: MARC.cotaPonte });
 
 // relógio e estação no painel: a hora de Basel (ceu.js segue o relógio real até alguém mexer)
@@ -574,6 +582,7 @@ const ROCHE = q.get('roche') === '0' ? null : await criarRoche({ cena, U, recort
   cena.traverse((o) => { if ((o.isMesh || o.isInstancedMesh) && o !== CH.malha && !o.userData.semNeve) for (const m of [o.material].flat()) comNeve(m); });
 }
 // gente e movimento (tarefa 19, docs/vida.js): bondes pelo horário do GTFS, pedestres, bicicletas, carros, gaivotas e nadadores
+carga?.etapa(0.96, t('gente e bondes…', 'people and trams…', 'Menschen und Trams…'));
 const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE, recorte: REC });
 $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
 if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
@@ -587,6 +596,7 @@ if (CAM) {
 }
 requestAnimationFrame(quadro);
 orto.carrega(); // tiles chegam depois da abertura
+carga?.etapa(1, '');
 $('carregando').classList.add('fora');
 
 // ---------- estatística para o tour (contada dos dados) ----------
