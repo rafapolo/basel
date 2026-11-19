@@ -20,6 +20,8 @@
     carregando: ['Desenhando a cidade…', 'Drawing the city…', 'Die Stadt wird gezeichnet…'],
     sub: ['A Altstadt prédio por prédio, agora', 'The old town building by building, right now', 'Die Altstadt Haus für Haus, jetzt'],
     tour: ['Tour de 2 min', '2-min tour', '2-Min-Tour'],
+    jogo: ['Pedalar', 'Ride a bike', 'Velo fahren'],
+    'jogo-titulo': ['Uma bicicleta vermelha na Mittlere Brücke: passe por seis lugares da cidade contra o relógio', 'A red bike on the Mittlere Brücke: ride to six places in town against the clock', 'Ein rotes Velo auf der Mittleren Brücke: fahren Sie sechs Orte der Stadt auf Zeit an'],
     'tour-titulo': ['Um passeio de 2 minutos pela cidade e pelo Reno enquanto o ano passa, com som', 'A 2-minute flight through the city and along the Rhine as the year goes by, with sound', 'Ein 2-minütiger Flug durch die Stadt und am Rhein entlang, während das Jahr vergeht, mit Ton'],
     noite: ['noite', 'night', 'Nacht'],
     ruas: ['ruas e bondes', 'streets and trams', 'Strassen und Tram'],

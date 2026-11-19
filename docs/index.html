@@ -30,6 +30,13 @@
   #tour-abrir { background: var(--tinta); color: var(--papel); border-color: var(--tinta); display: inline-flex; align-items: center; gap: 8px; }
   #tour-abrir::before { content: ""; border-left: 8px solid var(--ouro); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
   #tour-abrir:hover { background: #000; }
+  #jogo-abrir { background: #b3161c; color: #fff; border-color: #b3161c; display: inline-flex; align-items: center; gap: 7px; }
+  /* duas rodas e o quadro, desenhados com gradientes (o texto do botão é trocado pelo i18n, então nada de svg dentro) */
+  #jogo-abrir::before { content: ""; width: 20px; height: 11px; background:
+    radial-gradient(circle at 4px 7px, transparent 2.2px, #fff 2.6px, #fff 3.6px, transparent 4px),
+    radial-gradient(circle at 16px 7px, transparent 2.2px, #fff 2.6px, #fff 3.6px, transparent 4px),
+    linear-gradient(-28deg, transparent 44%, #fff 45%, #fff 55%, transparent 56%) 5px 1px / 10px 7px no-repeat; }
+  #jogo-abrir:hover { background: #8f0f14; }
   #linguas { display: inline-flex; border: 1px solid var(--linha); border-radius: 999px; overflow: hidden; background: rgba(239,230,210,.9); }
   #linguas button { border: 0; background: none; padding: 7px 10px; font: 600 12px Inter, sans-serif; cursor: pointer; color: var(--suave); }
   #linguas button[aria-pressed="true"] { background: var(--tinta); color: var(--papel); }
@@ -83,7 +90,7 @@
   body.noite .chave input { background: rgba(232,225,208,.25); }
   body.noite .chave input:checked { background: var(--ouro); }
   body.noite #marca p, body.noite #agora small, body.noite .nota, body.noite #creditos { color: #a99f8c; }
-  body.noite .btn:not(#tour-abrir) { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
+  body.noite .btn:not(#tour-abrir):not(#jogo-abrir) { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
 
   /* ---------- tour: faixas de cinema 2.39:1, legenda com kicker e frase, linha de progresso ---------- */
   body.touring #painel, body.touring #topo, body.touring #ficha, body.touring #creditos { opacity: 0; pointer-events: none; transition: opacity .5s; }
@@ -134,6 +141,7 @@
   <div id="marca"><h1>Basel</h1><p data-i18n="sub"></p></div>
   <div class="acoes">
     <div id="linguas" role="group" aria-label="Language / Sprache"><button type="button" data-lang="en">EN</button><button type="button" data-lang="de">DE</button></div>
+    <button id="jogo-abrir" class="btn" type="button" data-i18n="jogo" data-i18n-title="jogo-titulo" title="Pedalar pela cidade">Ride a bike</button>
     <button id="tour-abrir" class="btn" type="button" data-i18n="tour" data-i18n-title="tour-titulo" title="Um passeio de 1 minuto, com som">Tour de 1 min</button>
   </div>
 </header>
