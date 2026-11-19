@@ -60,6 +60,9 @@ controls.maxPolarAngle = THREE.MathUtils.degToRad(86);
 controls.minDistance = 25;
 controls.maxDistance = 2600;
 controls.screenSpacePanning = false;
+// como num mapa (pedido de 2026-11-19): botão esquerdo arrasta o mapa, o direito gira; no toque, um dedo arrasta e dois giram e dão zoom
+controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
 const orto = criaOrtofoto(THREE, renderer, controls); // foto aérea no chão e nos telhados (docs/ortofoto.js)
 
 const hemi = new THREE.HemisphereLight(0xfff6e4, 0xb9a785, 1.7);
@@ -409,8 +412,9 @@ function voarPara(posFim, alvoFim, ms = 900) {
 }
 function entrarRua(x, z) {
   if (!RUA.on) {
-    RUA.salvo = { minDistance: controls.minDistance, maxPolarAngle: controls.maxPolarAngle, minPolarAngle: controls.minPolarAngle, enablePan: controls.enablePan, enableZoom: controls.enableZoom, rotateSpeed: controls.rotateSpeed };
-    Object.assign(controls, { minDistance: 0.05, maxPolarAngle: THREE.MathUtils.degToRad(170), minPolarAngle: THREE.MathUtils.degToRad(10), enablePan: false, enableZoom: false, rotateSpeed: -0.35 });
+    RUA.salvo = { mouseButtons: { ...controls.mouseButtons }, touches: { ...controls.touches }, minDistance: controls.minDistance, maxPolarAngle: controls.maxPolarAngle, minPolarAngle: controls.minPolarAngle, enablePan: controls.enablePan, enableZoom: controls.enableZoom, rotateSpeed: controls.rotateSpeed };
+    Object.assign(controls, { minDistance: 0.05, maxPolarAngle: THREE.MathUtils.degToRad(170), minPolarAngle: THREE.MathUtils.degToRad(10), enablePan: false, enableZoom: false, rotateSpeed: -0.35,
+      mouseButtons: { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }, touches: { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE } }); // a pé: arrastar olha em volta
     RUA.on = true; chipRua.hidden = false; fecharFicha(); window.jogo?.livreRua(0, 0); velRua = 0;
     camera.near = 0.25; camera.updateProjectionMatrix(); // perto das fachadas: o corte de 1 m mostrava o lado de dentro
   }

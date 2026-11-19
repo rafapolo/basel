@@ -271,7 +271,13 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
     dirLuz.copy(lunar ? lua : e.dir);
     if (!lunar && dirLuz.y < 0.07) { dirLuz.y = 0.07; dirLuz.normalize(); } // sol rasante: não deixa a sombra esticar ao infinito
     const cor = lunar ? luaCor : e.luz.cor;
-    if (csm) { csm.lightDirection.copy(dirLuz).negate(); luzes.forEach((l) => { l.color.copy(cor); l.intensity = intens; }); csm.update(); }
+    if (csm) {
+      // alcance das sombras pela altura da câmera: vista do alto, a borda onde a sombra acabava (1,8 km) ficava na tela e
+      // andava junto com o mapa; agora vai até 5 km, refazendo as cascatas só quando muda mais de 15%
+      const alcance = Math.min(5000, Math.max(1800, camera.position.y * 3 + 1200));
+      if (Math.abs(alcance - csm.maxFar) / csm.maxFar > 0.15) { csm.maxFar = alcance; csm.updateFrustums(); }
+      csm.lightDirection.copy(dirLuz).negate(); luzes.forEach((l) => { l.color.copy(cor); l.intensity = intens; }); csm.update();
+    }
     else { sol.position.copy(sol.target.position).addScaledVector(dirLuz, 900); sol.color.copy(cor); sol.intensity = intens; }
     hemi.color.copy(hemiDia.c).lerp(hemiNoite.c, n); hemi.groundColor.copy(hemiDia.g).lerp(hemiNoite.g, n);
     hemi.intensity = 0.35 + 0.8 * e.dia + 0.2 * n;

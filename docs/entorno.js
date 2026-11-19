@@ -36,6 +36,9 @@ export async function criarEntorno({ cena, base = 'data/' }) {
   g.computeVertexNormals();
   const chao = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
   chao.receiveShadow = true; chao.name = 'entorno'; chao.userData.semNeve = false;
+  // só o rio fora do recorte (pedido de 2026-11-19: onde não há dados de verdade, não se mostra terreno); o chão fica
+  // montado (a altura serve à câmera) mas invisível
+  chao.visible = false;
   cena.add(chao);
   // o Reno fora do recorte: água escura e lisa, no nível do rio
   const ga = new THREE.BufferGeometry(), pa = new Float32Array((M.agua.length / 2) * 3);

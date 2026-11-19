@@ -197,6 +197,9 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); g.setIndex(idx); g.computeVertexNormals();
     const m = new THREE.Mesh(g, pedra); m.castShadow = m.receiveShadow = true; m.name = 'muros-de-cais';
+    // 2026-11-19: fora. O muro corria a margem inteira, 1,8 m dentro da água, e deixava um canal entre ele e a margem ("não
+    // existe rio murado"); com o relevo fino de 0,6 m a margem de verdade (degraus, taludes, cais) já aparece sozinha
+    m.visible = false;
     grupo.add(m);
   }
   {
