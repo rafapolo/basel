@@ -207,7 +207,7 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
       // pontas como as faixas da ponte (cotaPonta), para o topo ficar sob a pista
       const ux = c.b[0] - c.a[0], uz = c.b[1] - c.a[1];
       const hA = cotaPonta(altura, c.a[0], c.a[1], c.a[0] + ux * 0.01, c.a[1] + uz * 0.01), hB = cotaPonta(altura, c.b[0], c.b[1], c.b[0] - ux * 0.01, c.b[1] - uz * 0.01);
-      const topo = hA + (hB - hA) * c.f + 0.35;
+      const topo = hA + (hB - hA) * c.f - 0.2; // dentro da laje de concreto das pontes (cidade.js, de −0,65 a +0,55 m): sem furar o tabuleiro
       const fundo = NIVEL - 2.5;
       e.set(0, -Math.atan2(FLUXO[1], FLUXO[0]) + Math.PI / 2, 0);
       qt.setFromEuler(e); s.set(c.w, Math.max(2, topo - fundo), c.l); p.set(c.x, fundo, c.z);
