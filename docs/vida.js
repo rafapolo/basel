@@ -343,7 +343,7 @@ uniform float uVidaT; uniform float uAnima;`)
   const VIA_CARRO = new Set(['secondary', 'secondary_link', 'tertiary', 'unclassified', 'residential', 'service']);
   const matG = matGente();
   const matC = matGente(0.45);
-  const NPED = leve ? 300 : 1300, NBIKE = leve ? 20 : 70, NCARRO = leve ? 10 : 36;
+  const NPED = leve ? 300 : 1300, NBIKE = leve ? 70 : 280, NCARRO = leve ? 10 : 36;
   const ped = populacao({ n: NPED, grafo: gPed, geo: geoGente(), mat: matG, sombra: false, vel: [0.95, 1.65], livres: Math.round(NPED * 0.34),
     desloc: (i, r) => (r() < 0.5 ? -1 : 1) * (0.2 + r() * 0.9),
     offTipo: (t, o) => (VIA_CARRO.has(t) ? Math.sign(o) * (LARG[t] / 2 + 1.1) : o) });
