@@ -94,7 +94,8 @@ varying vec2 vChaoP; uniform sampler2D uRuasA; uniform sampler2D uRuasB; uniform
 float hsh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hsh(i), hsh(i + vec2(1, 0)), f.x), mix(hsh(i + vec2(0, 1)), hsh(i + vec2(1, 1)), f.x), f.y); }
-float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }`)
+float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }
+float gRelevo = 0.0; // relevo fino da rua (m), só perto da câmera: vira normal em <normal_fragment_maps>`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
   if (uRuasOn > 0.5) {
     vec2 uvR = (vChaoP - uRuasRet.xy) * uRuasRet.zw;
@@ -128,6 +129,26 @@ float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }`)
     float pesoFoto = mix(0.55, 0.18, perto);
     vec3 fotoLum = vec3(dot(foto, vec3(0.299, 0.587, 0.114)));
     vec3 rua = mix(cRua, cRua * (0.55 + foto / max(fotoLum, 0.05) * 0.0 + fotoLum * 1.1), pesoFoto);
+    // ---- de perto (até ~40 m): relevo das pedras, juntas fundas, bueiros e manchas de óleo; de longe nada disso pesa
+    float rente = (1.0 - smoothstep(12.0, 40.0, dist)) * uRuasOn;
+    if (rente > 0.01) {
+      // paralelepípedo abaulado (até 2 cm no meio da pedra), laje com junta afundada, asfalto com grão
+      float domo = (1.0 - junta) * (0.6 + 0.4 * hsh(cel + 3.0));
+      float laje = 1.0 - jl;
+      gRelevo = rente * (pav * 0.02 * domo + cal * 0.006 * laje + asf * 0.003 * hsh(floor(vChaoP * 40.0))) / cobMat * cobre;
+      // manchas de óleo e de chuva no asfalto
+      float oleo = smoothstep(0.62, 0.8, fbm(vChaoP * 1.7 + 11.0)) * asf;
+      rua *= 1.0 - 0.25 * oleo * rente;
+      // bueiros e tampas de ferro: um a cada ~20 m de asfalto, sorteado por célula
+      vec2 cB = floor(vChaoP / 19.0), oB = (vec2(hsh(cB), hsh(cB + 5.0)) * 0.6 + 0.2) * 19.0;
+      float dB = length(vChaoP - (cB * 19.0 + oB));
+      float tampa = (1.0 - smoothstep(0.33, 0.36, dB)) * step(0.6, asf) * step(0.35, hsh(cB + 9.0));
+      float aro = smoothstep(0.27, 0.29, dB) * (1.0 - smoothstep(0.33, 0.35, dB));
+      float grelha = step(0.5, fract(dot(vChaoP, vec2(0.7071)) * 9.0));
+      vec3 ferro = vec3(0.16, 0.15, 0.14) * (0.8 + 0.4 * grelha) * (1.0 - 0.4 * aro);
+      rua = mix(rua, ferro, tampa * rente);
+      gRelevo += tampa * rente * (aro * 0.01 - 0.004);
+    }
     diffuseColor.rgb = mix(diffuseColor.rgb, rua, cobre * 0.92);
     // leito do bonde: concreto escuro; marca de faixa branca
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.34, 0.33, 0.31) * (0.9 + 0.2 * ruido), rb.b * 0.7 * uRuasOn);
@@ -138,6 +159,15 @@ float fbm(vec2 p) { return vnoise(p) * 0.6 + vnoise(p * 2.1 + 7.3) * 0.4; }`)
     roughnessFactor = clamp(0.95 - 0.28 * mancha * (asf + cal) - 0.06 * ruido + 0.05 * pav, 0.4, 1.0);
     }
     diffuseColor.rgb *= mix(1.0, 0.62, ao * uRuasOn * 0.35 * (1.0 - cobre));
+  }`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  { // relevo fino (bump) a partir de gRelevo: método de Mikkelsen, como o bumpmap do three
+    vec2 dH = vec2(dFdx(gRelevo), dFdy(gRelevo));
+    if (abs(dH.x) + abs(dH.y) > 1e-6) {
+      vec3 sx = dFdx(-vViewPosition), sy = dFdy(-vViewPosition), r1 = cross(sy, normal), r2 = cross(normal, sx);
+      float det = dot(sx, r1);
+      normal = normalize(abs(det) * normal - sign(det) * (dH.x * r1 + dH.y * r2));
+    }
   }`);
   };
   const malha = new THREE.Mesh(g, mat);
