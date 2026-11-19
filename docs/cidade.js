@@ -389,7 +389,7 @@ canvas.addEventListener('pointerup', (e) => {
 const RUA = { on: false, salvo: null, anim: 0 };
 const chipRua = document.createElement('div');
 chipRua.id = 'rua-chip'; chipRua.hidden = true;
-chipRua.textContent = t('Vista de rua · arraste para olhar · clique duplo para andar · roda ou Esc para sair', 'Street view · drag to look · double-click to walk · scroll or Esc to leave', 'Strassenansicht · ziehen zum Umschauen · Doppelklick zum Gehen · Mausrad oder Esc zum Verlassen');
+chipRua.textContent = t('Vista de rua · W/S ou ↑/↓ anda, A/D ou ←/→ vira, Shift corre · arraste para olhar · clique duplo salta · roda ou Esc sai', 'Street view · W/S or ↑/↓ walk, A/D or ←/→ turn, Shift runs · drag to look · double-click jumps · scroll or Esc to leave', 'Strassenansicht · W/S oder ↑/↓ gehen, A/D oder ←/→ drehen, Shift rennt · ziehen zum Umschauen · Doppelklick springt · Mausrad oder Esc beendet');
 Object.assign(chipRua.style, { position: 'fixed', left: '50%', bottom: '18px', transform: 'translateX(-50%)', zIndex: 30, background: 'rgba(20,18,24,.75)', color: '#f6efe0', font: '600 13px system-ui, sans-serif', padding: '8px 14px', borderRadius: '999px', pointerEvents: 'none', maxWidth: 'calc(100% - 32px)', textAlign: 'center' });
 document.body.appendChild(chipRua);
 function voarPara(posFim, alvoFim, ms = 900) {
@@ -407,7 +407,8 @@ function entrarRua(x, z) {
   if (!RUA.on) {
     RUA.salvo = { minDistance: controls.minDistance, maxPolarAngle: controls.maxPolarAngle, minPolarAngle: controls.minPolarAngle, enablePan: controls.enablePan, enableZoom: controls.enableZoom, rotateSpeed: controls.rotateSpeed };
     Object.assign(controls, { minDistance: 0.05, maxPolarAngle: THREE.MathUtils.degToRad(170), minPolarAngle: THREE.MathUtils.degToRad(10), enablePan: false, enableZoom: false, rotateSpeed: -0.35 });
-    RUA.on = true; chipRua.hidden = false; fecharFicha();
+    RUA.on = true; chipRua.hidden = false; fecharFicha(); window.jogo?.livreRua(0, 0); velRua = 0;
+    camera.near = 0.25; camera.updateProjectionMatrix(); // perto das fachadas: o corte de 1 m mostrava o lado de dentro
   }
   // olha na direção em que a câmera já olhava, na horizontal
   const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
@@ -417,6 +418,7 @@ function entrarRua(x, z) {
 function sairRua() {
   if (!RUA.on) return;
   RUA.on = false; chipRua.hidden = true;
+  camera.near = 1; camera.updateProjectionMatrix();
   const salvo = RUA.salvo;
   setTimeout(() => { if (!RUA.on) Object.assign(controls, salvo); }, 1150); // depois do voo: com minDistance de 25 m já valendo, a câmera saltava
   const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize();
@@ -447,6 +449,36 @@ canvas.addEventListener('dblclick', (e) => {
   entrarRua(p.x, p.z);
 });
 canvas.addEventListener('wheel', (e) => { if (RUA.on && e.deltaY > 0) sairRua(); }, { passive: true });
+// andar na vista de rua, como na e-bike (jogo.js): W/S ou ↑/↓ para frente e para trás, A/D ou ←/→ viram, Shift corre.
+// Os prédios e o Reno barram o passo (grade de jogo.js); o olho segue o relevo e as pontes a 1,7 m
+const PASSO_RUA = { frente: false, tras: false, esq: false, dir: false, correr: false };
+const TECLA_RUA = { KeyW: 'frente', ArrowUp: 'frente', KeyS: 'tras', ArrowDown: 'tras', KeyA: 'esq', ArrowLeft: 'esq', KeyD: 'dir', ArrowRight: 'dir', ShiftLeft: 'correr', ShiftRight: 'correr' };
+addEventListener('keydown', (e) => { const k = TECLA_RUA[e.code]; if (k && RUA.on && !e.target.closest?.('input, textarea, select')) { PASSO_RUA[k] = true; e.preventDefault(); } });
+addEventListener('keyup', (e) => { const k = TECLA_RUA[e.code]; if (k) PASSO_RUA[k] = false; });
+addEventListener('blur', () => { for (const k in PASSO_RUA) PASSO_RUA[k] = false; });
+const vRua = new THREE.Vector3();
+let velRua = 0;
+function andarRua(dt) {
+  if (!RUA.on || !window.jogo) return;
+  const P = PASSO_RUA, J = window.jogo;
+  const giro = (P.esq ? 1 : 0) - (P.dir ? 1 : 0);
+  // vira: gira o alvo (30 cm à frente) em torno do olho
+  if (giro) { vRua.subVectors(controls.target, camera.position).applyAxisAngle(THREE.Object3D.DEFAULT_UP, giro * 1.6 * dt); controls.target.copy(camera.position).add(vRua); }
+  const quer = (P.frente ? 1 : 0) - (P.tras ? 1 : 0), vmax = P.correr ? 4.2 : 1.6; // passo e corrida (m/s)
+  velRua += (quer * vmax - velRua) * Math.min(1, dt * 6);
+  if (Math.abs(velRua) < 0.02) return;
+  vRua.subVectors(controls.target, camera.position); vRua.y = 0;
+  if (vRua.lengthSq() < 1e-8) return;
+  vRua.normalize();
+  const x = camera.position.x, z = camera.position.z, s = Math.sign(velRua);
+  // 1,2 m de folga à frente: a parede não chega ao plano de corte da câmera
+  const pode = (px, pz) => { if (J.bloqueado(px + vRua.x * 1.2 * s, pz + vRua.z * 1.2 * s) || J.bloqueado(px, pz) || foraREC(px, pz, 2)) return false; const p = J.piso(px, pz); return p.ponte || p.y > AGUA.nivel - 0.25; };
+  let nx = x + vRua.x * velRua * dt, nz = z + vRua.z * velRua * dt;
+  if (!pode(nx, nz)) { if (pode(nx, z)) nz = z; else if (pode(x, nz)) nx = x; else { velRua = 0; return; } } // desliza ao longo da parede
+  const y = J.piso(nx, nz).y + 1.7 + Math.abs(Math.sin(performance.now() / 280)) * 0.03 * Math.min(1, Math.abs(velRua));
+  const d = new THREE.Vector3(nx - x, y - camera.position.y, nz - z);
+  camera.position.add(d); controls.target.add(d);
+}
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && RUA.on) sairRua(); });
 
 // ---------- câmera: posição por alvo, distância, rumo (az) e inclinação (polar) ----------
@@ -484,8 +516,10 @@ window.camSom = camSom;
 let ant = null;
 const cDia = { hemi: new THREE.Color(0xfff6e4), hemiChao: new THREE.Color(0xb9a785), sol: new THREE.Color(0xfff0d6) };
 const cNoite = { hemi: new THREE.Color(0x4a5a86), hemiChao: new THREE.Color(0x1d1a22), sol: new THREE.Color(0x9fb3e8) };
+let tQuadro = 0;
 function quadro(agora) {
   requestAnimationFrame(quadro);
+  andarRua(Math.min(0.05, (agora - (tQuadro || agora)) / 1000)); tQuadro = agora;
   if (!(typeof window.tour?.ativo === "function" && window.tour.ativo()) && !window.jogo?.ativo()) controls.update();
   // nunca abaixo do chão nem dentro do Reno: a câmera fica ao menos 1,5 m acima do relevo (ou da água)
   { const p = camera.position, T = meta.terreno, L = (T.nvlado ?? 2048) * T.passo;
