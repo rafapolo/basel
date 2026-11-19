@@ -28,9 +28,9 @@ mechanics are our own. It is not a copy of his interface.
   sandstone or concrete and glass by age and use, plinths, tiled roofs, chimneys and dormers — all in the shader.
 - **Aerial photo** on the ground and the roofs (`docs/ortofoto.js`): opens with a 68 KB overview and streams the 16
   tiles in the background, nearest to the camera first.
-- **90-second tour** with music generated in the browser (fife, Basel drum and bells), ending with a year in 40 seconds
-  (the date runs January → December while the camera circles the Münster and the Rhine): button at the top or `?tour=1`
-  (`?tour=de`). Script, captions and sound in [design/tour.md](design/tour.md) (Portuguese).
+- **Two-minute tour** with music generated in the browser (fife, Basel drum and bells): a flight past the Münster and the
+  Pfalz, the Rheinsprung, the Mittlere Brücke, the Rheinbord and Clarastrasse, down the Rhine, the Marktplatz and the
+  Barfüsserplatz, while the date runs from January to December: button at the top or `?tour=1` (`?tour=de`). Script, captions and sound in [design/tour.md](design/tour.md) (Portuguese).
 - **Fixed cameras** to compare with the real city: `?cam=pfalz|munster|reno|rathaus|marktplatz|rheinsprung`.
   The side-by-side comparison with openly licensed photos is in [design/comparacao/](design/comparacao/).
 - **The Rhine** (`docs/agua.js`, data from `script/reno.py` -> `docs/data/reno.json`): OSM river polygon (way 1467859273, ODbL) instead of a height threshold, planar reflection of the buildings plus Preetham sky colours (off in light mode), waves travelling north-west (downstream), foam along the banks and around the bridge piers, water colour from the live data.bs.ch temperature (100046, CC BY 4.0) and turbidity (100323, CC0) with an offline snapshot, sandstone quay walls, bridge piers and bank stairs as geometry.

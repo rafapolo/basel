@@ -1,5 +1,5 @@
-// Tour de 90 s pela Altstadt de hoje, no estilo de cinema (faixas 2.39:1, legenda com kicker e frase), com a música de
-// som.js e 40 s em que as estações passam enquanto a câmera gira. Abre pelo botão do tour ou por ?tour=1 (?tour=de muda a
+// Tour de 2 min pela Altstadt de hoje, no estilo de cinema (faixas 2.39:1, legenda com kicker e frase), com a música de
+// som.js: um passeio pelos lugares conhecidos e pelo Reno enquanto o ano corre de janeiro a dezembro. Abre pelo botão do tour ou por ?tour=1 (?tour=de muda a
 // língua). Esc ou "✕ esc" param e deixam a câmera onde estava; a cidade volta à data, hora e noite de antes.
 // Todos os números das legendas são contados dos dados carregados (cidade.estat).
 // Roteiro, legendas e música descritos em design/tour.md.
@@ -9,7 +9,7 @@ const { THREE } = C;
 const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rad = THREE.MathUtils.degToRad;
 
-let ativo = false, inicio = 0, raf = 0, anim = 0, salvo = null, cenaAtual = 0, TOTAL = 88000, t0Cena = 0;
+let ativo = false, inicio = 0, raf = 0, anim = 0, salvo = null, cenaAtual = 0, TOTAL = 120000, t0Cena = 0, anoInteiro = null;
 const pendentes = new Set();
 class Parado extends Error {}
 const espera = (ms) => new Promise((ok, falha) => {
@@ -83,80 +83,104 @@ async function legenda(kicker, linha) {
 }
 
 function cenas() {
-  const E = C.estat, munster = C.centro('Münster'), rathaus = C.centro('Rathaus');
-  const ano = +C.ceu.estado().data.slice(0, 4);
+  const E = C.estat, ano = +C.ceu.estado().data.slice(0, 4);
+  // centro de um prédio pelo nome, com reserva (se o nome não estiver nos dados, o tour segue)
+  const lugar = (nome, reserva) => { const c = C.centro(nome); return c[0] === 0 && c[2] === 0 ? reserva : c; };
+  const munster = lugar('Münster', [213, 20, 211]), rathaus = lugar('Rathaus', [-81, 15, 10]);
+  const martin = lugar('Martinskirche', [-73, 18, -57]), kulturen = lugar('Museum der Kulturen', [40, 18, 120]);
+  const barfi = lugar('Barfüsserkirche (Historisches Museum)', [-10, 15, 420]), leonhard = lugar('St. Leonhardskirche', [-100, 25, 365]);
   return [
-    // 0 · abertura: do alto, a cidade inteira girando, descendo para a vista da Pfalz sobre o Reno
-    { dur: 10000, run: async () => {
-      C.definirNoite(false); C.ceu.definirHora(15);
+    // 0 · abertura: do alto, a cidade inteira girando; o ano começa a correr (janeiro → dezembro em 2 min)
+    { dur: 12000, run: async () => {
+      C.definirNoite(false); C.ceu.definirHora(14);
+      anoInteiro = estacoes(TOTAL - 8000, ano);
       C.porCamera({ alvo: [0, 0, 0], dist: 1900, az: rad(230), polar: rad(28) });
-      mover(C.VISTA_PFALZ, 10000, { giro: -80 });
-      await legenda('Basel · Altstadt', t(
-        `${fmt(E.total)} prédios, um por um: a forma vem da swisstopo; andares e uso, do registro federal de prédios.`,
-        `${fmt(E.total)} buildings, one by one: the shape from swisstopo, floors and use from the federal building register.`,
-        `${fmt(E.total)} Häuser, eines nach dem anderen: die Form von swisstopo, Geschosse und Nutzung aus dem eidgenössischen Gebäuderegister.`));
+      mover({ alvo: [60, 0, -40], dist: 760, polar: rad(58), az: rad(160) }, 12000, { giro: -70 });
+      await legenda(t('Basel · um ano em 2 minutos', 'Basel · a year in two minutes', 'Basel · ein Jahr in zwei Minuten'), t(
+        `${fmt(E.total)} prédios, um por um; enquanto o passeio anda, o ano corre de janeiro a dezembro.`,
+        `${fmt(E.total)} buildings, one by one; while we fly, the year runs from January to December.`,
+        `${fmt(E.total)} Häuser, eines nach dem anderen; während wir fliegen, läuft das Jahr von Januar bis Dezember.`));
     } },
-    // 1 · o Münster e a Pfalz
-    { dur: 10000, run: async () => {
-      mover({ alvo: munster, dist: 210, polar: rad(64), az: rad(200) }, 3500, { arco: 0.25 });
-      await em(3500);
-      mover({}, 6500, { giro: 110 });
+    // 1 · Münster e Pfalz: volta baixa em torno da catedral
+    { dur: 14000, run: async () => {
+      mover({ alvo: munster, dist: 190, polar: rad(70), az: rad(200) }, 4000, { arco: 0.25 });
       await legenda('Münster · Pfalz', t(
         'O Münster de arenito vermelho e o terraço da Pfalz, uns 20 m acima do Reno.',
         'The red sandstone Münster and the Pfalz terrace, some 20 m above the Rhine.',
         'Das Münster aus rotem Sandstein und die Pfalz, rund 20 m über dem Rhein.'));
+      await em(4000);
+      mover({ dist: 150 }, 10000, { giro: 140 });
     } },
-    // 2 · voo baixo pelo Reno até a Mittlere Brücke
-    { dur: 10000, run: async () => {
-      mover({ alvo: [330, 0, -60], dist: 330, polar: rad(70), az: rad(120) }, 2500);
-      await legenda('Rhein · Mittlere Brücke', t(
-        'A Mittlere Brücke e o Käppelijoch; os bondes verdes e amarelos rodam pelo horário de verdade.',
-        'The Mittlere Brücke and the Käppelijoch; the green and yellow trams run on the real timetable.',
-        'Die Mittlere Brücke und das Käppelijoch; die grünen und gelben Trams fahren nach dem echten Fahrplan.'));
-      await em(2500);
-      mover({ alvo: [-80, 0, -150], dist: 260, polar: rad(72), az: rad(150) }, 7500);
+    // 2 · pelas vielas acima do Reno: Museum der Kulturen → Martinskirche (Rheinsprung)
+    { dur: 13000, run: async () => {
+      mover({ alvo: kulturen, dist: 120, polar: rad(74), az: rad(250) }, 4000);
+      await legenda('Rheinsprung · Martinskirche', t(
+        'Ruas estreitas na colina entre o Münster e a Martinskirche, a mais antiga paróquia da cidade.',
+        'Narrow lanes on the hill between the Münster and the Martinskirche, the city’s oldest parish church.',
+        'Enge Gassen auf dem Hügel zwischen Münster und Martinskirche, der ältesten Pfarrkirche der Stadt.'));
+      await em(4000);
+      mover({ alvo: martin, dist: 110, polar: rad(72), az: rad(300) }, 9000);
     } },
-    // 3 · Rathaus e Marktplatz: a gente nas praças
-    { dur: 8000, run: async () => {
-      mover({ alvo: rathaus, dist: 280, polar: rad(55), az: rad(250) }, 3000, { arco: 0.2 });
-      await legenda('Rathaus · Marktplatz', t(
-        'Gente onde Basel se encontra: nas praças, na Clarastrasse, no Rheinbord e à espera do bonde.',
-        'People where Basel meets: on the squares, along Clarastrasse, on the Rheinbord and waiting for the tram.',
-        'Menschen, wo Basel sich trifft: auf den Plätzen, an der Clarastrasse, am Rheinbord und an der Tramhaltestelle.'));
-      await em(3000);
-      mover({}, 5000, { giro: 70 });
+    // 3 · Mittlere Brücke e Käppelijoch, atravessando para Kleinbasel
+    { dur: 14000, run: async () => {
+      mover({ alvo: [25, 10, -204], dist: 140, polar: rad(68), az: rad(120) }, 4500, { arco: 0.2 });
+      await legenda('Mittlere Brücke · Käppelijoch', t(
+        'A ponte de pedra e a capelinha no meio dela; os bondes verdes e amarelos rodam pelo horário de verdade.',
+        'The stone bridge and the little chapel at its middle; the green and yellow trams run on the real timetable.',
+        'Die Steinbrücke mit dem Kapellchen in der Mitte; die grünen und gelben Trams fahren nach dem echten Fahrplan.'));
+      await em(4500);
+      mover({ alvo: [80, 6, -250], dist: 120, polar: rad(74) }, 9500, { giro: 90 });
     } },
-    // 4 · as estações: um ano em 40 s, câmera em volta do Münster e do Reno, alta e baixa como um drone
-    { dur: 40000, run: async () => {
-      C.ceu.definirHora(14);
-      mover({ alvo: [110, 6, 10], dist: 620, polar: rad(60), az: rad(300) }, 3000, { arco: 0.15 });
-      await legenda(t('Um ano em 40 segundos', 'A year in 40 seconds', 'Ein Jahr in 40 Sekunden'), t(
-        'O sol, as árvores, as roupas e a gente na rua seguem a data.',
-        'The sun, the trees, the clothes and the people out of doors follow the date.',
-        'Sonne, Bäume, Kleidung und die Menschen draussen folgen dem Datum.'));
-      const ano40 = estacoes(38000, ano);
-      await em(3000);
-      mover({ dist: 380, polar: rad(66) }, 17000, { giro: 150 });
-      await em(9000);
-      await legenda(t('Primavera', 'Spring', 'Frühling'), t('As tílias e os castanheiros brotam em abril.', 'The limes and chestnuts come into leaf in April.', 'Linden und Kastanien schlagen im April aus.'));
-      await em(16000);
-      await legenda(t('Verão', 'Summer', 'Sommer'), t('O Rheinbord enche e há quem desça o Reno nadando.', 'The Rheinbord fills up and swimmers drift down the Rhine.', 'Das Rheinbord füllt sich, und man schwimmt den Rhein hinunter.'));
-      await em(20000);
-      mover({ dist: 560, polar: rad(58) }, 18000, { giro: 140 });
-      await em(26000);
-      await legenda(t('Outono', 'Autumn', 'Herbst'), t('As copas ficam amarelas, laranja e marrons, e caem até o fim de novembro.', 'The crowns turn yellow, orange and brown, and fall by the end of November.', 'Die Kronen werden gelb, orange und braun und fallen bis Ende November.'));
-      await em(34000);
-      await legenda(t('Inverno', 'Winter', 'Winter'), t('Galhos nus, sol baixo e pouca gente na rua.', 'Bare branches, a low sun and few people out.', 'Kahle Äste, tiefe Sonne und wenige Menschen draussen.'));
-      await ano40;
+    // 4 · Kleinbasel: Rheinbord e Clarastrasse
+    { dur: 12000, run: async () => {
+      mover({ alvo: [192, 4, -172], dist: 160, polar: rad(70), az: rad(20) }, 4000);
+      await legenda('Kleinbasel · Rheinbord', t(
+        'Gente sentada nos degraus do Reno; a Clarastrasse sobe da margem até a Claraplatz.',
+        'People sitting on the Rhine steps; the Clarastrasse runs up from the bank to the Claraplatz.',
+        'Menschen auf den Rheinstufen; die Clarastrasse führt vom Ufer hinauf zum Claraplatz.'));
+      await em(4000);
+      mover({ alvo: [355, 6, -367], dist: 170, polar: rad(66) }, 8000, { giro: 60 });
     } },
-    // 5 · noite: as janelas acendem e a câmera volta à vista da Pfalz
-    { dur: 10000, run: async () => {
-      C.definirNoite(true);
-      mover(C.VISTA_PFALZ, 9000, { arco: 0.2 });
+    // 5 · o Reno: voo baixo rio abaixo, da Wettsteinbrücke até depois da Mittlere
+    { dur: 14000, run: async () => {
+      mover({ alvo: [420, 0, 120], dist: 220, polar: rad(76), az: rad(60) }, 4000, { arco: 0.3 });
+      await legenda('Rhein', t(
+        'No verão, a gente desce o rio nadando; as balsas cruzam presas a um cabo, levadas só pela corrente.',
+        'In summer people swim downstream; the ferries cross on a cable, pushed by the current alone.',
+        'Im Sommer schwimmt man den Rhein hinunter; die Fähren hängen an einem Seil und fahren nur mit der Strömung.'));
+      await em(4000);
+      mover({ alvo: [-260, 0, -430], dist: 240, polar: rad(74), az: rad(140) }, 10000);
+    } },
+    // 6 · Marktplatz e Rathaus
+    { dur: 14000, run: async () => {
+      mover({ alvo: rathaus, dist: 200, polar: rad(62), az: rad(250) }, 4500, { arco: 0.25 });
+      await legenda('Marktplatz · Rathaus', t(
+        'A prefeitura vermelha e a praça do mercado, com as rodinhas de gente.',
+        'The red town hall and the market square, with people standing around.',
+        'Das rote Rathaus und der Marktplatz, mit Leuten, die zusammenstehen.'));
+      await em(4500);
+      mover({ dist: 160 }, 9500, { giro: 100 });
+    } },
+    // 7 · Barfüsserplatz e St. Leonhard
+    { dur: 13000, run: async () => {
+      mover({ alvo: barfi, dist: 190, polar: rad(64), az: rad(200) }, 4000);
+      await legenda('Barfüsserplatz · St. Leonhard', t(
+        'No Barfi os bondes se cruzam; acima, na colina, a igreja de St. Leonhard.',
+        'Trams cross at the Barfi; up on the hill above it, St. Leonhard’s church.',
+        'Am Barfi kreuzen sich die Trams; oben auf dem Hügel die Leonhardskirche.'));
+      await em(4000);
+      mover({ alvo: leonhard, dist: 170, polar: rad(66) }, 9000, { giro: 70 });
+    } },
+    // 8 · final: sobe e dá a volta na cidade enquanto anoitece; termina na vista da Pfalz
+    { dur: 14000, run: async () => {
+      mover({ alvo: [40, 0, -20], dist: 900, polar: rad(55) }, 7000, { giro: 160 });
       await legenda(t('Basel · dados abertos', 'Basel · open data', 'Basel · offene Daten'), t(
-        'swisstopo, o registro federal de prédios via data.bs.ch e o OpenStreetMap. Clique em qualquer prédio.',
-        'swisstopo, the federal building register via data.bs.ch, and OpenStreetMap. Click any building.',
-        'swisstopo, das eidgenössische Gebäuderegister via data.bs.ch und OpenStreetMap. Klicken Sie auf ein Haus.'));
+        'swisstopo, o registro federal de prédios via data.bs.ch, o OpenStreetMap e o tempo de agora. Clique em qualquer prédio.',
+        'swisstopo, the federal building register via data.bs.ch, OpenStreetMap and today’s weather. Click any building.',
+        'swisstopo, das eidgenössische Gebäuderegister via data.bs.ch, OpenStreetMap und das Wetter von heute. Klicken Sie auf ein Haus.'));
+      await em(6000);
+      C.definirNoite(true);
+      mover(C.VISTA_PFALZ, 7500, { arco: 0.15 });
     } },
   ];
 }
