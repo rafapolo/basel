@@ -1,0 +1,14 @@
+{
+  "name": "basel",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "python3 -m http.server -d docs 8000",
+    "build": "bun script/build.js"
+  },
+  "devDependencies": {
+    "html-minifier-terser": "^7.2.0",
+    "terser": "5.48.0",
+    "three": "0.170.0"
+  }
+}
