@@ -5,6 +5,7 @@
 // No tour ela desce a Augustinergasse em fevereiro; fora dele, aparece nos dias reais: da segunda depois da Quarta-feira de
 // Cinzas (Páscoa − 41 dias, 4h, Morgestraich) até quinta às 4h, num circuito pela Freie Strasse e a Marktplatz.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const TAU = Math.PI * 2;
 // Páscoa (algoritmo de Meeus/Jones/Butcher), em UTC
@@ -44,6 +45,20 @@ function texPadrao({ padrao, a, b }) {
   else { g.fillRect(0, 0, 128, 128); g.fillStyle = b; g.fillRect(0, 0, 128, 18); } // casaco liso com gola
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 2); return t;
 }
+// rosto da Larve, pintado num canvas: o centro do rosto fica em u = 0,25 (a frente, +z, da SphereGeometry)
+function texRosto(T) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = T.larve; g.fillRect(0, 0, 256, 128);
+  const cx = 64;
+  for (const s of [-1, 1]) {
+    g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(cx + s * 13, 50, 10, 13, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#151515'; g.beginPath(); g.ellipse(cx + s * 12, 52, 5, 6, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#151515'; g.lineWidth = 3; g.beginPath(); g.arc(cx + s * 13, 44, 13, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); // sobrancelha
+    g.fillStyle = 'rgba(220,60,60,0.55)'; g.beginPath(); g.arc(cx + s * 22, 72, 9, 0, Math.PI * 2); g.fill();                      // bochecha
+  }
+  g.fillStyle = '#b8202a'; g.beginPath(); g.ellipse(cx, 88, 14, 6, 0, 0, Math.PI); g.fill();                                   // boca
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 const texTambor = (() => { let t = null; return () => { if (t) return t;
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d');
   g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, 256, 64); g.strokeStyle = '#151515'; g.lineWidth = 3;
@@ -54,28 +69,65 @@ const texTambor = (() => { let t = null; return () => { if (t) return t;
 function clique({ cena, altura, semente = 0 }) {
   const T = TEMAS[semente % TEMAS.length];
   const g = new THREE.Group(); g.name = 'clique'; g.visible = false; cena.add(g);
-  // ---- quem é quem: [tipo, fileira (m atrás da lanterna), deslocamento lateral (m)] ----
-  const M = [];
-  for (const b of [-0.9, 0.9]) for (const f of [-1.1, 1.1]) M.push(['carregador', f, b]);
-  M.push(['tambormor', 4.5, 0]);
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) M.push(['piccolo', 7 + r * 1.3, (c - 1.5) * 0.95]);
-  for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) M.push(['tambor', 13 + r * 1.5, (c - 1.5) * 1.0]);
+  // ---- quem é quem: [papel, fileira (m atrás da frente), deslocamento lateral (m)] ----
+  // Clique de pífaros e tambores (com a lanterna na frente) ou, uma a cada quatro, Guggenmusik: metais e bumbos, sem lanterna
+  const gugge = semente % 4 === 3, M = [];
+  if (!gugge) {
+    for (const b of [-0.9, 0.9]) for (const f of [-1.1, 1.1]) M.push(['carregador', f, b]);
+    M.push(['tambormor', 4.5, 0]);
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) M.push(['piccolo', 7 + r * 1.3, (c - 1.5) * 0.95]);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) M.push(['tambor', 13 + r * 1.5, (c - 1.5) * 1.0]);
+  } else {
+    M.push(['tambormor', 0, 0]);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) M.push(['metal', 2.5 + r * 1.4, (c - 2) * 0.95]);
+    for (let c = 0; c < 3; c++) M.push(['bumbo', 7.4, (c - 1) * 1.3]);
+    for (let c = 0; c < 4; c++) M.push(['tambor', 9.0, (c - 1.5) * 1.0]);
+  }
   const n = M.length;
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.75, metalness: 0 });
   const matCorpo = new THREE.MeshStandardMaterial({ map: texPadrao(T), roughness: 0.8 });
-  const matLarve = new THREE.MeshStandardMaterial({ color: T.larve, roughness: 0.45 });
+  const matLarve = new THREE.MeshStandardMaterial({ map: texRosto(T), roughness: 0.45 });
+  const matNariz = new THREE.MeshStandardMaterial({ color: T.larve, roughness: 0.45 });
   const matCabelo = new THREE.MeshStandardMaterial({ color: T.cabelo, roughness: 1 });
   const matChapeu = new THREE.MeshStandardMaterial({ color: T.chapeu, roughness: 0.7 });
   const matTambor = new THREE.MeshStandardMaterial({ map: texTambor(), roughness: 0.5 });
+  const matPerna = new THREE.MeshStandardMaterial({ color: T.padrao === 'liso' ? '#2b2b2b' : T.b, roughness: 0.85 });
+  const matAcess = { piccolo: new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.3 }), tambor: new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.6 }),
+    metal: new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.85, roughness: 0.25 }), bumbo: new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.6 }) };
   const inst = (geo, cont, m0 = mat) => { const m = new THREE.InstancedMesh(geo, m0, cont); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.castShadow = true; m.frustumCulled = false; g.add(m); return m; };
-  const corpo = inst(new THREE.CylinderGeometry(0.2, 0.32, 1.25, 10).translate(0, 0.62, 0), n, matCorpo);
-  // Larve: cabeça grande (40% maior que uma de verdade), nariz enorme, cabeleira de lã em volta
-  const cabeca = inst(new THREE.SphereGeometry(0.3, 12, 10).scale(1.05, 1.3, 1.05).translate(0, 1.6, 0), n, matLarve);
-  const nariz = inst(new THREE.ConeGeometry(0.1, 0.62, 8).rotateX(Math.PI / 2).translate(0, 1.55, 0.55), n, matLarve);
-  const cabelo = inst(new THREE.TorusGeometry(0.3, 0.13, 6, 14).rotateX(Math.PI / 2).translate(0, 1.82, -0.04), n, matCabelo);
-  const chapeu = inst(new THREE.ConeGeometry(0.28, 0.62, 8).translate(0, 2.2, 0), n, matChapeu);
+  // corpo: fantasia até o joelho, pernas de meia e sapato preto
+  const corpo = inst(new THREE.CylinderGeometry(0.21, 0.34, 1.0, 12).translate(0, 0.95, 0), n, matCorpo);
+  const pernas = inst(mergeGeometries([0.1, -0.1].flatMap((x) => [new THREE.CylinderGeometry(0.065, 0.055, 0.5, 6).translate(x, 0.27, 0), new THREE.BoxGeometry(0.11, 0.07, 0.24).translate(x, 0.035, 0.05)])), n, matPerna);
+  // Larve: cabeça grande, rosto pintado (olhos enormes, bochechas, boca), nariz comprido, cabeleira de lã, chapéu
+  const cabeca = inst(new THREE.SphereGeometry(0.3, 16, 12).scale(1.05, 1.3, 1.05).translate(0, 1.72, 0), n, matLarve);
+  const nariz = inst(new THREE.ConeGeometry(0.1, 0.62, 8).rotateX(Math.PI / 2).translate(0, 1.67, 0.55), n, matNariz);
+  const cabelo = inst(new THREE.TorusGeometry(0.3, 0.13, 6, 14).rotateX(Math.PI / 2).translate(0, 1.94, -0.04), n, matCabelo);
+  const chapeu = inst(T.padrao === 'liso' ? new THREE.CylinderGeometry(0.34, 0.36, 0.14, 3).translate(0, 2.05, 0) : new THREE.ConeGeometry(0.28, 0.62, 8).translate(0, 2.32, 0), n, matChapeu); // tricórnio ou chapéu de ponta
+  // braços e o que cada um leva, na pose do papel (ombros a 1,38 m)
+  const braco = (a, b, rr = 0.055) => { const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b), L = va.distanceTo(vb); const c = new THREE.CylinderGeometry(rr, rr * 0.85, L, 6); c.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize())); return c.translate((va.x + vb.x) / 2, (va.y + vb.y) / 2, (va.z + vb.z) / 2); };
+  const POSE = {
+    carregador: [[[-0.22, 1.38, 0], [-0.3, 1.25, 0.15]], [[0.22, 1.38, 0], [0.3, 1.25, 0.15]]],
+    tambormor: [[[-0.22, 1.38, 0], [-0.3, 0.95, 0.12]], [[0.22, 1.38, 0], [0.38, 1.75, 0.25]]],
+    piccolo: [[[-0.22, 1.38, 0], [-0.08, 1.55, 0.38]], [[0.22, 1.38, 0], [0.22, 1.55, 0.36]]],
+    tambor: [[[-0.22, 1.38, 0], [-0.16, 1.02, 0.36]], [[0.22, 1.38, 0], [0.16, 1.05, 0.36]]],
+    metal: [[[-0.22, 1.38, 0], [-0.06, 1.55, 0.36]], [[0.22, 1.38, 0], [0.06, 1.52, 0.4]]],
+    bumbo: [[[-0.22, 1.38, 0], [-0.3, 1.15, 0.3]], [[0.22, 1.38, 0], [0.3, 1.2, 0.3]]],
+  };
+  const ACESS = {
+    piccolo: () => braco([-0.1, 1.6, 0.42], [0.32, 1.58, 0.38], 0.016),                                      // o flautim, de lado
+    tambor: () => mergeGeometries([braco([-0.16, 1.02, 0.36], [-0.05, 1.12, 0.5], 0.012), braco([0.16, 1.05, 0.36], [0.05, 1.1, 0.5], 0.012)]), // baquetas
+    metal: () => mergeGeometries([new THREE.ConeGeometry(0.11, 0.28, 10, 1, true).rotateX(-Math.PI / 2).translate(0, 1.55, 0.72), braco([0, 1.55, 0.36], [0, 1.55, 0.6], 0.025)]), // trompete
+    bumbo: () => new THREE.CylinderGeometry(0.46, 0.46, 0.36, 18).rotateZ(Math.PI / 2).translate(0, 1.0, 0.45),      // bumbo de lado
+  };
+  const papeis = [...new Set(M.map((x) => x[0]))], idx = new Int32Array(n), cont = {};
+  M.forEach(([p], i) => { idx[i] = cont[p] = (cont[p] ?? -1) + 1; });
+  const bracos = {}, acess = {};
+  for (const p of papeis) {
+    bracos[p] = inst(mergeGeometries(POSE[p].map(([a, b]) => braco(a, b))), cont[p] + 1, matCorpo);
+    if (ACESS[p]) acess[p] = inst(ACESS[p](), cont[p] + 1, p === 'bumbo' ? matTambor : matAcess[p]);
+  }
   const nT = M.filter((x) => x[0] === 'tambor').length;
-  const tambor = inst(new THREE.CylinderGeometry(0.24, 0.24, 0.36, 16).translate(0, 0.86, 0.32), nT, matTambor); // de pé na frente do corpo, como na Basler Trommel
+  const tambor = inst(new THREE.CylinderGeometry(0.24, 0.24, 0.36, 16).translate(0, 0.86, 0.32), Math.max(1, nT), matTambor); // de pé na frente do corpo, como na Basler Trommel
   const bastao = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.9, 6), new THREE.MeshStandardMaterial({ color: 0xc9a13b, metalness: 0.7, roughness: 0.3 }));
   g.add(bastao);
   // lanterna: caixa translúcida pintada (sujet satírico, cores fortes) que brilha por dentro, em dois varais
@@ -93,12 +145,12 @@ function clique({ cena, altura, semente = 0 }) {
   lanterna.add(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.06, 0.08).translate(0, 1.27, 0.6), madeira), new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.06, 0.08).translate(0, 1.27, -0.6), madeira));
   const luzL = new THREE.PointLight(0xffe2a8, 0, 14, 2); luzL.position.set(0, 2.5, 0); lanterna.add(luzL);
   g.add(lanterna);
+  lanterna.visible = !gugge;
   // variação leve de tom entre os membros (o tema é o mesmo; tecido e tinta mudam um pouco)
   { const c = new THREE.Color();
     for (let i = 0; i < n; i++) { const k = 0.88 + ((i * 37) % 11) / 45; c.setRGB(k, k, k);
-      for (const m of [corpo, cabeca, nariz, cabelo, chapeu]) m.setColorAt(i, c); }
-    for (let i = 0; i < nT; i++) tambor.setColorAt(i, new THREE.Color(1, 1, 1));
-    for (const m of [corpo, cabeca, nariz, cabelo, chapeu, tambor]) m.instanceColor.needsUpdate = true; }
+      for (const m of [corpo, cabeca, nariz, cabelo, chapeu, pernas]) m.setColorAt(i, c); }
+    for (const m of [corpo, cabeca, nariz, cabelo, chapeu, pernas]) m.instanceColor.needsUpdate = true; }
   // quem a e-bike (ou quem anda) derruba: s no chão e direção da queda; a Clique segue, o caído fica onde caiu
   const caido = new Float32Array(n), caiX = new Float32Array(n), caiZ = new Float32Array(n), caiP = new Float32Array(n * 3), CAIDO = 6;
   const eixo = new THREE.Vector3(), qT = new THREE.Quaternion();
@@ -138,12 +190,13 @@ function clique({ cena, altura, semente = 0 }) {
       }
       const k = tipo === 'tambormor' ? 1.2 : 1;
       esc.set(k, k, k); m4.compose(v.set(x, y + pulo, z), q, esc);
-      for (const im of [corpo, cabeca, nariz, cabelo, chapeu]) im.setMatrixAt(i, m4);
+      for (const im of [corpo, pernas, cabeca, nariz, cabelo, chapeu]) im.setMatrixAt(i, m4);
+      bracos[tipo].setMatrixAt(idx[i], m4); if (acess[tipo]) acess[tipo].setMatrixAt(idx[i], m4);
       if (tipo === 'tambor') tambor.setMatrixAt(iT++, m4);
       if (tipo === 'tambormor') { bastao.position.set(x + P.hx * 0.4, y + 1.2 + Math.sin(fase * 2) * 0.35, z + P.hz * 0.4); bastao.rotation.set(Math.sin(fase) * 0.4, 0, 0.2); }
       if (camera) dMin = Math.min(dMin, Math.hypot(x - camera.position.x, z - camera.position.z));
     });
-    for (const im of [corpo, cabeca, nariz, cabelo, chapeu, tambor]) im.instanceMatrix.needsUpdate = true;
+    for (const im of [corpo, pernas, cabeca, nariz, cabelo, chapeu, tambor, ...Object.values(bracos), ...Object.values(acess)]) im.instanceMatrix.needsUpdate = true;
     em(s, P); lanterna.position.set(P.x, altura(P.x, P.z) + Math.abs(Math.sin((agora / 1000) * vel * 1.9 * Math.PI)) * 0.04, P.z); lanterna.rotation.y = Math.atan2(P.hx, P.hz);
     luzL.intensity = 6 * noite; matL.emissiveIntensity = 0.35 + 1.4 * noite;
     return dMin;
@@ -159,7 +212,7 @@ function clique({ cena, altura, semente = 0 }) {
     });
     return k;
   }
-  return { marchar, parar, atualizar, derruba, grupo: g, visivel: () => g.visible, onde: () => lanterna.position.toArray() };
+  return { marchar, parar, atualizar, derruba, grupo: g, visivel: () => g.visible, onde: () => (gugge ? [corpo.instanceMatrix.array[12], corpo.instanceMatrix.array[13], corpo.instanceMatrix.array[14]] : lanterna.position.toArray()) };
 }
 
 // ---- som: tambor de marcha (ruído em rajadas com acento), da Clique mais perto ----
@@ -181,7 +234,8 @@ function tocar() {
 }
 
 // ruas do centro por onde as Cliques passam (nomes do OSM); cada uma vira um caminho de ida e volta
-const RUAS = ['Freie Strasse', 'Gerbergasse', 'Spalenberg', 'Clarastrasse', 'Augustinergasse', 'Steinenvorstadt', 'Eisengasse', 'Marktplatz'];
+const RUAS = ['Freie Strasse', 'Gerbergasse', 'Spalenberg', 'Clarastrasse', 'Augustinergasse', 'Steinenvorstadt', 'Eisengasse', 'Marktplatz',
+  'Spalenvorstadt', 'Rheinsprung', 'Münsterplatz', 'Barfüsserplatz', 'Steinenberg', 'Greifengasse', 'Rheingasse', 'Schneidergasse'];
 // junta os trechos do OSM com o mesmo nome numa linha só (encadeando pelas pontas), a mais longa
 function ruaPorNome(ruas, nome) {
   const ls = ruas.linhas.filter((l) => l.n === nome).map((l) => { const p = []; for (let i = 0; i < l.c.length; i += 2) p.push([l.c[i], l.c[i + 1]]); return p; });
@@ -204,9 +258,20 @@ function ruaPorNome(ruas, nome) {
 export function criarFasnacht({ cena, altura, ruas, ceu }) {
   const caminhos = RUAS.map((n) => ruaPorNome(ruas, n)).filter(Boolean);
   const cs = caminhos.map((_, i) => clique({ cena, altura, semente: i }));
+  // Räppli: confete colorido pelo chão das ruas por onde as Cliques passam (some quando acaba a Fasnacht)
+  const pc = [], cc = [], CORES = ['#c8102e', '#f2c14e', '#1f5aa6', '#2f8a4a', '#f4f1ea', '#ff7a1a', '#7b2d8b', '#ff5fa2'].map((c) => new THREE.Color(c));
+  let sem = 7; const rnd = () => ((sem = (sem * 16807) % 2147483647) / 2147483647);
+  for (const cam of caminhos) for (let i = 1; i < cam.length; i++) {
+    const [ax, az] = cam[i - 1], [bx, bz] = cam[i], L = Math.hypot(bx - ax, bz - az), nx = -(bz - az) / (L || 1), nz = (bx - ax) / (L || 1);
+    for (let k = 0; k < L * 9; k++) { const t = rnd(), d = (rnd() - 0.5) * 7; const x = ax + (bx - ax) * t + nx * d, z = az + (bz - az) * t + nz * d;
+      pc.push(x, altura(x, z) + 0.03, z); CORES[Math.floor(rnd() * CORES.length)].toArray(cc, cc.length); }
+  }
+  const gC = new THREE.BufferGeometry(); gC.setAttribute('position', new THREE.Float32BufferAttribute(pc, 3)); gC.setAttribute('color', new THREE.Float32BufferAttribute(cc, 3));
+  const rappli = new THREE.Points(gC, new THREE.PointsMaterial({ size: 0.07, vertexColors: true, sizeAttenuation: true }));
+  rappli.visible = false; rappli.frustumCulled = false; rappli.name = 'Räppli'; cena.add(rappli);
   let ligada = false, forcar = null;
   function ligar(on) {
-    if (on === ligada) return; ligada = on;
+    if (on === ligada) return; ligada = on; rappli.visible = on;
     cs.forEach((c, i) => (on ? c.marchar(caminhos[i], { inicio: i * 37, velocidade: 1.0 + (i % 3) * 0.08, idaEVolta: true }) : c.parar()));
     if (!on) somVol(0);
   }
