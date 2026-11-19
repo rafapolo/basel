@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { iniciarCeu } from './ceu.js';
 import { criaOrtofoto } from './ortofoto.js';
 import { criarFachadas } from './fachadas.js';
-import { criarMarcos } from './marcos.js';
+import { criarMarcos, MITTLERE } from './marcos.js';
 import { criaAgua } from './agua.js';
 import { criarArvores } from './arvores.js';
 import { criarChao, cotaPonta } from './chao.js';
@@ -542,7 +542,7 @@ function quadro(agora) {
   ceu.render();
 }
 // gente e movimento (tarefa 19, docs/vida.js): bondes pelo horário do GTFS, pedestres, bicicletas, carros, gaivotas e nadadores
-const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, ano: () => U.uAno.value, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve });
+const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, ano: () => U.uAno.value, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE });
 $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
 if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
 const ini = +(q.get('ano') || 2026);

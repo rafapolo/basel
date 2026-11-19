@@ -16,8 +16,10 @@ const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 const suave = (a, b, v) => { const t = lim((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const mulberry = (s) => () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 
-export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, ano = () => 2026, nivelRio = 1.95, nivelReno = 2.3, leve = false, base = 'data/' }) {
+export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, ano = () => 2026, nivelRio = 1.95, nivelReno = 2.3, leve = false, cotaPonte = () => null, ponte = null, base = 'data/' }) {
   const V = await fetch(base + 'vida.json').then((r) => r.json());
+  // lugares onde a gente para (script/pontos.py): rodinhas, Rheinbord, paradas de bonde e focos de quem anda
+  const PT = await fetch(base + 'pontos.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const rnd = mulberry(1912);
   const parado = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const grupo = new THREE.Group(); grupo.name = 'vida';
@@ -164,7 +166,10 @@ uniform float uVidaT; uniform float uAnima;`)
     const S2 = sitios(t), mx = Math.max(...S2.map((s) => s.m), 1);
     return (x, z) => { let a = 0; for (const s of S2) a += (s.m / mx) * Math.exp(-((x - s.x) ** 2 + (z - s.z) ** 2) / (2 * 260 * 260)); return base0 + ganho * Math.min(1.4, a); };
   };
-  const densP = mk('p', 0.3, 2.2), densV = mk('v', 0.4, 1.6);
+  const densP0 = mk('p', 0.3, 2.2), densV = mk('v', 0.4, 1.6);
+  // pontos conhecidos (Münsterplatz, Pfalz, Marktplatz, Barfüsserplatz, Clarastrasse, Rheinbord): gaussiana de 70 m
+  const FOCOS = PT?.focos ?? [];
+  const densP = (x, z) => { let a = densP0(x, z); for (const [fx, fz, w] of FOCOS) a += 1.6 * w * Math.exp(-((x - fx) ** 2 + (z - fz) ** 2) / (2 * 70 * 70)); return a; };
 
   const PESO_PED = { pedestrian: 3, living_street: 2.4, footway: 2, path: 1, steps: 0.5, residential: 1.2, service: 0.35, tertiary: 1, secondary: 1, unclassified: 1, platform: 1.5, cycleway: 0.3 };
   const LARG = { secondary: 8, secondary_link: 6, tertiary: 7, unclassified: 6, residential: 6, living_street: 5, pedestrian: 6, service: 3.5, footway: 2, path: 1.6, steps: 2, cycleway: 2, platform: 3 };
@@ -358,6 +363,101 @@ uniform float uVidaT; uniform float uAnima;`)
   }
   pintar();
   for (const p of [bici, carro]) { const A = p.im.geometry.attributes.aAnim; for (let i = 0; i < p.n; i++) A.setY(i, 0); A.needsUpdate = true; }
+
+  // ---------- gente parada: rodinhas nas praças, sentados no Rheinbord, debruçados na Mittlere, à espera do bonde ----------
+  // Cada lugar ganha um limiar sorteado; aparece quando a lotação do tipo (hora, dia, estação, ano) passa dele.
+  const geoSentado = () => {
+    const partes = [], dy = -0.78; // tronco e cabeça como os de quem anda, baixados até o chão
+    for (const l of [-1, 1]) {
+      partes.push({ g: mat4(cil(0.075, 0.06, 0.82, 5).rotateX(Math.PI / 2), l * 0.1, 0.09, 0.4), parte: 2 });
+      partes.push({ g: mat4(new THREE.BoxGeometry(0.1, 0.22, 0.07), l * 0.1, 0.12, 0.84), parte: 3 });
+      partes.push({ g: mat4(cil(0.042, 0.036, 0.5, 5).rotateX(-0.35), l * 0.235, 1.21 + dy, -0.06), parte: 1 });
+      partes.push({ g: mat4(new THREE.SphereGeometry(0.045, 4, 3), l * 0.235, 0.12, -0.14), parte: 0 });
+    }
+    partes.push({ g: mat4(cil(0.17, 0.2, 0.62, 7), 0, 1.19 + dy, 0, 1.2, 1, 0.72), parte: 1 });
+    partes.push({ g: mat4(cil(0.045, 0.05, 0.08, 5), 0, 1.54 + dy, 0), parte: 0 });
+    partes.push({ g: mat4(new THREE.SphereGeometry(0.115, 7, 5), 0, 1.65 + dy, 0.02), parte: 0 });
+    partes.push({ g: mat4(new THREE.SphereGeometry(0.124, 7, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.66 + dy, 0.015), parte: 4 });
+    return unir(partes);
+  };
+  const LUG = { x: [], z: [], y: [], hx: [], hz: [], tipo: [], lim: [], alt: [] };
+  const lugar = (x, z, y, hx, hz, tipo) => {
+    if (leve && rnd() < 0.5) return;
+    LUG.x.push(x); LUG.z.push(z); LUG.y.push(y); LUG.hx.push(hx); LUG.hz.push(hz); LUG.tipo.push(tipo); LUG.lim.push(rnd()); LUG.alt.push(0.94 + rnd() * 0.14);
+  };
+  const SENT = []; // os sentados vão numa malha à parte
+  if (PT) {
+    for (const [cx, cz] of PT.grupos) { // rodinha de 2 a 5, de frente para o centro
+      const k = 2 + Math.floor(rnd() * 4), r = 0.45 + 0.12 * k, a0 = rnd() * TAU;
+      for (let j = 0; j < k; j++) {
+        const a = a0 + (TAU * j) / k + (rnd() - 0.5) * 0.5, x = cx + Math.sin(a) * r, z = cz + Math.cos(a) * r;
+        lugar(x, z, null, cx - x, cz - z, 0);
+      }
+    }
+    for (const [x, z, ang] of PT.sentados) SENT.push([x, z, Math.sin(ang), Math.cos(ang)]);
+    for (const [px, pz] of PT.paradas) { // 1 a 4 à espera, olhando para lados quaisquer
+      const k = 1 + Math.floor(rnd() * 4);
+      for (let j = 0; j < k; j++) { const a = rnd() * TAU; lugar(px + (rnd() - 0.5) * 6, pz + (rnd() - 0.5) * 3, null, Math.sin(a), Math.cos(a), 3); }
+    }
+  }
+  if (ponte) { // debruçados no parapeito da Mittlere, de frente para o rio (o mesmo quadro de marcos.js)
+    const { A, B, larg } = ponte, L = Math.hypot(B[0] - A[0], B[1] - A[1]), ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, nx = -uz, nz = ux;
+    for (let sP = 18; sP < L - 18; sP += 3.2) for (const sg of [-1, 1]) {
+      const b = sg * (larg / 2 - 0.85), s2 = sP + (rnd() - 0.5) * 1.5, x = A[0] + ux * s2 + nx * b, z = A[1] + uz * s2 + nz * b;
+      lugar(x, z, cotaPonte(x, z), nx * sg, nz * sg, 2);
+    }
+  }
+  const nLug = LUG.x.length;
+  const imPar = nLug ? malhaInst(geoGente(), matG, nLug, false) : null;
+  const imSent = SENT.length ? malhaInst(geoSentado(), matG, SENT.length, false) : null;
+  const limSent = SENT.map(() => rnd()), altSent = SENT.map(() => 0.94 + rnd() * 0.14);
+  for (let i = 0; i < nLug; i++) if (LUG.y[i] == null) LUG.y[i] = altura(LUG.x[i], LUG.z[i]) + 0.02;
+  const ySent = SENT.map(([x, z]) => altura(x, z) + 0.02);
+  function pintarParados() {
+    const tor = TORSO[S.estacao];
+    for (const im of [imPar, imSent]) {
+      if (!im) continue;
+      const A = im.geometry.attributes;
+      for (let i = 0; i < im.count; i++) { poe3(A.aTorso, i, sorteia(tor)); poe3(A.aCalca, i, sorteia(CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); A.aAnim.setXY(i, 0, 0); }
+      for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo', 'aAnim']) A[k].needsUpdate = true;
+    }
+  }
+  pintarParados();
+  const ESTACAO_RIO = { verao: 1, meia: 0.4, inverno: 0.1 };
+  let tParados = -1e9;
+  function parados(agora, fp, a, h) {
+    if (agora - tParados < 900) return; // muda pouco: uma vez por segundo
+    tParados = agora;
+    const f = lim(fp, 0, 1);
+    // lotação de cada tipo (0..1); escalas que dão ~250–400 a mais numa tarde de verão
+    const dens = [
+      0.6 * lim(0.12 + 0.95 * f, 0, 1),                                        // rodinhas
+      0,
+      0.6 * lim(0.15 + 0.9 * f, 0, 1) * (a < 1850 ? 0.3 : 1),                  // parapeito da ponte
+      a < 1895 ? 0 : 0.5 * lim(0.1 + 0.9 * f, 0, 1),                           // paradas de bonde
+    ];
+    // Rheinbord: tardes e começo de noite, sobretudo no verão; antes de 1900 quase ninguém
+    const dRio = 0.5 * lim(f * 1.2, 0, 1) * suave(10, 15, h) * (1 - 0.7 * suave(21, 24, h)) * ESTACAO_RIO[S.estacao] * (a < 1900 ? 0.15 : 1);
+    let n = 0;
+    if (imPar) {
+      const m = imPar.instanceMatrix.array;
+      for (let i = 0; i < nLug; i++) {
+        if (LUG.lim[i] < dens[LUG.tipo[i]]) { matriz(imPar, i, LUG.x[i], LUG.y[i], LUG.z[i], LUG.hx[i], LUG.hz[i], 1, LUG.alt[i], 1); n++; }
+        else m.fill(0, i * 16, i * 16 + 16);
+      }
+      imPar.instanceMatrix.needsUpdate = true;
+    }
+    if (imSent) {
+      const m = imSent.instanceMatrix.array;
+      for (let i = 0; i < SENT.length; i++) {
+        const [x, z, hx, hz] = SENT[i];
+        if (limSent[i] < dRio) { matriz(imSent, i, x, ySent[i], z, hx, hz, 1, altSent[i], 1); n++; }
+        else m.fill(0, i * 16, i * 16 + 16);
+      }
+      imSent.instanceMatrix.needsUpdate = true;
+    }
+    info.parados = n;
+  }
 
   // ---------- bondes ----------
   const padroes = V.bondes.padroes;
@@ -647,7 +747,7 @@ uniform float uVidaT; uniform float uAnima;`)
     const seg = (performance.now() / 1000 - T0) - S.ref;
     S.simT = S.base + (parado ? 0 : seg);
     UV.uVidaT.value = S.relogio; UV.uVidaNoite.value = S.noite; matAve.emissiveIntensity = 0.55 * (1 - S.noite);
-    if (recolorir) { recolorir = false; pintar(); }
+    if (recolorir) { recolorir = false; pintar(); pintarParados(); }
     const a = ano();
     const h = hora();
     const fp = perfil(V.contagem.ped.hora[S.dia], h) * (0.55 + 0.45 * V.contagem.ped.mes[S.mes]);
@@ -658,6 +758,7 @@ uniform float uVidaT; uniform float uAnima;`)
     const fc = lim(0.05 + 0.6 * fv + 0.25 * suave(6, 9, h) * (1 - suave(19, 23, h)), 0, 1) * (S.dia === 'dom' ? 0.55 : 1);
     const nCarro = a < 1910 ? 0 : Math.round(NCARRO * fc * (a < 1970 ? 0.4 : 1));
     ped.atualizar(sd, nPed, alvoCam); bici.atualizar(sd, nBici, alvoCam); carro.atualizar(sd, nCarro, alvoCam);
+    parados(agora, fp * fAno, a, h);
     bondes(sd);
     const nAve = Math.round(NAVE * suave(-4, 8, S.alt ?? 40) * (S.noite > 0.9 ? 0 : 1));
     gaivotas(sd, nAve);
