@@ -276,7 +276,7 @@ uniform float uVidaT; uniform float uAnima;`)
                 const u = escolhe(i);
                 if (u < 0 || (g.viz[alvo[i]].length === 1 && respawnLonge)) semear(i, true); else irPara(i, u);
                 if (u >= 0 && g.viz[alvo[i]].length === 1 && !respawnLonge) { /* beco: volta */ }
-              } else { if (rnd() < 0.45) pausa[i] = 2 + rnd() * 14; else proximoLivre(i); }
+              } else proximoLivre(i); // sem pausas: todo mundo anda
             } else { x[i] += (dx / d) * passo; z[i] += (dz / d) * passo; if (modo[i] === 0) prog[i] = 1 - d / elen[i]; }
           }
           // rumo suave e deslocamento lateral (mão direita: direita do rumo = (−hz, hx))
@@ -418,7 +418,7 @@ uniform float uVidaT; uniform float uAnima;`)
     for (const im of [imPar, imSent]) {
       if (!im) continue;
       const A = im.geometry.attributes;
-      for (let i = 0; i < im.count; i++) { poe3(A.aTorso, i, sorteia(tor)); poe3(A.aCalca, i, sorteia(CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); A.aAnim.setXY(i, 0, 0); }
+      for (let i = 0; i < im.count; i++) { poe3(A.aTorso, i, sorteia(tor)); poe3(A.aCalca, i, sorteia(CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); A.aAnim.setXY(i, rnd() * TAU, 0.3 + rnd() * 0.25); } // ninguém fica estátua: braços e pernas mexem de leve
       for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo', 'aAnim']) A[k].needsUpdate = true;
     }
   }
@@ -493,7 +493,7 @@ uniform float uVidaT; uniform float uAnima;`)
     // quadros-chave de tempo → posição (s)
     const k = p.k, kf = [[0, 0, 0]];
     let tp = 0; // a tabela só tem minutos: garante ao menos 14 s de parada e tempos que não voltam atrás
-    k.forEach(([s, ta, td]) => { ta = Math.max(ta, tp); td = Math.max(td, ta + 14); kf.push([ta, s, 1], [td, s, 2]); tp = td + 4; });
+    k.forEach(([s, ta, td]) => { ta = Math.max(ta, tp); td = Math.min(Math.max(td, ta + 14), ta + 20); kf.push([ta, s, 1], [td, s, 2]); tp = td + 4; }); // parada de 14–20 s: a tabela só tem minutos e o bonde ficava um minuto inteiro parado
     kf.push([Math.max(p.T, tp), (xs.length - 1) * DS, 3]);
     return { xs, ys, zs, total: (xs.length - 1) * DS, kf, p };
   });
