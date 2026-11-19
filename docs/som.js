@@ -9,9 +9,27 @@
 // A varredura de anos do tour (som.varredura(anos/s)) vira um rufo contínuo que acompanha a velocidade.
 // Detalhes em design/tour.md. ?som=debug expõe window.som.
 (() => {
-  const ESCALA = [0, 2, 4, 7, 9];           // pentatônica maior sobre sol (sol lá si ré mi)
+  let ESCALA = [0, 2, 4, 7, 9];             // pentatônica maior sobre sol (sol lá si ré mi)
   const SOL = 196.0;                        // sol 3
-  const BPM = 104, PASSO = 60 / BPM / 4;    // marcha em 2/4, semicolcheia
+  let BPM = 104, PASSO = 60 / BPM / 4;      // marcha em 2/4, semicolcheia
+  // a música muda mês a mês com o ano do tour (2026-11-19): escala, andamento, transposição e quanto de tambor, pífaro e sino
+  //   jan neve, lenta, menor, sinos; fev Fasnacht, tambor e pífaro a 112; mar–mai primavera, mais clara; jun–ago verão no
+  //   Reno, leve e solta, pouco tambor; set–out outono (Herbstmesse), dórico; nov cinza e esparsa; dez mercado de Natal, sinos
+  const MESES = [
+    { esc: [0, 2, 3, 7, 8], bpm: 72, transp: -2, tambor: 0.35, pifaro: 0.5, sino: 1.6 },
+    { esc: [0, 2, 4, 7, 9], bpm: 112, transp: 0, tambor: 1.5, pifaro: 1.8, sino: 0.4 },
+    { esc: [0, 2, 4, 6, 9], bpm: 96, transp: 2, tambor: 0.7, pifaro: 1.0, sino: 0.8 },
+    { esc: [0, 2, 4, 7, 9], bpm: 100, transp: 4, tambor: 0.7, pifaro: 1.2, sino: 0.8 },
+    { esc: [0, 2, 4, 7, 9], bpm: 104, transp: 5, tambor: 0.8, pifaro: 1.2, sino: 1.0 },
+    { esc: [0, 2, 4, 7, 10], bpm: 108, transp: 7, tambor: 0.6, pifaro: 1.3, sino: 0.6 },
+    { esc: [0, 2, 4, 7, 9], bpm: 92, transp: 5, tambor: 0.35, pifaro: 1.5, sino: 0.3 },
+    { esc: [0, 2, 4, 7, 9], bpm: 90, transp: 2, tambor: 0.35, pifaro: 1.4, sino: 0.3 },
+    { esc: [0, 2, 3, 7, 9], bpm: 96, transp: 0, tambor: 0.7, pifaro: 1.0, sino: 0.8 },
+    { esc: [0, 2, 3, 7, 9], bpm: 100, transp: -2, tambor: 0.9, pifaro: 1.1, sino: 0.9 },
+    { esc: [0, 3, 5, 7, 10], bpm: 78, transp: -3, tambor: 0.4, pifaro: 0.6, sino: 1.2 },
+    { esc: [0, 2, 4, 7, 9], bpm: 84, transp: 0, tambor: 0.4, pifaro: 0.9, sino: 2.0 },
+  ];
+  let MES = MESES[1];
   const RAIZ_CENA = [0, -5, 2, 7, 5, 0];    // sol, ré (abaixo), lá, ré, dó, sol
   const CHAVE = 'basel-som';
 
@@ -204,7 +222,7 @@
       const forca = s === 0 ? 1 : s === 4 ? 0.75 : s % 2 === 0 ? 0.5 : 0.3;
       const lado = (s % 2 ? -1 : 1) * (0.1 + Math.min(0.6, Math.abs(cam.giro) / 50));
       // tambor: parado só marca os tempos; em movimento enche até as semicolcheias
-      const chance = s % 4 === 0 ? 0.55 + vel : s % 2 === 0 ? vel * 1.3 : vel * vel * 1.4;
+      const chance = (s % 4 === 0 ? 0.55 + vel : s % 2 === 0 ? vel * 1.3 : vel * vel * 1.4) * MES.tambor;
       if (rufo < 0.05 && Math.random() < chance) {
         const v = forca * (0.3 + 0.6 * vel);
         if (s === 0 && Math.random() < 0.5) arrastado(t, v, lado); else tambor(t, v, lado);
@@ -217,10 +235,11 @@
         for (let i = 0; i < n; i++) tambor(t + (i * PASSO) / n, (0.12 + rufo * 0.45) * (s % 4 === 0 && i === 0 ? 1.6 : 1), i % 2 ? -0.3 : 0.3);
       }
       // sino grave no começo de cada quatro compassos, só de longe
-      if (passo % 32 === 0 && perto() < 0.35) sino(hz(raiz, -1), t, 0.35, -0.3);
+      if (passo % 32 === 0 && perto() < 0.35 * MES.sino) sino(hz(raiz, -1), t, 0.35, -0.3);
+      if (MES.sino > 1.2 && passo % 16 === 8 && Math.random() < (MES.sino - 1.2)) sino(hz(raiz + ESCALA[Math.floor(Math.random() * 5)], 1), t, 0.22, 0.3); // carrilhão de inverno/Natal
       passo++; prox += PASSO;
     }
-    if (vel < 0.3 && rufo < 0.05 && performance.now() - ultimaFrase > 6000 + Math.random() * 4000) frase();
+    if (vel < 0.3 && rufo < 0.05 && performance.now() - ultimaFrase > (6000 + Math.random() * 4000) / MES.pifaro) frase();
   }
 
   // câmera → som, a cada quadro
@@ -256,7 +275,7 @@
   function cena(i) {
     if (!tocando) return;
     cenaN = i;
-    raiz = RAIZ_CENA[i % RAIZ_CENA.length];
+    raiz = RAIZ_CENA[i % RAIZ_CENA.length] + MES.transp;
     afinarBordao(raiz, 0.9);
     const t = ctx.currentTime + 0.02;
     sino(hz(raiz, 0), t, 0.7, -0.2);
@@ -315,7 +334,17 @@
   addEventListener('pointerdown', () => { if (ctx && tocando && ctx.state !== 'running') ctx.resume(); }, true);
   addEventListener('keydown', () => { if (ctx && tocando && ctx.state !== 'running') ctx.resume(); }, true);
 
-  const api = { iniciar, cena, legenda, varredura, parar, alternar, ligado: () => ligado };
+  // mês novo (0–11): escala, andamento e mistura; um rufo e o bordão deslizando marcam a virada
+  function mes(m) {
+    const novo = MESES[((m % 12) + 12) % 12];
+    if (novo === MES) return;
+    MES = novo; ESCALA = MES.esc; BPM = MES.bpm; PASSO = 60 / BPM / 4;
+    if (!tocando || !ctx) return;
+    raiz = RAIZ_CENA[cenaN % RAIZ_CENA.length] + MES.transp;
+    afinarBordao(raiz, 1.2);
+    if (rufo < 0.05) ruf(ctx.currentTime + 0.05, 0.45 * MES.tambor);
+  }
+  const api = { iniciar, cena, legenda, varredura, parar, alternar, mes, ligado: () => ligado };
   window.somTour = api;
   if (new URLSearchParams(location.search).get('som') === 'debug') {
     let an = null;

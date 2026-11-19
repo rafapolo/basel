@@ -554,6 +554,7 @@ function quadro(agora) {
   Object.assign(camSom, { dist: c.dist, polar: c.polar, az: c.az });
   MARC.atualiza(U.uSel.value);
   VIDA.atualizar(agora);
+  FAS?.atualizar(agora, camera, U.uNoite.value);
   atualizarNuvens(agora, ceu);
   atualizarNeve(agora, ceu, cena, camera, leve);
   ceu.atualizar(agora);
@@ -588,6 +589,8 @@ const ROCHE = q.get('roche') === '0' ? null : await criarRoche({ cena, U, recort
 carga?.etapa(0.96, t('gente e bondes…', 'people and trams…', 'Menschen und Trams…'));
 const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE, recorte: REC });
 $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
+// Fasnacht (fasnacht.js): Cliques pelas ruas do centro nos três dias reais, ou quando o tour chega em fevereiro
+const MOD_FAS = await import('./fasnacht.js'), FAS = MOD_FAS.criarFasnacht({ cena, altura, ruas, ceu }), FAS_SEG = MOD_FAS.segundaFasnacht;
 if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
 relogio(ceu.estado()); ceu.aoMudar(relogio);
 if (q.get('noite')) definirNoite(true);
@@ -618,7 +621,7 @@ function centro(nome) {
 
 window.cidade = {
   THREE, FACH, MARC, U, camera, arvores, centro, controls, lerCamera, porCamera, definirNoite, fecharFicha, abrirFicha,
-  noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura, ceu, cena, sairRua, rua: () => RUA.on,
+  noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura, ceu, cena, sairRua, rua: () => RUA.on, fasnacht: () => FAS, fasnachtSegunda: (a) => FAS_SEG(a),
   // para o modo jogo (jogo.js): plantas dos prédios, pontes e o Reno
   posicoes, nTris: meta.n_tris, ruas, cotaPonta, cotaPonte: MARC.cotaPonte, nivelReno: AGUA.nivel, relevo: R, ponte: MITTLERE,
 };

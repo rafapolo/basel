@@ -85,16 +85,22 @@ function estacoes(ms, ano) {
   const rotulo = $('tour-ano');
   rotulo.classList.add('on');
   const mes = new Intl.DateTimeFormat(document.documentElement.lang, { month: 'long', timeZone: 'UTC' });
-  const t0 = performance.now(), d0 = Date.UTC(ano, 0, 15), d1 = Date.UTC(ano, 11, 28);
-  let ult = 0;
+  // a data não corre reta: chega à segunda da Fasnacht quando começa o passeio a pé (12 s) e fica nos três dias até o fim
+  // dele (34 s): as Cliques passam pela Augustinergasse e se ouvem os tambores; depois o ano segue até dezembro
+  const DIA = 86400000, seg = window.cidade.fasnachtSegunda?.(ano) ?? Date.UTC(ano, 1, 23);
+  const KF = [[0, Date.UTC(ano, 0, 15)], [12000 / TOTAL, seg + 0.4 * DIA], [34000 / TOTAL, seg + 2.4 * DIA], [40000 / TOTAL, seg + 9 * DIA], [ms / TOTAL, Date.UTC(ano, 11, 28)]];
+  const dataEm = (t) => { let i = 1; while (i < KF.length - 1 && KF[i][0] < t) i++; const [ta, da] = KF[i - 1], [tb, db] = KF[i]; return da + (db - da) * Math.min(1, Math.max(0, (t - ta) / (tb - ta))); };
+  const t0 = performance.now();
+  let ult = 0, mesAnt = -1;
   return new Promise((ok) => {
     const passo = (agora) => {
       if (!ativo) return ok();
       const t = Math.min(1, (agora - t0) / ms);
       if (agora - ult > 120 || t >= 1) { // ~8 vezes por segundo basta: cada troca de data recalcula sol e árvores
         ult = agora;
-        const d = new Date(d0 + (d1 - d0) * t);
+        const d = new Date(dataEm((t * ms) / TOTAL)); // t: fração do ano corrido; o eixo dos quadros-chave é o tempo do tour
         C.ceu.definirData(d.toISOString().slice(0, 10));
+        if (d.getUTCMonth() !== mesAnt) { mesAnt = d.getUTCMonth(); somTour.mes?.(mesAnt); } // a música muda mês a mês
         rotulo.textContent = mes.format(d).replace(/^\p{Ll}/u, (c) => c.toUpperCase());
       }
       if (t < 1) requestAnimationFrame(passo);
@@ -137,10 +143,10 @@ function cenas() {
     { dur: 22000, run: async () => {
       C.porCamera({ alvo: [70, 12, 46], dist: 60, az: rad(215), polar: rad(55) });
       mover({ alvo: [44.5, C.altura(44.5, 14) + 1.7, 14], dist: 7, az: rad(222), polar: rad(87) }, 2200); // câmera chega a ~(39,9), no Rheinsprung
-      await legenda(t('A pé · Rheinsprung → Münsterplatz', 'On foot · Rheinsprung → Münsterplatz', 'Zu Fuss · Rheinsprung → Münsterplatz'), t(
-        'Pelas vielas da colina, na altura dos olhos, até a praça da catedral.',
-        'Up the lanes on the hill, at eye level, to the cathedral square.',
-        'Durch die Gassen auf dem Hügel, auf Augenhöhe, bis zum Münsterplatz.'));
+      await legenda(t('Fasnacht · a pé pela Altstadt', 'Fasnacht · on foot through the old town', 'Fasnacht · zu Fuss durch die Altstadt'), t(
+        'Três dias de Larven, pífaros e tambores: as Cliques descem as vielas até a praça da catedral.',
+        'Three days of masks, piccolos and drums: the cliques march down the lanes to the cathedral square.',
+        'Drei Tage Larven, Piccolos und Trommeln: die Cliquen ziehen durch die Gassen zum Münsterplatz.'));
       await em(2200);
       // traçado do OSM: Rheinsprung (de 38,8/7,8), Augustinergasse, Münsterplatz até o meio da praça
       const p0 = C.camera.position;
