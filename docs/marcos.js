@@ -108,6 +108,122 @@ function texRathaus() {
     g.strokeStyle = 'rgba(235,220,185,0.55)'; g.lineWidth = 2; g.strokeRect(6, 6, W - 12, H - 12);
   });
 }
+// fachada do Rathaus para a Marktplatz (2026-11-19), num desenho só de 41,4 x 36,5 m (de 6,1 m, o chão da praça, para
+// cima), em vez da célula repetida: à esquerda a Kanzlei de 1606–08, com janelas em cruz e pinturas em grisalha; no meio
+// o corpo de 1504–14, com os três arcos da Bogenhalle, a fileira de janelas góticas, o relógio dourado com a Justitia,
+// os escudos de Basel e o friso pintado (os murais de Hans Bock, em versão de longe); à direita o pé da torre de 1900.
+// u em metros ao longo da fachada a partir do canto norte (x −110,96, z −1,18); v em metros acima de 6,1 m.
+const RATH = { L: 41.4, H: 36.5, ppm: 40, kanzlei: [0, 17.6], corpo: [17.6, 34], topoCorpo: 18.6, topoKanzlei: 22.9 };
+function texRathausFrente() {
+  const { L, H, ppm } = RATH, W = Math.round(L * ppm), Hp = Math.round(H * ppm);
+  return tex(W, Hp, (g) => {
+    const r = mulberry(17);
+    const X = (u) => u * ppm, Y = (v) => Hp - v * ppm; // v em metros acima da praça
+    const ret = (u0, v0, u1, v1, cor) => { g.fillStyle = cor; g.fillRect(X(u0), Y(v1), X(u1) - X(u0), Y(v0) - Y(v1)); };
+    // reboco vermelho com manchas de tempo
+    ret(0, 0, L, H, '#a8352a');
+    for (let i = 0; i < 5000; i++) { g.fillStyle = `rgba(${r() > 0.5 ? '255,190,150' : '50,8,4'},${r() * 0.06})`; g.fillRect(r() * W, r() * Hp, 4 + r() * 22, 4 + r() * 14); }
+    // ---- Kanzlei (esquerda): 4 andares de janelas em cruz com molduras de arenito e pinturas em grisalha entre elas
+    const [k0, k1] = RATH.kanzlei;
+    ret(k0, 0, k1, 0.5, '#7d2b22');
+    for (let f = 0; f < 4; f++) {
+      const v0 = 1.2 + f * 5.2;
+      for (let c = 0; c < 4; c++) {
+        const u = k0 + 1.4 + c * 4.1;
+        if (f === 0) { // térreo: portas em arco
+          ret(u - 0.3, v0 - 1.2, u + 2.3, v0 + 3.3, '#cdb68a');
+          ret(u, v0 - 1.2, u + 2, v0 + 2.6, '#231c18');
+          g.fillStyle = '#231c18'; g.beginPath(); g.arc(X(u + 1), Y(v0 + 2.6), ppm, Math.PI, 0); g.fill();
+          continue;
+        }
+        ret(u - 0.25, v0 - 0.25, u + 2.25, v0 + 3.05, '#d6c194');
+        ret(u, v0, u + 2, v0 + 2.8, '#2a3440');
+        ret(u + 0.92, v0, u + 1.08, v0 + 2.8, '#d6c194'); ret(u, v0 + 1.9, u + 2, v0 + 2.05, '#d6c194');
+        ret(u - 0.4, v0 - 0.45, u + 2.4, v0 - 0.25, '#c4ac7e'); // peitoril
+        // pintura em grisalha entre as janelas: figura de pé num nicho fingido
+        if (c < 3) {
+          const uc = u + 3.05, vc = v0 + 0.3;
+          ret(uc - 0.7, vc, uc + 0.7, vc + 2.6, 'rgba(225,205,160,0.35)');
+          g.fillStyle = 'rgba(235,215,170,0.55)'; g.beginPath(); g.ellipse(X(uc), Y(vc + 2.25), 0.22 * ppm, 0.26 * ppm, 0, 0, 7); g.fill();
+          g.beginPath(); g.moveTo(X(uc - 0.45), Y(vc + 0.1)); g.lineTo(X(uc + 0.45), Y(vc + 0.1)); g.lineTo(X(uc + 0.2), Y(vc + 1.95)); g.lineTo(X(uc - 0.2), Y(vc + 1.95)); g.fill();
+        }
+      }
+      ret(k0, v0 + 3.6, k1, v0 + 3.8, '#c9b185'); // cornija de andar
+    }
+    // cunhais pintados nas quinas
+    for (const u of [k0, k1 - 0.9]) for (let v = 0; v < RATH.topoKanzlei; v += 1.1) ret(u, v, u + (Math.round(v / 1.1) % 2 ? 0.9 : 0.6), v + 1.0, '#c7ad80');
+    // ---- corpo principal (meio): Bogenhalle, janelas góticas, relógio, escudos e friso
+    const [c0, c1] = RATH.corpo, cw = c1 - c0, cm = (c0 + c1) / 2, topo = RATH.topoCorpo;
+    // três arcos redondos de 4,2 m de vão e 6,2 m de altura, em arenito claro
+    for (let i = 0; i < 3; i++) {
+      const uc = c0 + cw * (i + 0.5) / 3, h = 4.6, rr = 2.1;
+      g.fillStyle = '#d2ba8c'; g.beginPath(); g.arc(X(uc), Y(h), (rr + 0.55) * ppm, Math.PI, 0); g.lineTo(X(uc + rr + 0.55), Y(0)); g.lineTo(X(uc - rr - 0.55), Y(0)); g.fill();
+      g.fillStyle = '#1d1714'; g.beginPath(); g.arc(X(uc), Y(h), rr * ppm, Math.PI, 0); g.lineTo(X(uc + rr), Y(0)); g.lineTo(X(uc - rr), Y(0)); g.fill();
+      // grade dourada da porta e o fundo pintado do pátio (vermelho, mais escuro)
+      g.strokeStyle = 'rgba(214,170,64,0.8)'; g.lineWidth = 3;
+      for (let k = -4; k <= 4; k++) { g.beginPath(); g.moveTo(X(uc + k * rr / 5), Y(0)); g.lineTo(X(uc + k * rr / 5), Y(h + Math.sqrt(Math.max(0, rr * rr - (k * rr / 5) ** 2)) - 0.1)); g.stroke(); }
+      g.fillStyle = 'rgba(120,30,22,0.35)'; g.fillRect(X(uc - rr * 0.8), Y(h), X(rr * 1.6), X(h * 0.6));
+    }
+    ret(c0, 6.9, c1, 7.25, '#c8ae80'); // cornija sobre os arcos
+    // fileira de janelas góticas (arco quebrado, vitral em chumbo)
+    for (let i = 0; i < 5; i++) {
+      const u = c0 + 1.0 + i * (cw - 2) / 5 + 0.35, w = 2.2, v0 = 8.0, h = 3.4;
+      g.fillStyle = '#d2ba8c';
+      g.beginPath(); g.moveTo(X(u - 0.25), Y(v0 - 0.25)); g.lineTo(X(u - 0.25), Y(v0 + h)); g.quadraticCurveTo(X(u - 0.25), Y(v0 + h + 1.3), X(u + w / 2), Y(v0 + h + 1.6));
+      g.quadraticCurveTo(X(u + w + 0.25), Y(v0 + h + 1.3), X(u + w + 0.25), Y(v0 + h)); g.lineTo(X(u + w + 0.25), Y(v0 - 0.25)); g.fill();
+      const vid = g.createLinearGradient(0, Y(v0 + h + 1.3), 0, Y(v0));
+      vid.addColorStop(0, '#3e5a6a'); vid.addColorStop(0.5, '#2c3c48'); vid.addColorStop(1, '#4d5a52');
+      g.fillStyle = vid;
+      g.beginPath(); g.moveTo(X(u), Y(v0)); g.lineTo(X(u), Y(v0 + h)); g.quadraticCurveTo(X(u), Y(v0 + h + 1.05), X(u + w / 2), Y(v0 + h + 1.3));
+      g.quadraticCurveTo(X(u + w), Y(v0 + h + 1.05), X(u + w), Y(v0 + h)); g.lineTo(X(u + w), Y(v0)); g.fill();
+      g.strokeStyle = '#d2ba8c'; g.lineWidth = 3; g.beginPath(); g.moveTo(X(u + w / 2), Y(v0)); g.lineTo(X(u + w / 2), Y(v0 + h + 1.2)); g.stroke();
+      g.strokeStyle = 'rgba(30,30,30,0.5)'; g.lineWidth = 1;
+      for (let y = v0 + 0.3; y < v0 + h; y += 0.3) { g.beginPath(); g.moveTo(X(u), Y(y)); g.lineTo(X(u + w), Y(y)); g.stroke(); }
+    }
+    // relógio dourado no meio, com a Justitia em cima e um escudo de Basel de cada lado
+    const vr = 14.4;
+    g.fillStyle = '#c9a13b'; g.fillRect(X(cm - 2.2), Y(vr + 2.3), X(4.4), X(4.6));
+    g.fillStyle = '#20305c'; g.beginPath(); g.arc(X(cm), Y(vr), 1.75 * ppm, 0, 7); g.fill();
+    g.strokeStyle = '#e8c55a'; g.lineWidth = 6; g.beginPath(); g.arc(X(cm), Y(vr), 1.55 * ppm, 0, 7); g.stroke();
+    g.fillStyle = '#e8c55a';
+    for (let k = 0; k < 12; k++) { const a = k / 12 * 6.283; g.fillRect(X(cm) + Math.cos(a) * 1.3 * ppm - 3, Y(vr) + Math.sin(a) * 1.3 * ppm - 3, 6, 6); }
+    g.lineWidth = 5; g.beginPath(); g.moveTo(X(cm), Y(vr)); g.lineTo(X(cm + 0.7), Y(vr + 0.6)); g.moveTo(X(cm), Y(vr)); g.lineTo(X(cm - 0.2), Y(vr - 1.1)); g.stroke();
+    // Justitia (figura dourada com a balança)
+    g.fillStyle = '#d9b24a';
+    g.beginPath(); g.ellipse(X(cm), Y(vr + 3.65), 0.22 * ppm, 0.25 * ppm, 0, 0, 7); g.fill();
+    g.beginPath(); g.moveTo(X(cm - 0.55), Y(vr + 2.35)); g.lineTo(X(cm + 0.55), Y(vr + 2.35)); g.lineTo(X(cm + 0.25), Y(vr + 3.4)); g.lineTo(X(cm - 0.25), Y(vr + 3.4)); g.fill();
+    g.strokeStyle = '#d9b24a'; g.lineWidth = 3; g.beginPath(); g.moveTo(X(cm - 0.9), Y(vr + 3.3)); g.lineTo(X(cm + 0.9), Y(vr + 3.3)); g.stroke();
+    for (const s of [-0.9, 0.9]) { g.beginPath(); g.arc(X(cm + s), Y(vr + 2.95), 0.2 * ppm, 0, Math.PI); g.stroke(); }
+    // escudos: báculo de Basel, preto sobre branco
+    for (const s of [-1, 1]) {
+      const uc = cm + s * 4.6, v = vr + 0.4;
+      g.fillStyle = '#c9a13b'; g.beginPath(); g.moveTo(X(uc - 1.05), Y(v + 1.45)); g.lineTo(X(uc + 1.05), Y(v + 1.45)); g.lineTo(X(uc + 1.05), Y(v - 0.2)); g.quadraticCurveTo(X(uc + 1.05), Y(v - 1.4), X(uc), Y(v - 1.75)); g.quadraticCurveTo(X(uc - 1.05), Y(v - 1.4), X(uc - 1.05), Y(v - 0.2)); g.fill();
+      g.fillStyle = '#f1ece0'; g.beginPath(); g.moveTo(X(uc - 0.9), Y(v + 1.3)); g.lineTo(X(uc + 0.9), Y(v + 1.3)); g.lineTo(X(uc + 0.9), Y(v - 0.2)); g.quadraticCurveTo(X(uc + 0.9), Y(v - 1.25), X(uc), Y(v - 1.55)); g.quadraticCurveTo(X(uc - 0.9), Y(v - 1.25), X(uc - 0.9), Y(v - 0.2)); g.fill();
+      g.fillStyle = '#151515'; g.fillRect(X(uc - 0.12), Y(v + 0.6), X(0.24), X(1.9));
+      g.lineWidth = 7; g.strokeStyle = '#151515'; g.beginPath(); g.arc(X(uc + 0.12), Y(v + 0.65), 0.4 * ppm, Math.PI, 0.2 * Math.PI, true); g.stroke();
+      g.fillRect(X(uc - 0.35), Y(v - 1.25), X(0.7), X(0.18));
+    }
+    // friso pintado no alto do corpo: figuras em vestes coloridas entre colunas fingidas (os murais, vistos de longe)
+    const f0 = 18.6 - 4.0 + 0.6, f1 = 18.6 - 0.6;
+    ret(c0, f0 - 0.35, c1, f0, '#c8ae80');
+    const vestes = ['#2f4f7a', '#3f6b45', '#c9a13b', '#6a2a5a', '#d8c9a8', '#8a5a2a'];
+    for (let i = 0; i < 9; i++) {
+      const u = c0 + 0.9 + i * (cw - 1.8) / 9;
+      ret(u - 0.12, f0, u + 0.12, f1, '#cdb487'); // coluna fingida
+      const uc = u + (cw - 1.8) / 18;
+      g.fillStyle = vestes[i % vestes.length];
+      g.beginPath(); g.moveTo(X(uc - 0.5), Y(f0 + 0.15)); g.lineTo(X(uc + 0.5), Y(f0 + 0.15)); g.lineTo(X(uc + 0.22), Y(f1 - 0.7)); g.lineTo(X(uc - 0.22), Y(f1 - 0.7)); g.fill();
+      g.fillStyle = '#e0b894'; g.beginPath(); g.ellipse(X(uc), Y(f1 - 0.45), 0.2 * ppm, 0.24 * ppm, 0, 0, 7); g.fill();
+      g.fillStyle = vestes[(i + 3) % vestes.length]; g.fillRect(X(uc - 0.55), Y(f1 - 0.85), X(1.1), X(0.18)); // braços abertos
+    }
+    ret(c0, f1, c1, topo + 0.2, '#c8ae80'); // cornija sob as ameias
+    // cunhais do corpo
+    for (const u of [c0, c1 - 0.8]) for (let v = 0; v < topo; v += 1.1) ret(u, v, u + (Math.round(v / 1.1) % 2 ? 0.8 : 0.55), v + 1.0, '#cdb487');
+    // ---- pé da torre (direita) e o alto, acima dos telhados (o que sobrar do LOD2 ali)
+    ret(c1, 0, L, H, '#a33429');
+    for (let v = 2; v < H; v += 4.4) { ret(c1 + 2.2, v, c1 + 3.6, v + 2.4, '#d6c194'); ret(c1 + 2.4, v + 0.2, c1 + 3.4, v + 2.2, '#2a3440'); }
+  });
+}
 // telha vidrada do Münster: losangos concêntricos amarelo, vermelho, verde, preto; telhas de 8 px
 function texTelhaVidrada() {
   const N = 256, paleta = ['#c9a844', '#8f3a2a', '#3d6a52', '#2b2a2d', '#3d6a52', '#8f3a2a'];
@@ -261,6 +377,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     telhaM: std(texTelha('#8b4a35')),
     rosace: std(texRosace(), { roughness: 0.4, envMap: ENV, envMapIntensity: 0.6 }),
     rathaus: std(texRathaus()),
+    rathausFrente: std(texRathausFrente()),
     telhaR: std(texTelha('#8d4a34', 4)),
     pedraN: std(texPedra({ cw: 4, ch: 4, cor: '#b98a68', seed: 21 })),
     pedraNJ: std(texPedra({ cw: 4, ch: 12, cor: '#b98a68', janela: true, seed: 22 })),
@@ -273,7 +390,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     ouro: new THREE.MeshStandardMaterial({ color: 0xc9a13b, roughness: 0.3, metalness: 0.85, envMap: ENV, envMapIntensity: 1.1 }),
     relogio: new THREE.MeshStandardMaterial({ map: texRelogio(), roughness: 0.4, metalness: 0.2, envMap: ENV, envMapIntensity: 0.5 }),
   };
-  for (const k of ['rathaus', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha', 'ferro']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
+  for (const k of ['rathaus', 'rathausFrente', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha', 'ferro']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
   let cotaMittlere = null;
   const raiz = new THREE.Group();
   raiz.name = 'marcos';
@@ -397,7 +514,43 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     const ts = triangulos([1734]);
     const m = novo(); m.y0 = yMin(ts);
     const c = new THREE.Vector2(-90.6, 31.5);
-    recapeia(m, ts, (v) => Math.hypot(v.x - c.x, v.z - c.y) < 5.6, 'rathaus', 'telhaR', 3.6, 4.2);
+    // a frente para a Marktplatz (plano de normal (−0,89, 0,457)) sai do recapeamento e ganha a textura própria
+    const o = new THREE.Vector2(-110.96, -1.18), dir = new THREE.Vector2(0.457, 0.89), nf = new THREE.Vector2(-0.89, 0.457), Y0 = 6.1;
+    const frente = [], resto = [];
+    for (const t of ts) {
+      const [a, b, cc] = tri(t);
+      const n = b.clone().sub(a).cross(cc.clone().sub(a)); if (n.lengthSq() < 1e-9) continue; n.normalize();
+      const naFrente = Math.abs(n.y) < 0.2 && Math.abs(n.x * nf.x + n.z * nf.y) > 0.97 && [a, b, cc].every((v) => Math.abs((v.x - o.x) * nf.x + (v.z - o.y) * nf.y) < 0.8);
+      (naFrente ? frente : resto).push(t);
+    }
+    if (frente.length) {
+      const pos = [], uv = [];
+      for (const t of frente) for (const v of tri(t)) {
+        pos.push(v.x + nf.x * 0.03, v.y, v.z + nf.y * 0.03);
+        uv.push(((v.x - o.x) * dir.x + (v.z - o.y) * dir.y) / RATH.L, (v.y - Y0) / RATH.H);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.computeVertexNormals();
+      (m.mundo.rathausFrente ??= []).push(g);
+    }
+    recapeia(m, resto, (v) => Math.hypot(v.x - c.x, v.z - c.y) < 5.6, 'rathaus', 'telhaV', 3.6, 4.2);
+    // ameias sobre o corpo de 1504 (vermelhas, com cobertura de arenito) e pináculos dourados nas quinas e no meio
+    {
+      const ang = Math.atan2(dir.y, dir.x), mk = new Marco(quadro(o.x, o.y, ang)), [c0, c1] = RATH.corpo, yt = Y0 + RATH.topoCorpo;
+      for (let u = c0 + 0.2; u < c1 - 0.6; u += 1.3) {
+        mk.caixa('rathaus', u, u + 0.75, -0.25, 0.35, yt - 0.2, yt + 1.15, { sx: 3.6, sy: 4.2 });
+        mk.caixa('pedraL', u - 0.05, u + 0.8, -0.3, 0.4, yt + 1.15, yt + 1.3, { sx: 2 });
+      }
+      for (const u of [c0 + 0.3, (c0 + c1) / 2, c1 - 0.3]) {
+        mk.tronco('ouro', u, 0.05, 0.28, 0.28, yt + 1.3, yt + 2.2, 6);
+        mk.tronco('ouro', u, 0.05, 0.3, 0.0, yt + 2.2, yt + 4.4, 6);
+      }
+      // Dachreiter: torrinha dourada no telhado, atrás do relógio
+      mk.tronco('ouro', (c0 + c1) / 2, -4, 0.55, 0.55, yt + 4, yt + 7, 8);
+      mk.tronco('flecha', (c0 + c1) / 2, -4, 0.75, 0.0, yt + 7, yt + 12, 8);
+      empurra(m, mk);
+    }
     torre(m, { cx: c.x, cz: c.y, ang: 62 * Math.PI / 180, s: 7.6, y0: m.y0, yFuste: 41.8, yTambor: 46, yTopo: 52.4, matF: 'rathaus', matS: 'flecha', relogio: 1.5, sx: 3.6 });
     fecha(m, 'Rathaus', 1734);
   }
