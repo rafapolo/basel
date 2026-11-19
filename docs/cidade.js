@@ -12,6 +12,7 @@ import { criarArvores } from './arvores.js';
 import { criarChao, cotaPonta } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
 import { decodifica, baixaBin } from './compacta.js';
+import { injetarSombra, atualizarNuvens, TEMPO } from './nuvens.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -282,7 +283,7 @@ function injetar(shader, cheio) {
   }`);
 }
 const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-material.onBeforeCompile = (s) => { injetar(s, true); FACH.injetar(s); };
+material.onBeforeCompile = (s) => { injetar(s, true); FACH.injetar(s); injetarSombra(s, 'vMundo.xz'); };
 // a ortofoto encadeia depois das fachadas: a foto entra logo após <color_fragment> e vira a base da telha
 orto.telhados(material);
 const predios = new THREE.Mesh(geo, material);
@@ -309,8 +310,10 @@ const ESTACAO = { inverno: ['inverno', 'winter', 'Winter'], primavera: ['primave
 const estacaoDe = (data) => { const [, m, d] = data.split('-').map(Number), x = m * 100 + d; return x < 320 || x >= 1221 ? 'inverno' : x < 621 ? 'primavera' : x < 923 ? 'verao' : x < 1221 ? 'outono' : 'inverno'; };
 function relogio(e) {
   $('relogio').textContent = `${String(Math.floor(e.hora)).padStart(2, '0')}:${String(Math.floor((e.hora % 1) * 60)).padStart(2, '0')}`;
-  $('estacao').textContent = `${t(...ESTACAO[estacaoDe(e.data)])}${ceu.aoVivo ? t(' · agora', ' · live', ' · live') : ''}`;
+  const tempo = ceu.aoVivo && TEMPO.ok ? ` · ${Math.round(TEMPO.temp)} °C` : '';
+  $('estacao').textContent = `${t(...ESTACAO[estacaoDe(e.data)])}${ceu.aoVivo ? t(' · agora', ' · live', ' · live') : ''}${tempo}`;
 }
+addEventListener('tempo:agora', () => relogio(ceu.estado()));
 // ---------- chaves ----------
 $('c-ruas').addEventListener('change', (e) => { ruasObj.visible = e.target.checked; CH.ruas(e.target.checked); });
 let noiteAlvo = 0;
@@ -436,6 +439,7 @@ function quadro(agora) {
   Object.assign(camSom, { dist: c.dist, polar: c.polar, az: c.az });
   MARC.atualiza(U.uSel.value);
   VIDA.atualizar(agora);
+  atualizarNuvens(agora, ceu);
   ceu.atualizar(agora);
   AGUA.atualizar(agora);
   ceu.render();

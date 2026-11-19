@@ -4,6 +4,8 @@
 //
 // Custo: 1 InstancedMesh por classe (gênero) e por LOD, matrizes refeitas só quando a câmera anda. A sombra no CSM sai da
 // mesma malha (customDepthMaterial com o mesmo balanço e a mesma queda de folhas). Modo leve (ceu.leve): sem LOD 0, sem balanço.
+import { injetarSombra } from './nuvens.js';
+
 export async function criarArvores({ THREE, cena, camera, altura, dentro = () => true, ceu, nivelRio = 2.4 }) {
   const [meta, bin] = await Promise.all([fetch('data/arvores.json').then((r) => r.json()), fetch('data/arvores.bin').then((r) => r.arrayBuffer())]);
   const leve = ceu.leve;
@@ -218,7 +220,14 @@ void main() {
       // os dois lados: pelos vãos das folhas que caem aparece o outro lado da copa, e não o vazio de uma casca oca
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
       const uEver = { value: P.ever ? 1 : 0 }, uOut = { value: new THREE.Vector3(...AUTUMN[ci].map((v, i) => v * [0.8, 0.74, 0.8][i])) };
-      mat.onBeforeCompile = (s) => { injetar(s, { cheio: true }); s.uniforms.uEver = uEver; s.uniforms.uOutono = uOut; };
+      mat.onBeforeCompile = (s) => {
+        injetar(s, { cheio: true }); s.uniforms.uEver = uEver; s.uniforms.uOutono = uOut;
+        // sombra das nuvens (nuvens.js) na luz direta da copa e do tronco
+        s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vNvXZ;')
+          .replace('#include <project_vertex>', '#include <project_vertex>\n  vNvXZ = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xz;');
+        s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vNvXZ;');
+        injetarSombra(s, 'vNvXZ');
+      };
       mat.customProgramCacheKey = () => 'arv';
       const dep = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
       dep.onBeforeCompile = (s) => { injetar(s, { cheio: false }); s.uniforms.uEver = uEver; };

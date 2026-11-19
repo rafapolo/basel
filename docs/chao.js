@@ -5,6 +5,7 @@
 // Também: meio-fio em relevo, trilhos de bonde (bitola de 1 m), fio aéreo e postes.
 // criarChao(THREE, { meta, ruas, orto, nivelReno }) -> { malha, altura, grupo, ruas(on) }
 import { decodifica, baixaBin } from './compacta.js';
+import { injetarSombra } from './nuvens.js';
 
 // cota da ponta de uma ponte do OSM: a ponta costuma cair na beira do cais, onde o relevo já despenca para o rio
 // (a calçada de montante da Mittlere Brücke começava a 2,2 m, rente à água). Vale o maior entre a ponta e o chão
@@ -169,6 +170,7 @@ float gRelevo = 0.0; // relevo fino da rua (m), só perto da câmera: vira norma
       normal = normalize(abs(det) * normal - sign(det) * (dH.x * r1 + dH.y * r2));
     }
   }`);
+    injetarSombra(s, 'vChaoP');
   };
   const malha = new THREE.Mesh(g, mat);
   malha.receiveShadow = true;
