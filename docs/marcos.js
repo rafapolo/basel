@@ -273,6 +273,75 @@ function texBalmer() {
     g.fillStyle = '#9a9a9a'; g.fillRect(cx - 50, 200, 8, 120); // espada
   });
 }
+// Spalentor (Wikipedia de, conferido em 2026-11-19): torre central de pedra aparente, torres laterais rebocadas, portal
+// baixo de 1473/74 com o brasão de Basel entre dois leões e, acima, a Madonna na lua crescente entre dois profetas, sob
+// baldaquinos (cópias; os originais estão no Historisches Museum); portão de madeira pesado atrás de uma grade levadiça.
+// Desenho da face de fora do portal, w × h metros; `campo`: com as esculturas (lado de fora) ou só o arco (lado da cidade).
+function texSpalenPortal(w, h, campo) {
+  const ppm = 48, W = Math.max(64, Math.round(w * ppm)), H = Math.max(64, Math.round(h * ppm));
+  return tex(W, H, (g) => {
+    const r = mulberry(campo ? 61 : 62), X = (u) => u * ppm, Y = (v) => H - v * ppm;
+    // cantaria: blocos de 0,9 × 0,45 m em arenito acinzentado, junta clara
+    g.fillStyle = '#8f7a6a'; g.fillRect(0, 0, W, H);
+    for (let y = 0; y < h; y += 0.45) for (let x = -((y / 0.45) % 2) * 0.45; x < w; x += 0.9) {
+      const k = r(); g.fillStyle = `rgb(${140 + k * 30 | 0},${118 + k * 24 | 0},${100 + k * 22 | 0})`;
+      g.fillRect(X(x) + 1, Y(y + 0.45) + 1, 0.9 * ppm - 2, 0.45 * ppm - 2);
+    }
+    // arco do portão: 3,6 m de vão, 5 m até o fecho; porta de madeira e, na frente (lado de fora), a grade levadiça
+    const cx = w / 2, vao = Math.min(3.6, w * 0.6), ya = Math.min(3.4, h * 0.45), raio = vao / 2;
+    g.fillStyle = '#b8a48c'; g.beginPath(); g.moveTo(X(cx - raio - 0.4), Y(0)); g.lineTo(X(cx - raio - 0.4), Y(ya)); g.arc(X(cx), Y(ya), (raio + 0.4) * ppm, Math.PI, 0); g.lineTo(X(cx + raio + 0.4), Y(0)); g.fill();
+    g.fillStyle = '#4a2f1d'; g.beginPath(); g.moveTo(X(cx - raio), Y(0)); g.lineTo(X(cx - raio), Y(ya)); g.arc(X(cx), Y(ya), raio * ppm, Math.PI, 0); g.lineTo(X(cx + raio), Y(0)); g.fill();
+    g.strokeStyle = 'rgba(20,12,6,0.6)'; g.lineWidth = 2;
+    for (let x = cx - raio + 0.25; x < cx + raio; x += 0.25) { g.beginPath(); g.moveTo(X(x), Y(0)); g.lineTo(X(x), Y(ya + Math.sqrt(Math.max(0, raio * raio - (x - cx) ** 2)))); g.stroke(); }
+    g.fillStyle = '#2a2a2a'; for (const y of [0.9, 2.4]) g.fillRect(X(cx - raio), Y(y + 0.08), vao * ppm, 0.08 * ppm); // ferragens
+    if (campo) { // grade levadiça na frente da porta
+      g.strokeStyle = '#1b1b1b'; g.lineWidth = 5;
+      for (let x = cx - raio + 0.3; x < cx + raio; x += 0.45) { g.beginPath(); g.moveTo(X(x), Y(0.9)); g.lineTo(X(x), Y(ya + Math.sqrt(Math.max(0, raio * raio - (x - cx) ** 2)) - 0.05)); g.stroke(); }
+      for (let y = 1.2; y < ya + raio; y += 0.5) { const d = Math.sqrt(Math.max(0, raio * raio - Math.max(0, y - ya) ** 2)); g.beginPath(); g.moveTo(X(cx - d), Y(y)); g.lineTo(X(cx + d), Y(y)); g.stroke(); }
+    }
+  });
+}
+// esculturas da face do campo, num painel de fundo transparente (4,4 × 6,4 m): brasão de Basel com dois leões embaixo e, em
+// cima, a Madonna na lua crescente entre dois profetas, cada um num nicho com baldaquino
+function texSpalenEsculturas() {
+  const ppm = 64, w = 4.4, h = 6.4, W = w * ppm, H = h * ppm;
+  const t = tex(W, H, (g) => {
+    const X = (u) => u * ppm, Y = (v) => H - v * ppm, cx = w / 2;
+    // brasão e leões
+    const vb = 1.0;
+    g.fillStyle = '#c9a13b'; g.beginPath(); g.moveTo(X(cx - 0.55), Y(vb + 0.65)); g.lineTo(X(cx + 0.55), Y(vb + 0.65)); g.lineTo(X(cx + 0.55), Y(vb - 0.1)); g.quadraticCurveTo(X(cx + 0.55), Y(vb - 0.65), X(cx), Y(vb - 0.85)); g.quadraticCurveTo(X(cx - 0.55), Y(vb - 0.65), X(cx - 0.55), Y(vb - 0.1)); g.fill();
+    g.fillStyle = '#f1ece0'; g.beginPath(); g.moveTo(X(cx - 0.45), Y(vb + 0.55)); g.lineTo(X(cx + 0.45), Y(vb + 0.55)); g.lineTo(X(cx + 0.45), Y(vb - 0.1)); g.quadraticCurveTo(X(cx + 0.45), Y(vb - 0.55), X(cx), Y(vb - 0.72)); g.quadraticCurveTo(X(cx - 0.45), Y(vb - 0.55), X(cx - 0.45), Y(vb - 0.1)); g.fill();
+    g.fillStyle = '#151515'; g.fillRect(X(cx - 0.06), Y(vb + 0.35), X(0.12), X(0.9)); g.lineWidth = 7; g.strokeStyle = '#151515'; g.beginPath(); g.arc(X(cx + 0.06), Y(vb + 0.33), 0.18 * ppm, Math.PI, 0.2 * Math.PI, true); g.stroke();
+    g.fillStyle = '#b5a07c';
+    for (const s of [-1, 1]) { // leões de pé, segurando o escudo
+      g.beginPath(); g.ellipse(X(cx + s * 0.95), Y(vb), 0.3 * ppm, 0.55 * ppm, s * 0.25, 0, 7); g.fill();
+      g.beginPath(); g.ellipse(X(cx + s * 0.8), Y(vb + 0.62), 0.24 * ppm, 0.22 * ppm, 0, 0, 7); g.fill();
+      g.fillRect(X(cx + s * 0.95 - 0.1), Y(vb - 0.5), 0.2 * ppm, 0.5 * ppm);
+    }
+    // três figuras em nichos
+    const vm = 2.2;
+    for (const [du, alta] of [[-1.5, 2.6], [0, 3.2], [1.5, 2.6]]) {
+      const u = cx + du;
+      g.fillStyle = 'rgba(70,55,45,0.85)'; g.fillRect(X(u - 0.55), Y(vm + alta + 0.35), 1.1 * ppm, (alta + 0.45) * ppm);
+      g.fillStyle = '#b8a78c'; g.beginPath(); g.moveTo(X(u - 0.65), Y(vm + alta + 0.35)); g.lineTo(X(u), Y(vm + alta + 1.0)); g.lineTo(X(u + 0.65), Y(vm + alta + 0.35)); g.fill();
+      g.fillRect(X(u - 0.6), Y(vm), 1.2 * ppm, 0.12 * ppm); // mísula
+      g.fillStyle = du === 0 ? '#dccdae' : '#cbbb9c';
+      g.beginPath(); g.moveTo(X(u - 0.36), Y(vm + 0.1)); g.lineTo(X(u + 0.36), Y(vm + 0.1)); g.lineTo(X(u + 0.2), Y(vm + alta - 0.4)); g.lineTo(X(u - 0.2), Y(vm + alta - 0.4)); g.fill();
+      g.beginPath(); g.ellipse(X(u), Y(vm + alta - 0.2), 0.17 * ppm, 0.2 * ppm, 0, 0, 7); g.fill();
+      if (du === 0) {
+        g.strokeStyle = '#d6b456'; g.lineWidth = 6; g.beginPath(); g.arc(X(u), Y(vm + 0.35), 0.42 * ppm, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); // lua
+        g.beginPath(); g.arc(X(u), Y(vm + alta - 0.2), 0.3 * ppm, 0, 7); g.stroke(); // auréola
+        g.fillStyle = '#e4d4b4'; g.beginPath(); g.ellipse(X(u + 0.16), Y(vm + alta * 0.62), 0.12 * ppm, 0.15 * ppm, 0, 0, 7); g.fill(); // o Menino
+      }
+    }
+  });
+  return t;
+}
+// reboco claro das torres laterais (verputzt), com manchas
+function texReboco(cor, seed = 71) {
+  return tex(128, 128, (g) => { const r = mulberry(seed); g.fillStyle = cor; g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${r() > 0.5 ? '255,250,240' : '70,55,40'},${r() * 0.06})`; g.fillRect(r() * 128, r() * 128, 2 + r() * 10, 2 + r() * 8); } });
+}
 // telha vidrada do Münster: losangos concêntricos amarelo, vermelho, verde, preto; telhas de 8 px
 function texTelhaVidrada() {
   const N = 256, paleta = ['#c9a844', '#8f3a2a', '#3d6a52', '#2b2a2d', '#3d6a52', '#8f3a2a'];
@@ -429,7 +498,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     for (const [i, [sx, sz, n]] of soma) { const d = Math.hypot(sx / n - 29.7, sz / n + 190.6); if (d < d0) { d0 = d; melhor = i; } }
     return melhor;
   })();
-  const EG = { munster: 243009807, rathaus: 440080, martin: 243009202, peter: 243010854, leonhard: 243008474 };
+  const EG = { munster: 243009807, rathaus: 440080, martin: 243009202, peter: 243010854, leonhard: 243008474, spalen: 243013263 };
   const RUG = ruido();
   const pmrem = new THREE.PMREMGenerator(renderer);
   const ENV = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -445,6 +514,8 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     rosace: std(texRosace(), { roughness: 0.4, envMap: ENV, envMapIntensity: 0.6 }),
     rathaus: std(texRathaus()),
     rathausFrente: std(texRathausFrente()),
+    pedraSp: std(texPedra({ cw: 4, ch: 4, cor: '#9a8070', seed: 63 })),
+    rebocoSp: std(texReboco('#cdbfa4')),
     brasoes: std(texBrasoes(), { roughness: 0.5 }),
     balmer: std(texBalmer()),
     telhaR: std(texTelha('#8d4a34', 4)),
@@ -459,7 +530,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     ouro: new THREE.MeshStandardMaterial({ color: 0xc9a13b, roughness: 0.3, metalness: 0.85, envMap: ENV, envMapIntensity: 1.1 }),
     relogio: new THREE.MeshStandardMaterial({ map: texRelogio(), roughness: 0.4, metalness: 0.2, envMap: ENV, envMapIntensity: 0.5 }),
   };
-  for (const k of ['rathaus', 'rathausFrente', 'brasoes', 'balmer', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha', 'ferro']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
+  for (const k of ['pedraSp', 'rebocoSp', 'rathaus', 'rathausFrente', 'brasoes', 'balmer', 'telhaR', 'telhaI', 'pedraN', 'pedraNJ', 'pedraL', 'pedraLJ', 'flecha', 'ferro']) mats[k].side = THREE.DoubleSide; // o LOD2 tem triângulos com giro invertido
   let cotaMittlere = null;
   const raiz = new THREE.Group();
   raiz.name = 'marcos';
@@ -652,6 +723,72 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
   }
   igreja('Martinskirche', ids(EG.martin), um(EG.martin), { cx: -72.7, cz: -57.4, r: 5.2, ang: Math.atan2(0.367, -0.93), s: 7.2, flecha: 17, tambor: 5 }, 'pedraN', 'pedraNJ');
   igreja('Peterskirche', ids(EG.peter), um(EG.peter), { cx: -296.7, cz: -113.1, r: 5.2, ang: 0, s: 6.8, flecha: 14, tambor: 4 }, 'pedraN', 'pedraNJ');
+  // =====================================================================================================
+  // Spalentor: o LOD2 tem a forma certa; trocam-se os materiais e entram as duas faces do portal desenhadas
+  // =====================================================================================================
+  if (ids(EG.spalen).length) {
+    const ts = triangulos(ids(EG.spalen));
+    const m = novo(); m.y0 = yMin(ts);
+    // as torres laterais: os dois grupos de vértices mais altos fora do eixo (do LOD2: em (−601, 38) e (−608, 50))
+    const T = [[-601, 38], [-608, 50]], RT = 4.3, lateral = (v) => T.some(([x, z]) => Math.hypot(v.x - x, v.z - z) < RT);
+    const y0 = m.y0, yPortal = y0 + 9; // o portal (Vortor) é a parte baixa, até ~8 m
+    const faces = [], lat = [], resto = [];
+    for (const t of ts) {
+      const tr = tri(t), n = tr[1].clone().sub(tr[0]).cross(tr[2].clone().sub(tr[0]));
+      if (n.lengthSq() < 1e-9) continue; n.normalize();
+      if (Math.abs(n.y) < 0.2 && tr.every((v) => v.y < yPortal) && !tr.some(lateral)) faces.push({ t, n, tr });
+      else if (tr.every(lateral)) lat.push(t); else resto.push(t);
+    }
+    // faces do portal perpendiculares ao eixo do portão: as duas maiores; a de fora é a mais a oeste (longe do centro)
+    const grupos = [];
+    for (const f of faces) {
+      let gq = grupos.find((G) => Math.abs(G.n.dot(f.n)) > 0.96 && Math.abs(G.n.dot(f.tr[0]) - G.d) < 0.6);
+      if (!gq) grupos.push((gq = { n: f.n.clone(), d: f.n.dot(f.tr[0]), fs: [], area: 0 }));
+      gq.fs.push(f); gq.area += f.tr[1].clone().sub(f.tr[0]).cross(f.tr[2].clone().sub(f.tr[0])).length() / 2;
+    }
+    grupos.sort((a, b) => b.area - a.area);
+    const usados = new Set();
+    // o portão atravessa a ~33° do leste (no LOD2, a face do arco tem normal (0,84; 0,54)); só a face de fora (campo) é baixa
+    // o bastante para entrar aqui: a do lado da cidade é a própria torre central
+    const eixo = new THREE.Vector3(0.84, 0, 0.54).normalize();
+    const portais = grupos.filter((G) => Math.abs(G.n.dot(eixo)) > 0.9 && G.area > 8).slice(0, 2);
+    const cx = (G) => G.fs.reduce((s, f) => s + f.tr[0].x + f.tr[1].x + f.tr[2].x, 0) / (3 * G.fs.length);
+    portais.sort((a, b) => cx(a) - cx(b)); // o primeiro, mais a oeste, é o lado do campo
+    portais.forEach((G, k) => {
+      const nf = G.n.clone().setY(0).normalize(), tg = new THREE.Vector3(-nf.z, 0, nf.x);
+      const pts = G.fs.flatMap((f) => f.tr), us = pts.map((v) => v.dot(tg)), u0 = Math.min(...us), w = Math.max(...us) - u0, h = Math.max(...pts.map((v) => v.y)) - y0;
+      // a face fica 3 cm para fora do lado em que ela olha (o lado de fora do sólido, longe do centro do portão)
+      const cxz = new THREE.Vector3(ts.reduce((s, t) => s + tri(t)[0].x, 0) / ts.length, 0, ts.reduce((s, t) => s + tri(t)[0].z, 0) / ts.length);
+      const fora = Math.sign(nf.dot(pts[0].clone().sub(cxz).setY(0))) || 1;
+      const nome = `spalenPortal${k}`; mats[nome] = std(texSpalenPortal(w, h, k === 0)); mats[nome].side = THREE.DoubleSide;
+      const pos = [], uv = [];
+      for (const f of G.fs) { usados.add(f.t); for (const v of f.tr) { pos.push(v.x + nf.x * 0.03 * fora, v.y, v.z + nf.z * 0.03 * fora); uv.push((v.dot(tg) - u0) / w, (v.y - y0) / h); } }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
+      (m.mundo[nome] ??= []).push(g);
+    });
+    for (const f of faces) if (!usados.has(f.t)) resto.push(f.t);
+    // painel das esculturas na face da torre central virada para o campo (−eixo), logo acima do telhado do portal
+    {
+      const cen = new THREE.Vector3(); let nC = 0, dMin = Infinity;
+      for (const t of resto) { const tr = tri(t), n = tr[1].clone().sub(tr[0]).cross(tr[2].clone().sub(tr[0])).normalize();
+        if (Math.abs(n.y) < 0.2 && Math.abs(n.dot(eixo)) > 0.9 && tr.every((v) => v.y > y0 + 9 && v.y < y0 + 26) && !tr.some(lateral)) {
+          for (const v of tr) { const d = v.dot(eixo); if (d < dMin - 0.3) { dMin = d; cen.set(0, 0, 0); nC = 0; } if (Math.abs(d - dMin) < 0.3) { cen.add(v); nC++; } } } }
+      if (nC) {
+        cen.divideScalar(nC);
+        const q = new THREE.PlaneGeometry(4.4, 6.4), tg = new THREE.Vector3(-eixo.z, 0, eixo.x);
+        q.applyMatrix4(new THREE.Matrix4().makeBasis(tg.clone().negate(), new THREE.Vector3(0, 1, 0), eixo.clone().negate()));
+        q.translate(cen.x - eixo.x * 0.06, y0 + 9.6 + 3.2, cen.z - eixo.z * 0.06);
+        mats.spalenEsc = std(texSpalenEsculturas(), { transparent: true, alphaTest: 0.4 }); mats.spalenEsc.side = THREE.DoubleSide;
+        (m.mundo.spalenEsc ??= []).push(q);
+      }
+    }
+    recapeia(m, lat, null, 'rebocoSp', 'pedraSp', 4, 4);     // torres laterais rebocadas; o topo das ameias em pedra
+    // a flecha da torre central é tão íngreme que a normal a classificaria como parede: tudo acima do beiral (~27,5 m) é telhado
+    const yBeiral = y0 + 27.5, flecha = resto.filter((t) => tri(t).every((v) => v.y > yBeiral)), corpo = resto.filter((t) => !flecha.includes(t));
+    recapeia(m, corpo, null, 'pedraSp', 'telhaV', 4, 4);     // torre central e portal em pedra
+    if (flecha.length) (m.mundo.telhaV ??= []).push(uvMetros(new THREE.BufferGeometry().setFromPoints(flecha.flatMap(tri)), 3, 3)); // telha vidrada colorida
+    fecha(m, 'Spalentor', um(EG.spalen));
+  }
   igreja('Leonhardskirche', ids(EG.leonhard), um(EG.leonhard), { cx: -100.5, cz: 365, r: 5.8, ang: Math.atan2(-0.297, 0.955), s: 7.4, flecha: 15, tambor: 5 }, 'pedraL', 'pedraLJ');
 
   // =====================================================================================================
