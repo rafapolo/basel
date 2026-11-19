@@ -120,8 +120,20 @@ function criarBici() {
   for (const s of [-1, 1]) g.add(tubo([s * 0.17, 1.42, 0.02], [s * 0.24, 1.04, 0.36], 0.04, roupa));
   const pernas = [];
   for (const s of [-1, 1]) { const p = tubo([0, 0, 0], [0, 1, 0], 0.055, calca); g.add(p); pernas.push({ m: p, s }); }
+  // luzes: farol baixo no guidão (cone de luz para a frente e para baixo) e lanterna vermelha no bagageiro; as lentes
+  // brilham (emissivas) e as luzes de verdade ficam sempre na cena, com intensidade 0 de dia (ligar e desligar uma luz
+  // obriga o three a recompilar todos os materiais)
+  const lenteF = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xfff3d6, emissiveIntensity: 0 });
+  const lenteT = new THREE.MeshStandardMaterial({ color: 0x3a0505, emissive: 0xff1a10, emissiveIntensity: 0 });
+  const farolM = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.07, 12).rotateX(Math.PI / 2), lenteF); farolM.position.set(0, 0.93, 0.46);
+  const rack = tubo([0, 0.74, -0.2], [0, 0.74, -0.68], 0.012, preto);
+  const lanternaM = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.025), lenteT); lanternaM.position.set(0, 0.72, -0.7);
+  const farol = new THREE.SpotLight(0xfff1d0, 0, 38, 0.42, 0.55, 1.4);
+  farol.position.set(0, 0.95, 0.5); farol.target.position.set(0, -0.6, 7); // farol baixo: ilumina o chão à frente, não a parede farol.castShadow = false;
+  const lanterna = new THREE.PointLight(0xff2010, 0, 5, 2); lanterna.position.set(0, 0.72, -0.78);
+  g.add(farolM, rack, lanternaM, farol, farol.target, lanterna);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.userData = { rodas, pedivela, pernas, R0, pedal, selim };
+  g.userData = { rodas, pedivela, pernas, R0, pedal, selim, luzes: { farol, lanterna, lenteF, lenteT } };
   return g;
 }
 const vA = new THREE.Vector3(), vB = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
@@ -230,7 +242,13 @@ function proximoAlvo() {
 
 function iniciar() {
   if (ativo || window.tour?.ativo()) return;
-  if (C.rua()) C.sairRua();
+  // a pé na vista de rua: a bici aparece onde se está, virada para onde se olha
+  let aqui = null;
+  if (C.rua()) {
+    const p = camera.position, d = new THREE.Vector3(); camera.getWorldDirection(d);
+    aqui = { x: p.x, z: p.z, rumo: Math.atan2(d.x, d.z) };
+    C.sairRua(false);
+  }
   if (!ocup) montarGrade();
   if (!bici) { bici = criarBici(); farol = criarFarol(); C.cena.add(bici, farol); }
   bici.visible = farol.visible = true;
@@ -244,12 +262,14 @@ function iniciar() {
   if (retoma) { S.t0 += performance.now() - pausa; S.v = 0; proximoAlvo(); farol.visible = S.alvo < ALVOS.length; }
   else largada();
   pausa = null;
+  if (aqui && !bloqueado(aqui.x, aqui.z)) { Object.assign(S, aqui, { v: 0 }); S.y = piso(S.x, S.z).y; }
   const melhor = lerMelhor();
   $('jogo-ajuda').innerHTML = t('W/S ou ↑/↓ pedala e freia · A/D ou ←/→ vira · B campainha · V câmera · Esc sai (o botão retoma) · cuidado com bondes, carros e o Reno',
     'W/S or ↑/↓ pedal and brake · A/D or ←/→ steer · B bell · V camera · Esc exits (the button resumes) · mind trams, cars and the Rhine',
     'W/S oder ↑/↓ treten und bremsen · A/D oder ←/→ lenken · B Klingel · V Kamera · Esc beendet (der Knopf macht weiter) · Achtung vor Trams, Autos und dem Rhein') +
     (melhor ? `<br>${t('melhor tempo', 'best time', 'Bestzeit')}: ${mmss(melhor)}` : '');
-  if (retoma) mensagem(t('De volta à e-bike', 'Back on the e-bike', 'Zurück auf dem E-Bike'), `${S.alvo}/${ALVOS.length} · ${mmss(performance.now() - S.t0)}`, 1800);
+  if (aqui) mensagem(t('E-bike aqui', 'E-bike right here', 'E-Bike genau hier'), t(`siga a seta até ${ALVOS[S.alvo]?.n ?? 'a chegada'}`, `follow the arrow to ${ALVOS[S.alvo]?.n ?? 'the finish'}`, `folgen Sie dem Pfeil zu ${ALVOS[S.alvo]?.n ?? 'dem Ziel'}`), 2200);
+  else if (retoma) mensagem(t('De volta à e-bike', 'Back on the e-bike', 'Zurück auf dem E-Bike'), `${S.alvo}/${ALVOS.length} · ${mmss(performance.now() - S.t0)}`, 1800);
   else mensagem(t('E-bike vermelha na Mittlere Brücke', 'Red e-bike on the Mittlere Brücke', 'Rotes E-Bike auf der Mittleren Brücke'),
     t(`Passe pelos ${ALVOS.length} lugares; siga a seta e a luz dourada.`, `Ride through all ${ALVOS.length} places; follow the arrow and the golden light.`, `Fahren Sie alle ${ALVOS.length} Orte an; folgen Sie dem Pfeil und dem goldenen Licht.`), 3800);
   tAnt = performance.now();
@@ -351,6 +371,10 @@ function passo(agora) {
   const pedalada = tecla.frente || Math.abs(S.v) > 0.3 ? S.fase * 0.55 : bici.userData.pedivela.rotation.x;
   bici.userData.pedivela.rotation.x = pedalada;
   animarPernas(bici, pedalada);
+  // ---- luzes: acendem sozinhas ao anoitecer (uNoite vai de 0 a 1 devagar) ----
+  { const n = THREE.MathUtils.smoothstep(C.U.uNoite.value, 0.25, 0.6), L = bici.userData.luzes;
+    L.farol.intensity = 26 * n; L.lanterna.intensity = 2.5 * n;
+    L.lenteF.emissiveIntensity = 2.2 * n; L.lenteT.emissiveIntensity = (1.4 + 0.6 * (tecla.tras ? 1 : 0)) * n; } // freio: a lanterna brilha mais
   // ---- alvo ----
   const a = ALVOS[S.alvo];
   if (a) {
