@@ -167,7 +167,7 @@ def main():
     dz_predio, folga = chao.pes_dos_predios(dem, dem_e0, dem_n1, pegadas, bases)
     print(f"base acima do chão ao redor: {(folga > 0.05).sum()} prédios (> 5 cm), {(folga > 0.5).sum()} (> 0,5 m), "
           f"{(folga > 2).sum()} (> 2 m); mediana {np.median(folga):.2f} m (o sólido desce ~3 m abaixo do chão)")
-    terreno_meta = chao.grava_terreno(dem, SAIDA, 0.35)  # 0,25 m no recorte antigo; 0,35 m tira ~0,9 MB da abertura no novo
+    terreno_meta = chao.grava_terreno(dem, SAIDA, 0.5)  # 0,25 m na Altstadt; 0,5 m no recorte de 3,4 km (abertura < 8 MB)
     print(f"terreno: {terreno_meta['nv']} vértices, {terreno_meta['nt']} triângulos, "
           f"{(SAIDA / 'terreno.v2.bin').stat().st_size / 1e6:.2f} MB")
     pts = points(vivos["gkode"].to_numpy(), vivos["gkodn"].to_numpy())
@@ -279,7 +279,7 @@ def main():
             linhas.append({"t": tg["highway"], "c": coords, **({"n": tg["name"]} if "name" in tg else {}),
                            **({"ponte": 1} if tg.get("bridge") else {})})
 
-    meio_fio, est_ruas = chao.mascaras(osm, pegadas, ORIGEM_E, ORIGEM_N, E0, N0, E1, N1, SAIDA, passo=0.6)
+    meio_fio, est_ruas = chao.mascaras(osm, pegadas, ORIGEM_E, ORIGEM_N, E0, N0, E1, N1, SAIDA, passo=0.8)  # máscaras de ruas a 0,8 m/px no recorte de 3,4 km
     print("ruas como áreas:", est_ruas)
     meta = {
         "terreno": terreno_meta,

@@ -74,7 +74,9 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
     async carrega() {
       const meta = await fetch(base + 'ortofoto.json').then((r) => r.json());
       const N = meta.grade, LADO = meta.lado;
-      const tam = Math.min(N * LADO, renderer.capabilities.maxTextureSize, 4096);
+      // 5120 px fora do modo leve (o recorte de 3,4 km a 4096 px ficava com 0,83 m/px); celular e modo leve seguem em 4096
+      const leve = new URLSearchParams(location.search).get('leve') === '1' || matchMedia('(pointer:coarse)').matches;
+      const tam = Math.min(N * LADO, renderer.capabilities.maxTextureSize, leve ? 4096 : 5120);
       const k = tam / (N * LADO);
       const cv = document.createElement('canvas');
       cv.width = cv.height = tam;

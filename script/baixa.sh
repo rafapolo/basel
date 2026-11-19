@@ -22,7 +22,7 @@ for t in 2610-1266 2610-1267 2610-1268 2611-1266 2611-1267 2611-1268; do
   [ -f "data/raw/alti/$f" ] || curl -sfo "data/raw/alti/$f" "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2025_$t/$f"
 done
 (cd data/raw/alti && gdalbuildvrt -q -overwrite alti.vrt swissalti3d_*.tif \
-  && gdalwarp -q -overwrite -te 2609600 1266150 2611900 1268100 -tr 5 5 -r average alti.vrt crop5.tif)
+  && gdalwarp -q -overwrite -te 2609600 1266150 2613000 1268100 -tr 5 5 -r average alti.vrt crop5.tif)
 
 # OSM (ruas, lojas, água, verde, detalhes), com a caixa de script/recorte.py
 (cd script && uv run --with pyproj python baixa_osm.py)

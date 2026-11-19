@@ -7,7 +7,8 @@ import * as THREE from 'three';
 export async function criarRoche({ cena, U, recorte }) {
   const d = await fetch('data/roche.json').then((r) => r.json());
   const k = 1 / d.escala, pos = [], alta = [];
-  for (const p of d.predios) {
+  // só as duas torres: o resto do campus agora está no recorte (predios.json), e as torres de lá ficam escondidas (marcos.js)
+  for (const p of d.predios.filter((q) => /Bau [12]/.test(q.nome || ''))) {
     const v = p.v, t = p.t;
     // giro: o volume assinado diz se o sólido veio do avesso (z = −norte espelha o LV95)
     let vol = 0;

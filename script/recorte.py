@@ -1,13 +1,13 @@
 """Recorte e origem do Basel 3D, num lugar só (todos os scripts importam daqui).
 
-O recorte foi de 1,1 × 1,15 km (Altstadt) a 2,3 × 1,95 km em 2026-11-19: a oeste até a Allschwilerplatz (entradas do
+O recorte foi de 1,1 × 1,15 km (Altstadt) a 3,4 × 1,95 km em 2026-11-19: a leste até as torres da Roche, a oeste até a Allschwilerplatz (entradas do
 GWR em 2609875–2609990 / 1267390–1267410) e ao sul até a estação SBB e a Centralbahnplatz (2611390/1266430).
 
 A ORIGEM fica fixa no centro do recorte antigo: as coordenadas locais já espalhadas pelo código (câmeras, marcos, ponte,
 tour, pontos) continuam valendo. Local: x = E − ORIGEM_E (leste), z = −(N − ORIGEM_N) (sul é +z).
 """
 
-E0, E1 = 2609600.0, 2611900.0  # oeste: 250 m além da Allschwilerplatz, com a Oekolampad (igreja, Gemeindehaus e a Anlage)
+E0, E1 = 2609600.0, 2613000.0  # oeste: 250 m além da Allschwilerplatz, com a Oekolampad (igreja, Gemeindehaus e a Anlage)
 N0, N1 = 1266150.0, 1268100.0
 ORIGEM_E, ORIGEM_N = 2611350.0, 1267525.0
 BASE_Z = 244.0
@@ -32,7 +32,7 @@ def bbox_wgs84(folga_m=60.0):
     return round(la0, 5), round(lo0, 5), round(la1, 5), round(lo1, 5)
 
 # relevo fino (script/chao.py): grade (2^k + 1)² a 0,6 m centrada no meio do recorte (4096 × 0,6 = 2458 m, cobre 2300 × 1950)
-DEM_N = 4097
+DEM_N = 8193  # 8192 × 0,6 = 4915 m: cobre o recorte de 3,4 km até a Roche
 DEM_PASSO = 0.6
 CENTRO_E, CENTRO_N = (E0 + E1) / 2, (N0 + N1) / 2
 

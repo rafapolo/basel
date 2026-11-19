@@ -516,7 +516,8 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     return melhor;
   })();
   const EG = { munster: 243009807, rathaus: 440080, martin: 243009202, peter: 243010854, leonhard: 243008474, spalen: 243013263,
-    barfusser: 243000946, prediger: 243014187, clara: 243016294, elisabeth: 2084811, paulus: 243013506 };
+    barfusser: 243000946, prediger: 243014187, clara: 243016294, elisabeth: 2084811, paulus: 243013506,
+    rocheBau1: 243053964, rocheBau2: 243058129 }; // as torres da Roche: o LOD2 sai, roche.js desenha as faixas brancas
   const RUG = ruido();
   const pmrem = new THREE.PMREMGenerator(renderer);
   const ENV = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;

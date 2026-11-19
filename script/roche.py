@@ -25,7 +25,7 @@ saida = []
 for f in feats:
     faces = f["geometry"]["coordinates"]
     zs = [p[2] for face in faces for anel in face for p in anel]
-    if max(zs) - min(zs) < ALTURA_MIN:
+    if max(zs) - min(zs) < ALTURA_MIN or int(f["properties"].get("EGID") or 0) not in NOMES:  # só as torres (o campus está no recorte desde 2026-11-19)
         continue
     pos, tris = [], []
     for face in faces:

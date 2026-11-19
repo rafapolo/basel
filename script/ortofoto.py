@@ -28,7 +28,7 @@ SAIDA = RAIZ / "docs/data/ortofoto"
 # mesmo recorte e origem de script/predios.py
 from recorte import E0, E1, N0, N1, ORIGEM_E, ORIGEM_N
 
-GRADE = 4          # 4 × 4 tiles
+GRADE = 5          # 5 × 5 tiles (recorte de 3,4 km: 5120 px dão ~0,66 m/px)
 LADO = 1024        # px por tile
 GERAL = 512        # px da visão geral
 QUALIDADE = 72     # WebP
