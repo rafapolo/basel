@@ -44,6 +44,12 @@ function paraMs(data, hora) {
   const [a, m, d] = data.split('-').map(Number);
   return Date.UTC(a, m - 1, d) + (hora - deslocamentoBasel(a, m, d)) * 3600000;
 }
+// agora no fuso de Basel (Europe/Zurich), qualquer que seja o fuso de quem vê
+function agoraEmBasel() {
+  const f = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+    .formatToParts(new Date()).map((p) => [p.type, p.value]));
+  return { data: `${f.year}-${f.month}-${f.day}`, hora: +f.hour + +f.minute / 60 + +f.second / 3600 };
+}
 const hhmm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 
 // ---------- céu Preetham em JS (o mesmo cálculo do shader do Sky, para a névoa) ----------
@@ -108,12 +114,14 @@ function emitir() {
 const ceu = {
   leve: false,
   estado, solEm, nascerPoente,
-  definirHora(h, { animar = false } = {}) {
+  aoVivo: false, // segue o relógio real de Basel até alguém mudar hora, data ou noite
+  definirHora(h, { animar = false, vivo = false } = {}) {
+    if (!vivo) ceu.aoVivo = false;
     h = ((h % 24) + 24) % 24;
     if (animar) { S.deslize = { de: S.hora, para: h, t0: null }; return; }
     S.deslize = null; S.hora = S.alvo = h; emitir();
   },
-  definirData(d) { if (/^\d{4}-\d{2}-\d{2}$/.test(d)) { S.data = d; emitir(); } },
+  definirData(d, { vivo = false } = {}) { if (/^\d{4}-\d{2}-\d{2}$/.test(d)) { if (!vivo) ceu.aoVivo = false; S.data = d; emitir(); } },
   noite(on) {
     const e = estado();
     if (on) { if (e.noite < 0.5) { S.aposNoite = S.hora; ceu.definirHora(22.5, { animar: true }); } }
@@ -127,9 +135,18 @@ window.ceu = ceu;
 export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNormal, leve = false, pixelMax = 1.5 }) {
   ceu.leve = leve;
   const q = new URLSearchParams(location.search);
-  if (q.get('data')) S.data = q.get('data');
-  S.hora = S.alvo = q.get('hora') != null ? +q.get('hora') : q.get('noite') ? 22.5 : 15;
+  // sem ?hora/?data/?noite: abre na hora e na data reais de Basel e acompanha o relógio (a cada 20 s)
+  const agora = agoraEmBasel();
+  S.data = q.get('data') || agora.data;
+  S.hora = S.alvo = q.get('hora') != null ? +q.get('hora') : q.get('noite') ? 22.5 : agora.hora;
   if (q.get('noite')) S.aposNoite = 15;
+  ceu.aoVivo = !q.get('hora') && !q.get('data') && !q.get('noite');
+  setInterval(() => {
+    if (!ceu.aoVivo || S.deslize) return;
+    const a = agoraEmBasel();
+    if (a.data !== S.data) ceu.definirData(a.data, { vivo: true });
+    ceu.definirHora(a.hora, { vivo: true });
+  }, 20000);
   const fundo = cena.background;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1;
