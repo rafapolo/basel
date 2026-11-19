@@ -47,6 +47,38 @@ function mover(alvo, ms, { arco = 0, giro } = {}) {
   anim = requestAnimationFrame(passo);
 }
 
+// caminhada em primeira pessoa: a câmera anda na altura dos olhos (1,7 m sobre o relevo) por uma curva suave pelos
+// pontos dados, olhando um pouco à frente no caminho; nos últimos 30% o olhar vira para `fim` (o Münster). A lente abre
+// para 62° enquanto se anda e volta aos 42° de sempre no fim. controls.target acompanha o olhar: o voo seguinte parte daqui.
+function caminhar(pontos, ms, fim) {
+  cancelAnimationFrame(anim);
+  const cam = C.camera, fov0 = cam.fov;
+  const curva = new THREE.CatmullRomCurve3(pontos.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+  const olho = (u) => { const p = curva.getPointAt(Math.min(1, Math.max(0, u))); p.y = C.altura(p.x, p.z) + 1.7; return p; };
+  const fimV = new THREE.Vector3(...fim), alvo = new THREE.Vector3(), olhar = olho(0.04);
+  const t0 = performance.now();
+  return new Promise((ok) => {
+    const passo = (agora) => {
+      if (!ativo) { cam.fov = fov0; cam.updateProjectionMatrix(); return ok(); }
+      const t = Math.min(1, (agora - t0) / ms);
+      const t1 = Math.min(1, t / 0.9), u = suave(t1) * 0.3 + t1 * 0.7; // quase em velocidade constante, com saída e chegada suaves
+      const p = olho(Math.min(1, u));
+      // olhar: 14 m à frente no caminho, balanço leve do passo; depois vira para o Münster
+      const frente = olho(Math.min(1, u) + 14 / curva.getLength());
+      frente.y = p.y - 0.15 + Math.sin(agora / 260) * 0.05;
+      const vira = THREE.MathUtils.smoothstep(t, 0.7, 0.95);
+      alvo.copy(frente).lerp(fimV, vira);
+      olhar.lerp(alvo, 0.12);
+      cam.fov = fov0 + (62 - fov0) * Math.min(1, t * 6) * (1 - THREE.MathUtils.smoothstep(t, 0.9, 1)); cam.updateProjectionMatrix();
+      cam.position.set(p.x, p.y + Math.abs(Math.sin(agora / 260)) * 0.04, p.z);
+      cam.lookAt(olhar);
+      C.controls.target.copy(olhar);
+      if (t < 1) anim = requestAnimationFrame(passo); else { cam.fov = fov0; cam.updateProjectionMatrix(); ok(); }
+    };
+    anim = requestAnimationFrame(passo);
+  });
+}
+
 // um ano em ms: a data corre de meados de janeiro ao fim de dezembro (ceu.js muda sol, árvores, roupas e quem está
 // na rua), com o mês grande no canto; devolve uma promessa que resolve no fim
 function estacoes(ms, ano) {
@@ -101,65 +133,68 @@ function cenas() {
         `${fmt(E.total)} buildings, one by one; while we fly, the year runs from January to December.`,
         `${fmt(E.total)} Häuser, eines nach dem anderen; während wir fliegen, läuft das Jahr von Januar bis Dezember.`));
     } },
-    // 1 · Münster e Pfalz: volta baixa em torno da catedral
-    { dur: 14000, run: async () => {
-      mover({ alvo: munster, dist: 190, polar: rad(70), az: rad(200) }, 4000, { arco: 0.25 });
+    // 1 · a pé pela Altstadt: Rheinsprung acima, Augustinergasse, até abrir a Münsterplatz (primeira pessoa)
+    { dur: 22000, run: async () => {
+      C.porCamera({ alvo: [70, 12, 46], dist: 60, az: rad(215), polar: rad(55) });
+      mover({ alvo: [44.5, C.altura(44.5, 14) + 1.7, 14], dist: 7, az: rad(222), polar: rad(87) }, 2200); // câmera chega a ~(39,9), no Rheinsprung
+      await legenda(t('A pé · Rheinsprung → Münsterplatz', 'On foot · Rheinsprung → Münsterplatz', 'Zu Fuss · Rheinsprung → Münsterplatz'), t(
+        'Pelas vielas da colina, na altura dos olhos, até a praça da catedral.',
+        'Up the lanes on the hill, at eye level, to the cathedral square.',
+        'Durch die Gassen auf dem Hügel, auf Augenhöhe, bis zum Münsterplatz.'));
+      await em(2200);
+      // traçado do OSM: Rheinsprung (de 38,8/7,8), Augustinergasse, Münsterplatz até o meio da praça
+      const p0 = C.camera.position;
+      await caminhar([[p0.x, p0.z], [54.3, 26.0], [68.4, 43.7], [77.7, 55.0], [94.1, 75.1], [102.9, 86.1], [111.1, 97.6], [120.5, 112.4], [124.9, 125.0], [130.6, 144.6], [139.5, 164.3], [154.4, 188.8], [160, 198]], 19300, [munster[0], 26, munster[2]]);
+    } },
+    // 2 · Münster e Pfalz: da praça, sobe em volta da catedral
+    { dur: 12000, run: async () => {
+      mover({ alvo: munster, dist: 170, polar: rad(68), az: rad(200) }, 4500, { arco: 0.2 });
       await legenda('Münster · Pfalz', t(
         'O Münster de arenito vermelho e o terraço da Pfalz, uns 20 m acima do Reno.',
         'The red sandstone Münster and the Pfalz terrace, some 20 m above the Rhine.',
         'Das Münster aus rotem Sandstein und die Pfalz, rund 20 m über dem Rhein.'));
-      await em(4000);
-      mover({ dist: 150 }, 10000, { giro: 140 });
-    } },
-    // 2 · pelas vielas acima do Reno: Museum der Kulturen → Martinskirche (Rheinsprung)
-    { dur: 13000, run: async () => {
-      mover({ alvo: kulturen, dist: 120, polar: rad(74), az: rad(250) }, 4000);
-      await legenda('Rheinsprung · Martinskirche', t(
-        'Ruas estreitas na colina entre o Münster e a Martinskirche, a mais antiga paróquia da cidade.',
-        'Narrow lanes on the hill between the Münster and the Martinskirche, the city’s oldest parish church.',
-        'Enge Gassen auf dem Hügel zwischen Münster und Martinskirche, der ältesten Pfarrkirche der Stadt.'));
-      await em(4000);
-      mover({ alvo: martin, dist: 110, polar: rad(72), az: rad(300) }, 9000);
+      await em(4500);
+      mover({ dist: 150 }, 7500, { giro: 110 });
     } },
     // 3 · Mittlere Brücke e Käppelijoch, atravessando para Kleinbasel
-    { dur: 14000, run: async () => {
+    { dur: 12000, run: async () => {
       mover({ alvo: [25, 10, -204], dist: 140, polar: rad(68), az: rad(120) }, 4500, { arco: 0.2 });
       await legenda('Mittlere Brücke · Käppelijoch', t(
         'A ponte de pedra e a capelinha no meio dela; os bondes verdes e amarelos rodam pelo horário de verdade.',
         'The stone bridge and the little chapel at its middle; the green and yellow trams run on the real timetable.',
         'Die Steinbrücke mit dem Kapellchen in der Mitte; die grünen und gelben Trams fahren nach dem echten Fahrplan.'));
       await em(4500);
-      mover({ alvo: [80, 6, -250], dist: 120, polar: rad(74) }, 9500, { giro: 90 });
+      mover({ alvo: [80, 6, -250], dist: 120, polar: rad(74) }, 7500, { giro: 80 });
     } },
     // 4 · Kleinbasel: Rheinbord e Clarastrasse
-    { dur: 12000, run: async () => {
+    { dur: 11000, run: async () => {
       mover({ alvo: [192, 4, -172], dist: 160, polar: rad(70), az: rad(20) }, 4000);
       await legenda('Kleinbasel · Rheinbord', t(
         'Gente sentada nos degraus do Reno; a Clarastrasse sobe da margem até a Claraplatz.',
         'People sitting on the Rhine steps; the Clarastrasse runs up from the bank to the Claraplatz.',
         'Menschen auf den Rheinstufen; die Clarastrasse führt vom Ufer hinauf zum Claraplatz.'));
       await em(4000);
-      mover({ alvo: [355, 6, -367], dist: 170, polar: rad(66) }, 8000, { giro: 60 });
+      mover({ alvo: [355, 6, -367], dist: 170, polar: rad(66) }, 7000, { giro: 55 });
     } },
     // 5 · o Reno: voo baixo rio abaixo, da Wettsteinbrücke até depois da Mittlere
-    { dur: 14000, run: async () => {
+    { dur: 12000, run: async () => {
       mover({ alvo: [420, 0, 120], dist: 220, polar: rad(76), az: rad(60) }, 4000, { arco: 0.3 });
       await legenda('Rhein', t(
         'No verão, a gente desce o rio nadando; as balsas cruzam presas a um cabo, levadas só pela corrente.',
         'In summer people swim downstream; the ferries cross on a cable, pushed by the current alone.',
         'Im Sommer schwimmt man den Rhein hinunter; die Fähren hängen an einem Seil und fahren nur mit der Strömung.'));
       await em(4000);
-      mover({ alvo: [-260, 0, -430], dist: 240, polar: rad(74), az: rad(140) }, 10000);
+      mover({ alvo: [-260, 0, -430], dist: 240, polar: rad(74), az: rad(140) }, 8000);
     } },
     // 6 · Marktplatz e Rathaus
-    { dur: 14000, run: async () => {
+    { dur: 13000, run: async () => {
       mover({ alvo: rathaus, dist: 200, polar: rad(62), az: rad(250) }, 4500, { arco: 0.25 });
       await legenda('Marktplatz · Rathaus', t(
         'A prefeitura vermelha e a praça do mercado, com as rodinhas de gente.',
         'The red town hall and the market square, with people standing around.',
         'Das rote Rathaus und der Marktplatz, mit Leuten, die zusammenstehen.'));
       await em(4500);
-      mover({ dist: 160 }, 9500, { giro: 100 });
+      mover({ dist: 160 }, 8500, { giro: 90 });
     } },
     // 7 · Barfüsserplatz e St. Leonhard
     { dur: 13000, run: async () => {
@@ -172,7 +207,7 @@ function cenas() {
       mover({ alvo: leonhard, dist: 170, polar: rad(66) }, 9000, { giro: 70 });
     } },
     // 8 · final: sobe e dá a volta na cidade enquanto anoitece; termina na vista da Pfalz
-    { dur: 14000, run: async () => {
+    { dur: 13000, run: async () => {
       mover({ alvo: [40, 0, -20], dist: 900, polar: rad(55) }, 7000, { giro: 160 });
       await legenda(t('Basel · dados abertos', 'Basel · open data', 'Basel · offene Daten'), t(
         'swisstopo, o registro federal de prédios via data.bs.ch, o OpenStreetMap e o tempo de agora. Clique em qualquer prédio.',
@@ -180,7 +215,7 @@ function cenas() {
         'swisstopo, das eidgenössische Gebäuderegister via data.bs.ch, OpenStreetMap und das Wetter von heute. Klicken Sie auf ein Haus.'));
       await em(6000);
       C.definirNoite(true);
-      mover(C.VISTA_PFALZ, 7500, { arco: 0.15 });
+      mover(C.VISTA_PFALZ, 7000, { arco: 0.15 });
     } },
   ];
 }
