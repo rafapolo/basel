@@ -63,7 +63,7 @@ for (const f of [...CLASSICOS, 'cidade.js']) {
 // pedaços importados estaticamente pelo cidade.js (o three entre eles): o navegador os pede já, sem esperar o parse
 const entrada = readFileSync(join(DIST, 'cidade.js'), 'utf-8');
 const estaticos = [...new Set([...entrada.matchAll(/(?:^|[;}\s])import\s*(?:[^'"()]*?from\s*)?["'](\.\/js\/[^"']+)["']/g)].map((m) => m[1]))];
-const ABERTURA = ['data/predios.json', 'data/ruas.json', 'data/relevo.bin', ...MALHAS.map((m) => (comGz ? m + '.gz' : m))];
+const ABERTURA = ['data/predios.json', 'data/ruas.json', 'data/relevo.bin', 'data/entorno.json', 'data/entorno.bin', ...MALHAS.map((m) => (comGz ? m + '.gz' : m))];
 const pre = [
   ...estaticos.map((u) => `<link rel="modulepreload" href="${u}">`),
   ...ABERTURA.map((u) => `<link rel="preload" href="${u}" as="fetch" crossorigin>`),

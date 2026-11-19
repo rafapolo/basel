@@ -712,7 +712,7 @@ uniform float uVidaT; uniform float uAnima;`)
     aves.instanceMatrix.needsUpdate = true;
   }
   // nadadores (Wickelfisch laranja ou amarelo, touca de cor)
-  const NNAD = leve ? 12 : 36;
+  const NNAD = leve ? 400 : 2000; // no auge do verão, milhares descem o Reno (o "Rheinschwimmen"); de resto, poucos
   const geoNad = unir([
     { g: mat4(new THREE.SphereGeometry(0.1, 6, 5), 0, 0.0, 0.18), parte: 0 },
     { g: mat4(new THREE.SphereGeometry(0.105, 6, 4, 0, TAU, 0, Math.PI * 0.55), 0, 0.01, 0.175), parte: 4 },
@@ -737,7 +737,11 @@ uniform float uVidaT; uniform float uAnima;`)
   }
   const nadoQuer = () => {
     const dia = S.diaAno, verao = suave(170, 190, dia) * (1 - suave(300, 320, dia)); // meados de maio a fim de setembro (dia = mês·31 + dia)
-    return verao * suave(8, 11, hora()) * (1 - suave(19, 21.5, hora())) * suave(18, 30, S.alt ?? 40) * (S.dia === 'util' ? 0.75 : 1);
+    // auge: julho e agosto (dia ~ 217–278), à tarde; fora dele uns poucos por cento. Ao vivo, o calor de agora pesa
+    const auge = suave(205, 225, dia) * (1 - suave(270, 290, dia)), tarde = suave(11, 14, hora()) * (1 - suave(19, 21, hora()));
+    const temp = window.nuvens?.vivo && window.TEMPO_BASEL ? lim((window.TEMPO_BASEL.temp - 18) / 12, 0.05, 1) : 1;
+    const base = verao * suave(8, 11, hora()) * (1 - suave(19, 21.5, hora())) * suave(18, 30, S.alt ?? 40) * (S.dia === 'util' ? 0.75 : 1);
+    return base * (0.02 + 0.98 * auge * tarde) * temp;
   };
   function nadadores(dt, quer) {
     const n = Math.round(NNAD * quer);

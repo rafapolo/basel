@@ -15,6 +15,7 @@ import { decodifica, baixaBin } from './compacta.js';
 import { atualizarNuvens, TEMPO } from './nuvens.js';
 import { injetarNeve, atualizarNeve } from './neve.js';
 import { criarRoche } from './roche.js';
+import { criarEntorno } from './entorno.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -527,7 +528,7 @@ function quadro(agora) {
   if (!(typeof window.tour?.ativo === "function" && window.tour.ativo()) && !window.jogo?.ativo()) controls.update();
   // nunca abaixo do chão nem dentro do Reno: a câmera fica ao menos 1,5 m acima do relevo (ou da água)
   { const p = camera.position, T = meta.terreno, L = (T.nvlado ?? 2048) * T.passo;
-    const fora = p.x < T.x0 || p.z < T.z0 || p.x > T.x0 + L || p.z > T.z0 + L, h = fora ? (ROCHE && Math.hypot(p.x - 1300, p.z + 180) < 380 ? 8 : 0) : altura(p.x, p.z); // fora: o disco de chão da Roche (roche.js), em 8 m
+    const fora = p.x < T.x0 || p.z < T.z0 || p.x > T.x0 + L || p.z > T.z0 + L, h = fora ? (ENTORNO ? ENTORNO.altura(p.x, p.z) : 0) : altura(p.x, p.z); // fora: o relevo do entorno
     const piso = Math.max(Number.isFinite(h) ? h : 0, AGUA.nivel) + 1.5;
     if (p.y < piso) p.y = piso;
     const t = controls.target, pisoT = altura(t.x, t.z) - 2; if (t.y < pisoT) t.y = pisoT; }
@@ -568,7 +569,9 @@ function quadro(agora) {
   AGUA.atualizar(agora);
   ceu.render();
 }
-// torres da Roche e o chão além do recorte (roche.js)
+// entorno (entorno.js): o chão em volta e o Reno da fronteira alemã à francesa; a cidade não termina mais numa borda
+const ENTORNO = q.get('entorno') === '0' ? null : await criarEntorno({ cena }).catch(() => null);
+// torres da Roche (roche.js)
 const ROCHE = q.get('roche') === '0' ? null : await criarRoche({ cena, U, recorte: (() => { const T = meta.terreno, L = (T.nvlado ?? 2048) * T.passo; return { x0: T.x0 + 0.3, x1: T.x0 + L - 0.3, z0: T.z0 + 0.3, z1: T.z0 + L - 0.3, y: 8 }; })() }); // buraco do tamanho do relevo fino (chao.py), não do relevo de 5 m
 // neve (neve.js): em tudo o que já está na cena (prédios, marcos, árvores, detalhes), antes da gente e dos bondes; o chão à
 // parte, com as ruas limpas (a máscara de ruas de chao.js tira a neve do asfalto e de parte das calçadas)

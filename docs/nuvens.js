@@ -70,6 +70,7 @@ export function atualizarNuvens(agora, ceu) {
 
 // tempo de agora em Basel (Open-Meteo): cobertura de nuvens, vento, temperatura
 export const TEMPO = { ok: false };
+window.TEMPO_BASEL = TEMPO; // vida.js lê o calor de agora para o número de nadadores
 async function tempoAgora() {
   try {
     const u = 'https://api.open-meteo.com/v1/forecast?latitude=47.557&longitude=7.59&current=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,temperature_2m,precipitation,rain,snowfall,snow_depth&timezone=Europe%2FZurich';
