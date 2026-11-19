@@ -64,7 +64,9 @@ const sol = new THREE.DirectionalLight(0xfff0d6, 2.4);
 sol.position.set(-420, 520, 300);
 sol.castShadow = true;
 sol.shadow.mapSize.set(4096, 4096);
-Object.assign(sol.shadow.camera, { left: -1450, right: 1450, top: 1450, bottom: -1450, near: 10, far: 3200 }); // cobre o recorte de 1,85 × 1,95 km
+// modo leve (sem CSM): a sombra segue o alvo da câmera (quadro()); cobrir o recorte inteiro de 2,3 km deixava cada texel
+// com 0,7 m e a parede se sombreava sozinha em pontinhos e listras (acne)
+Object.assign(sol.shadow.camera, { left: -600, right: 600, top: 600, bottom: -600, near: 10, far: 2000 });
 sol.shadow.bias = -0.0004;
 sol.shadow.normalBias = 0.6;
 cena.add(sol, sol.target);
@@ -278,19 +280,8 @@ function injetar(shader, cheio) {
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <color_fragment>', `#include <color_fragment>
   if (vSel > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.70, 0.15, 0.12), 0.65);`)
-    .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-  // noite: janelas acesas nas paredes, em andares de 3,2 m, sorteadas por prédio e por janela
-  if (uNoite > 0.01) {
-    vec3 nW = normalize(cross(dFdx(vMundo), dFdy(vMundo)));
-    if (abs(nW.y) < 0.3) {
-      vec2 tg = normalize(vec2(-nW.z, nW.x));
-      float u = dot(vMundo.xz, tg) / 2.7, v = (vMundo.y - 0.8) / 3.2;
-      vec2 cel = floor(vec2(u, v));
-      float acesa = step(0.58, fract(sin(dot(cel, vec2(12.9898, 78.233)) + vPid * 0.618) * 43758.5453));
-      float jan = step(0.28, fract(u)) * step(fract(u), 0.72) * step(0.3, fract(v)) * step(fract(v), 0.78) * step(1.0, v);
-      totalEmissiveRadiance += vec3(1.0, 0.72, 0.38) * jan * acesa * uNoite * 1.4;
-    }
-  }`);
+    // (as janelas acesas da noite são de fachadas.js, na grade real de cada fachada; a grade antiga de 2,7 x 3,2 m, calculada
+    // pixel a pixel, voltou por engano em 2026-11-19 e salpicava as paredes de pontos claros: removida)
 }
 const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 material.onBeforeCompile = (s) => { injetar(s, true); FACH.injetar(s); };
@@ -423,11 +414,12 @@ function entrarRua(x, z) {
   const y = altura(x, z) + 1.7, olho = new THREE.Vector3(x, y, z);
   voarPara(olho, olho.clone().addScaledVector(f, 0.3));
 }
-function sairRua() {
+function sairRua(voo = true) {
   if (!RUA.on) return;
   RUA.on = false; chipRua.hidden = true;
   camera.near = 1; camera.updateProjectionMatrix();
   const salvo = RUA.salvo;
+  if (!voo) { cancelAnimationFrame(RUA.anim); Object.assign(controls, salvo); return; } // o jogo assume a câmera daqui
   setTimeout(() => { if (!RUA.on) Object.assign(controls, salvo); }, 1150); // depois do voo: com minDistance de 25 m já valendo, a câmera saltava
   const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize();
   const alvo = camera.position.clone(); alvo.y -= 1.7;
@@ -561,6 +553,13 @@ function quadro(agora) {
   atualizarNuvens(agora, ceu);
   atualizarNeve(agora, ceu, cena, camera, leve);
   ceu.atualizar(agora);
+  if (sol.castShadow) { // a sombra do modo leve acompanha a câmera, em passos de 8 m (sem tremer a cada quadro)
+    const tx = Math.round(controls.target.x / 8) * 8, tz = Math.round(controls.target.z / 8) * 8;
+    if (tx !== sol.target.position.x || tz !== sol.target.position.z) {
+      const d = sol.position.clone().sub(sol.target.position);
+      sol.target.position.set(tx, 0, tz); sol.target.updateMatrixWorld(); sol.position.copy(sol.target.position).add(d);
+    }
+  }
   AGUA.atualizar(agora);
   ceu.render();
 }
