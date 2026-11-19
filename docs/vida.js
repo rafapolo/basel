@@ -200,6 +200,7 @@ uniform float uVidaT; uniform float uAnima;`)
     const alvo = new Int32Array(n), ant = new Int32Array(n), spd = new Float32Array(n), off = new Float32Array(n), esc = new Float32Array(n);
     const modo = new Uint8Array(n), seg = new Int32Array(n), sentido = new Uint8Array(n), pausa = new Float32Array(n), tx = new Float32Array(n), tz = new Float32Array(n);
     const offA = new Float32Array(n), tipoA = new Array(n), alt = new Float32Array(n), prog = new Float32Array(n), elen = new Float32Array(n), escI = new Float32Array(n).fill(1);
+    const caido = new Float32Array(n), caiX = new Float32Array(n), caiZ = new Float32Array(n), CAIDO = 6; // derrubados pela e-bike do jogo: s no chão e para onde caíram
     const g = grafo;
     const escolhe = (i) => {
       const v = alvo[i], nb = g.viz[v];
@@ -267,6 +268,7 @@ uniform float uVidaT; uniform float uAnima;`)
           if (primeiro) esc[i] = quer; else esc[i] += lim(quer - esc[i], -dt / 1.6, dt / 1.6);
           if (esc[i] <= 0.01) { a.fill(0, i * 16, i * 16 + 16); if (!quer) esc[i] = 0; continue; }
           let v = spd[i];
+          if (caido[i] > 0) { caido[i] = Math.max(0, caido[i] - dt); v = 0; }
           if (modo[i] === 1 && pausa[i] > 0) { pausa[i] -= dt; v = 0; if (pausa[i] <= 0) { proximoLivre(i); } }
           if (dt > 0 && v > 0) {
             const dx = tx[i] - x[i], dz = tz[i] - z[i], d = Math.hypot(dx, dz), passo = v * dt;
@@ -290,7 +292,15 @@ uniform float uVidaT; uniform float uAnima;`)
           else py = altura(px, pz) + 0.02;
           if (py < nivelReno - 0.3) py = nivelReno - 0.3;
           const e = esc[i];
-          matriz(im, i, px, py, pz, hx[i], hz[i], e, e * alt[i], e);
+          if (caido[i] > 0) {
+            // tomba na direção do empurrão em 0,35 s, fica deitado e levanta nos últimos 0,6 s
+            const tq = CAIDO - caido[i], th = (Math.PI / 2) * Math.min(1, tq / 0.35, caido[i] / 0.6), sT = Math.sin(th), cT = Math.cos(th);
+            const fx = caiX[i], fz = caiZ[i], o = i * 16, sy = e * alt[i];
+            a[o] = -fz * e; a[o + 1] = 0; a[o + 2] = fx * e; a[o + 3] = 0;
+            a[o + 4] = sT * fx * sy; a[o + 5] = cT * sy; a[o + 6] = sT * fz * sy; a[o + 7] = 0;
+            a[o + 8] = -fx * cT * e; a[o + 9] = sT * e; a[o + 10] = -fz * cT * e; a[o + 11] = 0;
+            a[o + 12] = px; a[o + 13] = py + 0.12 * sT; a[o + 14] = pz; a[o + 15] = 1;
+          } else matriz(im, i, px, py, pz, hx[i], hz[i], e, e * alt[i], e);
           const vv = v > 0 ? spd[i] : 0;
           if (A.getY(i) !== vv) { A.setY(i, vv); animar = true; }
           if (alvoCam && Math.abs(px - alvoCam.x) < 70 && Math.abs(pz - alvoCam.z) < 70) perto++;
@@ -301,6 +311,16 @@ uniform float uVidaT; uniform float uAnima;`)
         pos.perto = perto;
       },
       perto: () => pos.perto,
+      // derruba quem estiver a menos de r de (x, z), caindo na direção (fx, fz); devolve quantos caíram
+      derruba(x0, z0, r, fx, fz) {
+        let k = 0;
+        for (let i = 0; i < n; i++) {
+          if (esc[i] < 0.5 || caido[i] > 0) continue;
+          const px = x[i] - hz[i] * offA[i], pz = z[i] + hx[i] * offA[i];
+          if (Math.hypot(px - x0, pz - z0) < r) { caido[i] = CAIDO; caiX[i] = fx; caiZ[i] = fz; k++; }
+        }
+        return k;
+      },
     };
   }
 
@@ -783,7 +803,9 @@ uniform float uVidaT; uniform float uAnima;`)
     for (let i = 0; i < carro.n; i++) if (carro.esc[i] > 0.5 && Math.hypot(x - carro.x[i], z - carro.z[i]) < 2.2 + r) return 'carro';
     return null;
   }
-  const api = { grupo, atualizar, ligar, info, S, bate, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
+  // a e-bike do jogo atropela pedestres: eles caem e levantam (só quem anda; os parados e sentados ficam)
+  const atropela = (x, z, r, fx, fz) => (ligado ? ped.derruba(x, z, r, fx, fz) : 0);
+  const api = { grupo, atualizar, ligar, info, S, bate, atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
   window.vida = api;
   return api;
 }

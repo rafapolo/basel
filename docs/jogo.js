@@ -260,7 +260,7 @@ function iniciar() {
 function largada() {
   // na calçada de montante (7 m do eixo, fora dos trilhos do bonde que corre pelo meio da ponte)
   const { A, B } = C.ponte, f = 0.62, L = Math.hypot(B[0] - A[0], B[1] - A[1]), nx = -(B[1] - A[1]) / L, nz = (B[0] - A[0]) / L;
-  Object.assign(S, { x: A[0] + (B[0] - A[0]) * f + nx * 7, z: A[1] + (B[1] - A[1]) * f + nz * 7, rumo: Math.atan2(A[0] - B[0], A[1] - B[1]), v: 0, incl: 0, alvo: 0, fim: 0, caiu: 0, morto: 0 });
+  Object.assign(S, { x: A[0] + (B[0] - A[0]) * f + nx * 7, z: A[1] + (B[1] - A[1]) * f + nz * 7, rumo: Math.atan2(A[0] - B[0], A[1] - B[1]), v: 0, incl: 0, alvo: 0, fim: 0, caiu: 0, morto: 0, derrubados: 0 });
   S.y = piso(S.x, S.z).y;
   S.t0 = performance.now();
   bici.rotation.set(0, 0, 0);
@@ -329,6 +329,14 @@ function passo(agora) {
   if (!S.morto && agora - S.t0 > 2000) { // 2 s de folga na largada
     if (naAgua(S.x, S.z)) { S.caiu = agora; morrer(agora, 'reno'); }
     else { const v = window.vida?.bate(S.x + fx * 0.4, S.z + fz * 0.4, 0.45); if (v) morrer(agora, v); }
+  }
+  // pedestres: quem a bici pega cai no chão (e levanta 6 s depois); a bici perde metade da velocidade
+  if (!S.morto && Math.abs(S.v) > 1.5) {
+    const k = window.vida?.atropela(S.x + fx * 0.6, S.z + fz * 0.6, 0.75, fx, fz) || 0;
+    if (k) {
+      S.v *= 0.5; S.tremor = 0.25; S.derrubados = (S.derrubados || 0) + k; campainha();
+      mensagem(t('Opa! Derrubou alguém', 'Oops! Knocked someone over', 'Hoppla! Jemanden umgefahren'), t(`${S.derrubados} no chão nesta corrida`, `${S.derrubados} knocked down this race`, `${S.derrubados} umgefahren in diesem Rennen`), 1400);
+    }
   }
   const p0 = piso(S.x, S.z), naRio = S.morto && S.caiu, yAlvo = naRio ? C.nivelReno - 1.2 : p0.y;
   S.y += (yAlvo - S.y) * Math.min(1, dt * (naRio ? 2 : 14));
