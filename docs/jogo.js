@@ -1,5 +1,5 @@
-// Modo jogo (2026-11-19): uma bicicleta vermelha que sai do meio da Mittlere Brücke e corre pela cidade atrás de seis
-// lugares (Marktplatz, Münsterplatz, Pfalz, Barfi, Rheinbord, Claraplatz), contra o relógio. W/S ou ↑/↓ pedalam e
+// Modo jogo (2026-11-19): uma bicicleta vermelha que sai do meio da Mittlere Brücke e corre pela cidade atrás de sete
+// lugares (Marktplatz, Münsterplatz, Pfalz, Barfi, Rheinbord, Claraplatz e a chegada na estação SBB), contra o relógio. W/S ou ↑/↓ pedalam e
 // freiam, A/D ou ←/→ viram, Shift dá um sprint, B toca a campainha, V troca a câmera (atrás / primeira pessoa), Esc sai.
 // Em tela de toque, quatro botões. Os prédios são sólidos: uma grade de 1 m com a projeção dos telhados do LOD2
 // (montada só na primeira volta); as pontes, pela altura das faixas do OSM; quem cai no Reno volta para a margem.
@@ -16,6 +16,7 @@ const ALVOS = [
   { n: 'Barfüsserplatz', x: -8.4, z: 413.3 },
   { n: 'Rheinbord', x: 192.3, z: -172.3 },
   { n: 'Claraplatz', x: 340.3, z: -356.7 },
+  { n: 'Bahnhof SBB', x: 64, z: 1088 }, // a chegada: Centralbahnplatz, na frente da estação (20 m livres em volta na grade)
 ];
 const RAIO_ALVO = 9;
 

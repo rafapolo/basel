@@ -16,6 +16,7 @@ export function cotaPonta(altura, x, z, xi, zi) {
 
 export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, base = 'data/' }) {
   const T = meta.terreno;
+  const REC = (() => { const [e0, n0, e1, n1] = meta.recorte_lv95, [oe, on] = meta.origem_lv95; return { x0: e0 - oe, x1: e1 - oe, z0: -(n1 - on), z1: -(n0 - on) }; })();
   // terreno.v2.bin (script/compacta.py): mesmos vértices e triângulos do terreno.bin.gz, em ~55% dos bytes
   const { cols, idx } = decodifica(await baixaBin(base + 'terreno.v2.bin'), 3, 3);
   const nv = cols[0].length, nt = idx.length / 3;
@@ -243,7 +244,7 @@ float gRelevo = 0.0; // relevo fino da rua (m), só perto da câmera: vira norma
     for (const l of ruas.linhas) {
       if (l.t !== 'tram') continue;
       const c = l.c, pts = [];
-      if (c.some((v, i) => (i % 2 ? Math.abs(v) > 570 : Math.abs(v) > 545))) continue; // fora da malha do relevo
+      if (c.some((v, i) => (i % 2 ? v < REC.z0 + 5 || v > REC.z1 - 5 : v < REC.x0 + 5 || v > REC.x1 - 5))) continue; // fora da malha do relevo
       for (let i = 0; i < c.length - 2; i += 2) {
         const n = Math.max(1, Math.ceil(Math.hypot(c[i + 2] - c[i], c[i + 3] - c[i + 1]) / 2));
         for (let k = 0; k < n; k++) pts.push([c[i] + ((c[i + 2] - c[i]) * k) / n, c[i + 1] + ((c[i + 3] - c[i + 1]) * k) / n]);

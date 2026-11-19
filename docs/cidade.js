@@ -26,6 +26,9 @@ const [meta, ruas, bin, rel] = await Promise.all([
   fetch('data/relevo.bin').then((r) => r.arrayBuffer()),
 ]);
 const P = meta.predios;
+// recorte em coordenadas locais (predios.json): desde 2026-11-19 vai da Allschwilerplatz (oeste) à SBB (sul)
+const REC = (() => { const [e0, n0, e1, n1] = meta.recorte_lv95, [oe, on] = meta.origem_lv95; return { x0: e0 - oe, x1: e1 - oe, z0: -(n1 - on), z1: -(n0 - on) }; })();
+const foraREC = (x, z, f = 0) => x < REC.x0 + f || x > REC.x1 - f || z < REC.z0 + f || z > REC.z1 - f;
 const NIVEL_RENO = 2.3; // m acima de BASE_Z (244 m): abaixo disso o relevo é água
 
 // ---------- cena ----------
@@ -58,7 +61,7 @@ const sol = new THREE.DirectionalLight(0xfff0d6, 2.4);
 sol.position.set(-420, 520, 300);
 sol.castShadow = true;
 sol.shadow.mapSize.set(4096, 4096);
-Object.assign(sol.shadow.camera, { left: -700, right: 700, top: 700, bottom: -700, near: 10, far: 2000 });
+Object.assign(sol.shadow.camera, { left: -1450, right: 1450, top: 1450, bottom: -1450, near: 10, far: 3200 }); // cobre o recorte de 1,85 × 1,95 km
 sol.shadow.bias = -0.0004;
 sol.shadow.normalBias = 0.6;
 cena.add(sol, sol.target);
@@ -169,7 +172,7 @@ const ruasObj = new THREE.Group();
   const mp = [];
   for (const c of ruas.muralha) for (let i = 0; i < c.length - 2; i += 2) {
     const [ax, az, bx, bz] = [c[i], c[i + 1], c[i + 2], c[i + 3]];
-    if (Math.abs(ax) > 560 || Math.abs(az) > 585) continue;
+    if (foraREC(ax, az, -10)) continue;
     const ya = altura(ax, az), yb = altura(bx, bz);
     mp.push(ax, ya, az, bx, yb, bz, bx, yb + 5, bz, ax, ya, az, bx, yb + 5, bz, ax, ya + 5, az);
   }
@@ -471,7 +474,7 @@ const ROCHE = q.get('roche') === '0' ? null : await criarRoche({ cena, U, recort
   cena.traverse((o) => { if ((o.isMesh || o.isInstancedMesh) && o !== CH.malha && !o.userData.semNeve) for (const m of [o.material].flat()) comNeve(m); });
 }
 // gente e movimento (tarefa 19, docs/vida.js): bondes pelo horário do GTFS, pedestres, bicicletas, carros, gaivotas e nadadores
-const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE });
+const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE, recorte: REC });
 $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
 if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
 relogio(ceu.estado()); ceu.aoMudar(relogio);

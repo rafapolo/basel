@@ -126,7 +126,7 @@ function cenas() {
     { dur: 12000, run: async () => {
       C.definirNoite(false); C.ceu.definirHora(14);
       anoInteiro = estacoes(TOTAL - 8000, ano);
-      C.porCamera({ alvo: [0, 0, 0], dist: 1900, az: rad(230), polar: rad(28) });
+      C.porCamera({ alvo: [-400, 0, 350], dist: 2400, az: rad(230), polar: rad(28) }); // o meio do recorte de 2026-11-19
       mover({ alvo: [60, 0, -40], dist: 760, polar: rad(58), az: rad(160) }, 12000, { giro: -70 });
       await legenda(t('Basel · um ano em 2 minutos', 'Basel · a year in two minutes', 'Basel · ein Jahr in zwei Minuten'), t(
         `${fmt(E.total)} prédios, um por um; enquanto o passeio anda, o ano corre de janeiro a dezembro.`,
@@ -196,19 +196,19 @@ function cenas() {
       await em(4500);
       mover({ dist: 160 }, 8500, { giro: 90 });
     } },
-    // 7 · Barfüsserplatz e St. Leonhard
+    // 7 · Barfüsserplatz, St. Leonhard e, mais ao sul, a estação SBB (no recorte desde 2026-11-19)
     { dur: 13000, run: async () => {
       mover({ alvo: barfi, dist: 190, polar: rad(64), az: rad(200) }, 4000);
-      await legenda('Barfüsserplatz · St. Leonhard', t(
-        'No Barfi os bondes se cruzam; acima, na colina, a igreja de St. Leonhard.',
-        'Trams cross at the Barfi; up on the hill above it, St. Leonhard’s church.',
-        'Am Barfi kreuzen sich die Trams; oben auf dem Hügel die Leonhardskirche.'));
+      await legenda('Barfüsserplatz · Bahnhof SBB', t(
+        'No Barfi os bondes se cruzam; a Steinenvorstadt e a Elisabethenstrasse descem até a estação, sempre cheia.',
+        'Trams cross at the Barfi; the Steinenvorstadt and Elisabethenstrasse lead down to the station, always busy.',
+        'Am Barfi kreuzen sich die Trams; Steinenvorstadt und Elisabethenstrasse führen zum Bahnhof, wo immer viel los ist.'));
       await em(4000);
-      mover({ alvo: leonhard, dist: 170, polar: rad(66) }, 9000, { giro: 70 });
+      mover({ alvo: [64, 8, 1088], dist: 230, polar: rad(62), az: rad(160) }, 9000, { arco: 0.35 }); // Centralbahnplatz
     } },
     // 8 · final: sobe e dá a volta na cidade enquanto anoitece; termina na vista da Pfalz
     { dur: 13000, run: async () => {
-      mover({ alvo: [40, 0, -20], dist: 900, polar: rad(55) }, 7000, { giro: 160 });
+      mover({ alvo: [-250, 0, 250], dist: 1500, polar: rad(55) }, 7000, { giro: 160 });
       await legenda(t('Basel · dados abertos', 'Basel · open data', 'Basel · offene Daten'), t(
         'swisstopo, o registro federal de prédios via data.bs.ch, o OpenStreetMap e o tempo de agora. Clique em qualquer prédio.',
         'swisstopo, the federal building register via data.bs.ch, OpenStreetMap and today’s weather. Click any building.',

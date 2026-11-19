@@ -412,6 +412,24 @@ class Marco {
 
 export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, nivelReno, U }) {
   const P = meta.predios;
+  // os marcos são achados pelo EGID (o índice na lista muda sempre que o recorte muda); a Käppelijoch, sem registro no GWR,
+  // pelo sólido sem EGID mais perto de onde a capela fica na ponte
+  const porEgid = new Map();
+  P.forEach((p, i) => { if (p.egid) (porEgid.get(p.egid) ?? porEgid.set(p.egid, []).get(p.egid)).push(i); });
+  const ids = (egid) => porEgid.get(egid) ?? [];
+  const um = (egid) => ids(egid)[0] ?? -1;
+  const KAPPELI = (() => {
+    const soma = new Map();
+    for (let v = 0; v < ids16.length; v++) {
+      const i = ids16[v]; if (P[i].egid) continue;
+      const x = posicoes[v * 3], z = posicoes[v * 3 + 2]; if (Math.abs(x - 29.7) > 8 || Math.abs(z + 190.6) > 8) continue;
+      const q = soma.get(i) ?? soma.set(i, [0, 0, 0]).get(i); q[0] += x; q[1] += z; q[2]++;
+    }
+    let melhor = -1, d0 = 6;
+    for (const [i, [sx, sz, n]] of soma) { const d = Math.hypot(sx / n - 29.7, sz / n + 190.6); if (d < d0) { d0 = d; melhor = i; } }
+    return melhor;
+  })();
+  const EG = { munster: 243009807, rathaus: 440080, martin: 243009202, peter: 243010854, leonhard: 243008474 };
   const RUG = ruido();
   const pmrem = new THREE.PMREMGenerator(renderer);
   const ENV = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -511,7 +529,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
   const empurra = (m, marco) => { for (const [k, ls] of Object.entries(marco.partes)) for (const g of ls) (m.mundo[k] ??= []).push(g); };
 
   // =====================================================================================================
-  // Münster (EGID 243009807, sólido 1872). Eixo a: oeste → leste (-34°); origem entre as torres da fachada.
+  // Münster (EGID 243009807). Eixo a: oeste → leste (-34°); origem entre as torres da fachada.
   // =====================================================================================================
   {
     const ang = Math.atan2(-0.559, 0.829);
@@ -555,14 +573,14 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
       const w = new THREE.Vector3(0, 0, b).applyMatrix4(q);
       torre(m, { cx: w.x, cz: w.z, ang, s: 9, y0, yFuste: y0 + 31, yTambor: y0 + 38, yTopo: y0 + 68.5, matF: 'pedraMTorre', matS: 'pedraM', sx: 4 });
     }
-    fecha(m, 'Münster', 1872);
+    fecha(m, 'Münster', um(EG.munster));
   }
 
   // =====================================================================================================
-  // Rathaus (EGID 440080, sólido 1734): fachada vermelha pintada, torre com relógio
+  // Rathaus (EGID 440080): fachada vermelha pintada, torre com relógio
   // =====================================================================================================
   {
-    const ts = triangulos([1734]);
+    const ts = triangulos(ids(EG.rathaus));
     const m = novo(); m.y0 = yMin(ts);
     const c = new THREE.Vector2(-90.6, 31.5);
     // a frente para a Marktplatz (plano de normal (−0,89, 0,457)) sai do recapeamento e ganha a textura própria
@@ -618,7 +636,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
       empurra(m, mk);
     }
     torre(m, { cx: c.x, cz: c.y, ang: 62 * Math.PI / 180, s: 7.6, y0: m.y0, yFuste: 41.8, yTambor: 46, yTopo: 52.4, matF: 'rathaus', matS: 'flecha', relogio: 1.5, sx: 3.6 });
-    fecha(m, 'Rathaus', 1734);
+    fecha(m, 'Rathaus', um(EG.rathaus));
   }
 
   // =====================================================================================================
@@ -632,9 +650,9 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     torre(m, { cx: t.cx, cz: t.cz, ang: t.ang, s: t.s, y0: m.y0, yFuste: topo - t.flecha - t.tambor, yTambor: topo - t.flecha, yTopo: topo, matF: pedraJ, matS: 'flecha', sx: 4 });
     fecha(m, nome, pid);
   }
-  igreja('Martinskirche', [1535, 1536], 1535, { cx: -72.7, cz: -57.4, r: 5.2, ang: Math.atan2(0.367, -0.93), s: 7.2, flecha: 17, tambor: 5 }, 'pedraN', 'pedraNJ');
-  igreja('Peterskirche', [504, 505], 504, { cx: -296.7, cz: -113.1, r: 5.2, ang: 0, s: 6.8, flecha: 14, tambor: 4 }, 'pedraN', 'pedraNJ');
-  igreja('Leonhardskirche', [807], 807, { cx: -100.5, cz: 365, r: 5.8, ang: Math.atan2(-0.297, 0.955), s: 7.4, flecha: 15, tambor: 5 }, 'pedraL', 'pedraLJ');
+  igreja('Martinskirche', ids(EG.martin), um(EG.martin), { cx: -72.7, cz: -57.4, r: 5.2, ang: Math.atan2(0.367, -0.93), s: 7.2, flecha: 17, tambor: 5 }, 'pedraN', 'pedraNJ');
+  igreja('Peterskirche', ids(EG.peter), um(EG.peter), { cx: -296.7, cz: -113.1, r: 5.2, ang: 0, s: 6.8, flecha: 14, tambor: 4 }, 'pedraN', 'pedraNJ');
+  igreja('Leonhardskirche', ids(EG.leonhard), um(EG.leonhard), { cx: -100.5, cz: 365, r: 5.8, ang: Math.atan2(-0.297, 0.955), s: 7.4, flecha: 15, tambor: 5 }, 'pedraL', 'pedraLJ');
 
   // =====================================================================================================
   // Mittlere Brücke: arcos de pedra extrudados ao longo do eixo da ponte do OSM, parapeitos e Käppelijoch
@@ -699,7 +717,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
       const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gg.setIndex(idx);
       mk.add('ferro', gg.toNonIndexed());
     }
-    // Käppelijoch: capela de pedra pendurada a jusante, no meio da ponte. Posição do sólido 949 do swissBUILDINGS3D
+    // Käppelijoch: capela de pedra pendurada a jusante, no meio da ponte. Posição do sólido sem EGID do swissBUILDINGS3D (KAPPELI)
     // (a capela real, sem registro no GWR), que esconde() tira: o pé (dz) do relevo fino o afundava 9 m no rio
     {
       const s = 89.5, y = yConv(s), b0 = larg / 2 - 0.3;
@@ -724,7 +742,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
   // ---------- integração ----------
   // esconde os triângulos do LOD2 de `ids` (colapsa em um ponto; some do desenho, da sombra e do raio)
   function esconde(geo) {
-    const ocultos = new Set([1872, 1734, 1535, 1536, 504, 505, 807, 949]); // 949: Käppelijoch, refeita acima
+    const ocultos = new Set([...Object.values(EG).flatMap(ids), KAPPELI].filter((i) => i >= 0)); // Käppelijoch: refeita acima
     // `posicoes` fica intacta (centro(), fachadas e tour leem dela); a geometria desenhada ganha uma cópia colapsada
     const copia = new Float32Array(posicoes);
     for (let v = 0; v < ids16.length; v++) if (ocultos.has(ids16[v])) { copia[v * 3] = 0; copia[v * 3 + 1] = -50; copia[v * 3 + 2] = 0; }
@@ -732,8 +750,7 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
     geo.computeBoundingSphere();
   }
   const alvos = new Map(); // pid -> pids irmãos (sólidos do mesmo EGID)
-  alvos.set(1536, 1535);
-  alvos.set(505, 504);
+  for (const e of Object.values(EG)) { const l = ids(e); for (const i of l.slice(1)) alvos.set(i, l[0]); }
   // chamado a cada quadro: destaque do marco da ficha
   function atualiza(uSel) {
     for (const m of lista) {

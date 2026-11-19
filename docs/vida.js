@@ -16,7 +16,7 @@ const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 const suave = (a, b, v) => { const t = lim((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const mulberry = (s) => () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 
-export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelRio = 1.95, nivelReno = 2.3, leve = false, cotaPonte = () => null, ponte = null, base = 'data/' }) {
+export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelRio = 1.95, nivelReno = 2.3, leve = false, cotaPonte = () => null, ponte = null, recorte = { x0: -560, x1: 560, z0: -585, z1: 585 }, base = 'data/' }) {
   const V = await fetch(base + 'vida.json').then((r) => r.json());
   // lugares onde a gente para (script/pontos.py): rodinhas, Rheinbord, paradas de bonde e focos de quem anda
   const PT = await fetch(base + 'pontos.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -114,7 +114,7 @@ uniform float uVidaT; uniform float uAnima;`)
   const poe3 = (at, i, c) => at.setXYZ(i, c.r, c.g, c.b);
 
   // ---------- grafos de ruas (do que ruas.json já carrega) ----------
-  const FORA = (x, z) => Math.abs(x) > 560 || Math.abs(z) > 585;
+  const FORA = (x, z) => x < recorte.x0 - 10 || x > recorte.x1 + 10 || z < recorte.z0 - 10 || z > recorte.z1 + 10;
   function criarGrafo(tipos, pesoTipo, dens) {
     const chave = new Map(), X = [], Z = [], Y = [], viz = [], tp = [], el = [];
     const vid = (x, z) => {
@@ -615,13 +615,13 @@ uniform float uVidaT; uniform float uAnima;`)
   }
 
   // ---------- rio: máscara de água, corrente, gaivotas e nadadores ----------
-  const RX0 = -560, RZ0 = -585, RP = 8, RNX = 141, RNZ = 147;
+  const RX0 = recorte.x0 - 10, RZ0 = recorte.z0 - 10, RP = 8, RNX = Math.ceil((recorte.x1 - recorte.x0 + 20) / RP) + 1, RNZ = Math.ceil((recorte.z1 - recorte.z0 + 20) / RP) + 1;
   const agua = new Uint8Array(RNX * RNZ);
   for (let j = 0; j < RNZ; j++) for (let i = 0; i < RNX; i++) agua[j * RNX + i] = altura(RX0 + i * RP, RZ0 + j * RP) < nivelReno ? 1 : 0;
   const ehAgua = (x, z) => { const i = Math.round((x - RX0) / RP), j = Math.round((z - RZ0) / RP); return i >= 0 && j >= 0 && i < RNX && j < RNZ && agua[j * RNX + i] === 1; };
   const celAgua = []; for (let j = 0; j < RNZ; j++) for (let i = 0; i < RNX; i++) if (agua[j * RNX + i]) celAgua.push([RX0 + i * RP, RZ0 + j * RP]);
   // corrente: eixo principal da água num raio de 70 m, orientado para jusante (do sudeste para o noroeste: −x, −z)
-  const FP = 24, FNX = Math.ceil(1120 / FP), FNZ = Math.ceil(1170 / FP), corrente = new Float32Array(FNX * FNZ * 2);
+  const FP = 24, FNX = Math.ceil((RNX * RP) / FP), FNZ = Math.ceil((RNZ * RP) / FP), corrente = new Float32Array(FNX * FNZ * 2);
   for (let fj = 0; fj < FNZ; fj++) for (let fi = 0; fi < FNX; fi++) {
     const cx = RX0 + fi * FP, cz = RZ0 + fj * FP; let n = 0, mx = 0, mz = 0, sxx = 0, szz = 0, sxz = 0;
     for (let j = Math.max(0, Math.floor((cz - 70 - RZ0) / RP)); j <= Math.min(RNZ - 1, Math.ceil((cz + 70 - RZ0) / RP)); j++)
