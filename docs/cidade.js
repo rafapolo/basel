@@ -13,6 +13,8 @@ import { criarChao, cotaPonta } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
 import { decodifica, baixaBin } from './compacta.js';
 import { atualizarNuvens, TEMPO } from './nuvens.js';
+import { injetarNeve, atualizarNeve } from './neve.js';
+import { criarRoche } from './roche.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -368,7 +370,7 @@ const raio = new THREE.Raycaster();
 let apertou = null;
 canvas.addEventListener('pointerdown', (e) => { apertou = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', (e) => {
-  if (!apertou || Math.hypot(e.clientX - apertou[0], e.clientY - apertou[1]) > 5 || (typeof window.tour?.ativo === "function" && window.tour.ativo())) return;
+  if (!apertou || Math.hypot(e.clientX - apertou[0], e.clientY - apertou[1]) > 5 || (typeof window.tour?.ativo === "function" && window.tour.ativo()) || window.jogo?.ativo()) return;
   const r = canvas.getBoundingClientRect();
   raio.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
   const hits = raio.intersectObject(predios, false);
@@ -415,7 +417,11 @@ const cDia = { hemi: new THREE.Color(0xfff6e4), hemiChao: new THREE.Color(0xb9a7
 const cNoite = { hemi: new THREE.Color(0x4a5a86), hemiChao: new THREE.Color(0x1d1a22), sol: new THREE.Color(0x9fb3e8) };
 function quadro(agora) {
   requestAnimationFrame(quadro);
-  if (!(typeof window.tour?.ativo === "function" && window.tour.ativo())) controls.update();
+  if (!(typeof window.tour?.ativo === "function" && window.tour.ativo()) && !window.jogo?.ativo()) controls.update();
+  // nunca abaixo do chão nem dentro do Reno: a câmera fica ao menos 1,5 m acima do relevo (ou da água)
+  { const p = camera.position, piso = Math.max(altura(p.x, p.z), AGUA.nivel) + 1.5;
+    if (p.y < piso) p.y = piso;
+    const t = controls.target, pisoT = altura(t.x, t.z) - 2; if (t.y < pisoT) t.y = pisoT; }
   // noite que cai devagar
   const n = U.uNoite.value + (noiteAlvo - U.uNoite.value) * 0.04;
   U.uNoite.value = n;
@@ -440,9 +446,27 @@ function quadro(agora) {
   MARC.atualiza(U.uSel.value);
   VIDA.atualizar(agora);
   atualizarNuvens(agora, ceu);
+  atualizarNeve(agora, ceu, cena, camera, leve);
   ceu.atualizar(agora);
   AGUA.atualizar(agora);
   ceu.render();
+}
+// torres da Roche e o chão além do recorte (roche.js)
+const ROCHE = q.get('roche') === '0' ? null : await criarRoche({ cena, U, recorte: { x0: R.x0, x1: R.x0 + (R.nx - 1) * R.passo, z0: R.z0, z1: R.z0 + (R.ny - 1) * R.passo, y: 8 } });
+// neve (neve.js): em tudo o que já está na cena (prédios, marcos, árvores, detalhes), antes da gente e dos bondes; o chão à
+// parte, com as ruas limpas (a máscara de ruas de chao.js tira a neve do asfalto e de parte das calçadas)
+{
+  const feitos = new Set();
+  const comNeve = (m, op) => {
+    if (feitos.has(m) || m.userData.semNeve || !(m.isMeshStandardMaterial || m.isMeshLambertMaterial)) return;
+    feitos.add(m);
+    const orig = m.onBeforeCompile, chave = m.customProgramCacheKey();
+    m.onBeforeCompile = (sh, r) => { orig?.call(m, sh, r); injetarNeve(sh, op); };
+    m.customProgramCacheKey = () => `${chave}|neve`;
+    m.needsUpdate = true;
+  };
+  comNeve(CH.malha.material, { xz: 'vChaoP', tira: '(texture2D(uRuasA, (vChaoP - uRuasRet.xy) * uRuasRet.zw).r * 0.85 + texture2D(uRuasA, (vChaoP - uRuasRet.xy) * uRuasRet.zw).b * 0.45) * uRuasOn' });
+  cena.traverse((o) => { if ((o.isMesh || o.isInstancedMesh) && o !== CH.malha && !o.userData.semNeve) for (const m of [o.material].flat()) comNeve(m); });
 }
 // gente e movimento (tarefa 19, docs/vida.js): bondes pelo horário do GTFS, pedestres, bicicletas, carros, gaivotas e nadadores
 const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE });
@@ -476,6 +500,9 @@ function centro(nome) {
 
 window.cidade = {
   THREE, FACH, MARC, U, camera, arvores, centro, controls, lerCamera, porCamera, definirNoite, fecharFicha, abrirFicha,
-  noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura, ceu,
+  noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura, ceu, cena,
+  // para o modo jogo (jogo.js): plantas dos prédios, pontes e o Reno
+  posicoes, nTris: meta.n_tris, ruas, cotaPonta, cotaPonte: MARC.cotaPonte, nivelReno: AGUA.nivel, relevo: R, ponte: MITTLERE,
 };
 await import('./tour.js');
+await import('./jogo.js');
