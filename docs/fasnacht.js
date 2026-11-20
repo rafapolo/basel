@@ -35,12 +35,18 @@ const TEMAS = [
   { padrao: 'losango', a: '#f2c14e', b: '#151515', larve: '#f6e2c8', cabelo: '#151515', chapeu: '#f2c14e' },
   { padrao: 'xadrez', a: '#2f8a4a', b: '#f4f1ea', larve: '#f2d0b0', cabelo: '#2f8a4a', chapeu: '#f4f1ea' },
   { padrao: 'listra', a: '#c8102e', b: '#f4f1ea', larve: '#f4efe6', cabelo: '#151515', chapeu: '#151515' },
+  // retalhos: o Kostüm costurado de pedaços de 3 a 4 cores vivas, o mais comum nas fotos
+  { padrao: 'retalho', a: '#e8452c', b: '#f2c14e', c: ['#1f9ad6', '#3fae5a', '#d6458f'], larve: '#f6e2c8', cabelo: '#ff2f8a', chapeu: '#1f9ad6' },
+  { padrao: 'retalho', a: '#7b2d8b', b: '#ffd23f', c: ['#00a6a6', '#ff7a1a'], larve: '#f2d0b0', cabelo: '#ffd23f', chapeu: '#ff7a1a' },
+  { padrao: 'losango', a: '#ff2f8a', b: '#00a6a6', larve: '#f4efe6', cabelo: '#7ad13b', chapeu: '#ffd23f' },
+  { padrao: 'retalho', a: '#3fae5a', b: '#ff5fa2', c: ['#1f5aa6', '#f2c14e', '#e8452c'], larve: '#f6e2c8', cabelo: '#ff7a1a', chapeu: '#7b2d8b' },
 ];
-function texPadrao({ padrao, a, b }) {
+function texPadrao({ padrao, a, b, c: extra = [] }) {
   const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
   g.fillStyle = b; g.fillRect(0, 0, 128, 128); g.fillStyle = a;
   if (padrao === 'xadrez') for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { if ((x + y) % 2) g.fillRect(x * 16, y * 16, 16, 16); }
   else if (padrao === 'listra') for (let x = 0; x < 128; x += 32) g.fillRect(x, 0, 16, 128);
+  else if (padrao === 'retalho') { const cs = [a, b, ...extra]; for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) { g.fillStyle = cs[(x * 7 + y * 3 + ((x * y) % 3)) % cs.length]; g.fillRect(x * 22 - 4, y * 22 - 4, 26, 26); } g.strokeStyle = '#151515'; g.lineWidth = 1.5; for (let k = 0; k < 7; k++) { g.beginPath(); g.moveTo(k * 22 - 4, 0); g.lineTo(k * 22 - 4, 128); g.moveTo(0, k * 22 - 4); g.lineTo(128, k * 22 - 4); g.stroke(); } }
   else if (padrao === 'losango') for (let y = -1; y < 5; y++) for (let x = -1; x < 5; x++) if ((x + y) % 2 === 0) { g.beginPath(); g.moveTo(x * 32 + 16, y * 32); g.lineTo(x * 32 + 32, y * 32 + 16); g.lineTo(x * 32 + 16, y * 32 + 32); g.lineTo(x * 32, y * 32 + 16); g.fill(); }
   else { g.fillRect(0, 0, 128, 128); g.fillStyle = b; g.fillRect(0, 0, 128, 18); } // casaco liso com gola
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 2); return t;
@@ -133,8 +139,9 @@ function clique({ cena, altura, semente = 0 }) {
   // lanterna: caixa translúcida pintada (sujet satírico, cores fortes) que brilha por dentro, em dois varais
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 384;
   { const c = cv.getContext('2d'); c.fillStyle = '#f6ecd0'; c.fillRect(0, 0, 256, 384);
-    const cores = ['#c8102e', '#1f5aa6', '#2f8a4a', '#f2c14e', '#7b2d8b', '#151515'];
-    for (let i = 0; i < 26; i++) { c.fillStyle = cores[i % cores.length]; c.beginPath(); c.ellipse(20 + ((i * 97) % 220), 30 + ((i * 53) % 320), 12 + (i % 5) * 9, 10 + (i % 4) * 12, i, 0, TAU); c.fill(); }
+    const cores = ['#e8102e', '#1f7ae6', '#2fb04a', '#ffc81e', '#a12dbb', '#ff6a00', '#ff2f8a', '#00b3b3', '#151515'];
+    c.fillStyle = cores[semente % 8]; c.fillRect(0, 0, 256, 384); c.fillStyle = '#ffe9a8'; c.fillRect(14, 14, 228, 330);
+    for (let i = 0; i < 40; i++) { c.fillStyle = cores[i % cores.length]; c.beginPath(); c.ellipse(20 + ((i * 97) % 220), 30 + ((i * 53) % 320), 12 + (i % 5) * 9, 10 + (i % 4) * 12, i, 0, TAU); c.fill(); }
     c.fillStyle = '#151515'; c.font = 'bold 34px serif'; c.fillText('BASEL', 70, 360); c.lineWidth = 8; c.strokeStyle = '#151515'; c.strokeRect(4, 4, 248, 376); }
   const texL = new THREE.CanvasTexture(cv); texL.colorSpace = THREE.SRGBColorSpace;
   const matL = new THREE.MeshStandardMaterial({ map: texL, emissive: 0xffffff, emissiveMap: texL, emissiveIntensity: 0.6, roughness: 0.6 });
@@ -148,8 +155,12 @@ function clique({ cena, altura, semente = 0 }) {
   lanterna.visible = !gugge;
   // variação leve de tom entre os membros (o tema é o mesmo; tecido e tinta mudam um pouco)
   { const c = new THREE.Color();
-    for (let i = 0; i < n; i++) { const k = 0.88 + ((i * 37) % 11) / 45; c.setRGB(k, k, k);
-      for (const m of [corpo, cabeca, nariz, cabelo, chapeu, pernas]) m.setColorAt(i, c); }
+    const h = new THREE.Color();
+    for (let i = 0; i < n; i++) { const k = 0.9 + ((i * 37) % 11) / 50; c.setRGB(k, k, k);
+      for (const m of [corpo, cabeca, nariz, pernas]) m.setColorAt(i, c);
+      // cabeleira e chapéu: o tema e, em parte da Clique, outra cor viva (cada um enfeita a sua)
+      h.setHSL(((i * 0.618) + semente * 0.13) % 1, 0.85, 0.55);
+      cabelo.setColorAt(i, (i * 7) % 3 === 0 ? h : c); chapeu.setColorAt(i, (i * 5) % 4 === 0 ? h : c); }
     for (const m of [corpo, cabeca, nariz, cabelo, chapeu, pernas]) m.instanceColor.needsUpdate = true; }
   // quem a e-bike (ou quem anda) derruba: s no chão e direção da queda; a Clique segue, o caído fica onde caiu
   const caido = new Float32Array(n), caiX = new Float32Array(n), caiZ = new Float32Array(n), caiP = new Float32Array(n * 3), CAIDO = 6;
@@ -263,15 +274,37 @@ export function criarFasnacht({ cena, altura, ruas, ceu }) {
   let sem = 7; const rnd = () => ((sem = (sem * 16807) % 2147483647) / 2147483647);
   for (const cam of caminhos) for (let i = 1; i < cam.length; i++) {
     const [ax, az] = cam[i - 1], [bx, bz] = cam[i], L = Math.hypot(bx - ax, bz - az), nx = -(bz - az) / (L || 1), nz = (bx - ax) / (L || 1);
-    for (let k = 0; k < L * 9; k++) { const t = rnd(), d = (rnd() - 0.5) * 7; const x = ax + (bx - ax) * t + nx * d, z = az + (bz - az) * t + nz * d;
+    for (let k = 0; k < L * 22; k++) { const t = rnd(), d = (rnd() - 0.5) * 8; const x = ax + (bx - ax) * t + nx * d, z = az + (bz - az) * t + nz * d;
       pc.push(x, altura(x, z) + 0.03, z); CORES[Math.floor(rnd() * CORES.length)].toArray(cc, cc.length); }
   }
   const gC = new THREE.BufferGeometry(); gC.setAttribute('position', new THREE.Float32BufferAttribute(pc, 3)); gC.setAttribute('color', new THREE.Float32BufferAttribute(cc, 3));
-  const rappli = new THREE.Points(gC, new THREE.PointsMaterial({ size: 0.07, vertexColors: true, sizeAttenuation: true }));
+  const rappli = new THREE.Points(gC, new THREE.PointsMaterial({ size: 0.1, vertexColors: true, sizeAttenuation: true }));
   rappli.visible = false; rappli.frustumCulled = false; rappli.name = 'Räppli'; cena.add(rappli);
+  // bandeirinhas: varais de flâmulas coloridas atravessando as ruas do desfile, a cada ~14 m, a 6–7 m do chão, com barriga
+  const BAND = [];
+  for (const cam of caminhos) { let falta = 6;
+    for (let i = 1; i < cam.length; i++) {
+      const [ax, az] = cam[i - 1], [bx, bz] = cam[i], L = Math.hypot(bx - ax, bz - az); if (L < 1e-3) continue;
+      const nx = -(bz - az) / L, nz = (bx - ax) / L;
+      for (let t = falta; t < L; t += 14) { const x = ax + (bx - ax) * t / L, z = az + (bz - az) * t / L; BAND.push([x, z, nx, nz, altura(x, z) + 6 + rnd()]); }
+      falta = 14 - ((L - falta) % 14);
+    } }
+  const POR = 16, LARGV = 9; // flâmulas por varal, largura do varal (m)
+  const geoF = new THREE.BufferGeometry(); geoF.setAttribute('position', new THREE.Float32BufferAttribute([-0.17, 0, 0, 0.17, 0, 0, 0, -0.42, 0], 3)); geoF.computeVertexNormals();
+  const band = new THREE.InstancedMesh(geoF, new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.7, emissive: 0x222222 }), BAND.length * POR);
+  const pv = []; { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), Yv = new THREE.Vector3(0, 1, 0), CF = ['#e8102e', '#ffc81e', '#1f7ae6', '#2fb04a', '#ff6a00', '#a12dbb', '#ff2f8a', '#00b3b3', '#f4f1ea'].map((c) => new THREE.Color(c));
+    BAND.forEach(([x, z, nx, nz, y], b) => {
+      q.setFromAxisAngle(Yv, Math.atan2(nz, -nx) + 0); // flâmula no plano do varal
+      for (let k = 0; k < POR; k++) { const u = (k + 0.5) / POR - 0.5, d = u * LARGV, yy = y - 0.9 * (1 - 4 * u * u);
+        m.compose(p.set(x + nx * d, yy, z + nz * d), q, e); band.setMatrixAt(b * POR + k, m); band.setColorAt(b * POR + k, CF[(k + b * 3) % CF.length]); }
+      for (let k = 0; k < 12; k++) { const u0 = k / 12 - 0.5, u1 = (k + 1) / 12 - 0.5; pv.push(x + nx * u0 * LARGV, y - 0.9 * (1 - 4 * u0 * u0), z + nz * u0 * LARGV, x + nx * u1 * LARGV, y - 0.9 * (1 - 4 * u1 * u1), z + nz * u1 * LARGV); }
+    }); }
+  band.frustumCulled = false; band.visible = false; band.name = 'bandeirinhas'; cena.add(band);
+  const gV = new THREE.BufferGeometry(); gV.setAttribute('position', new THREE.Float32BufferAttribute(pv, 3));
+  const varal = new THREE.LineSegments(gV, new THREE.LineBasicMaterial({ color: 0x3a3a3a })); varal.visible = false; varal.frustumCulled = false; cena.add(varal);
   let ligada = false, forcar = null;
   function ligar(on) {
-    if (on === ligada) return; ligada = on; rappli.visible = on;
+    if (on === ligada) return; ligada = on; rappli.visible = on; band.visible = on; varal.visible = on;
     cs.forEach((c, i) => (on ? c.marchar(caminhos[i], { inicio: i * 37, velocidade: 1.0 + (i % 3) * 0.08, idaEVolta: true }) : c.parar()));
     if (!on) somVol(0);
   }
