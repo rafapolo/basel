@@ -111,6 +111,9 @@ uniform float uVidaT; uniform float uAnima;`)
   const CALCA = ['#2a2f3a', '#1f2430', '#3d4a63', '#5b4e3a', '#262626', '#6a6f78', '#8a7a5a', '#c9bfa8', '#43506b'].map(cor);
   const CARRO = ['#e9e9e6', '#1c1d20', '#7d8288', '#a31f24', '#27406b', '#c9ccd0', '#3a3f44', '#b9a77a', '#e9e9e6', '#4d6a54'].map(cor);
   const sorteia = (a, r = rnd) => a[Math.floor(r() * a.length)];
+  // roupa de criança: anoraques e capas de chuva em cores vivas, mochilas de escola
+  const INFANTIL = ['#e8452c', '#f2b51d', '#2f8fd8', '#3fae5a', '#d6458f', '#ff7a1a', '#7a4fc9', '#18a5a5', '#e9e2cf'].map(cor);
+  const hash01 = (i) => { let x = Math.imul(i ^ 0x9e3779b9, 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
   const poe3 = (at, i, c) => at.setXYZ(i, c.r, c.g, c.b);
 
   // ---------- grafos de ruas (do que ruas.json já carrega) ----------
@@ -209,7 +212,7 @@ uniform float uVidaT; uniform float uAnima;`)
     a[o + 8] = -fx * cT * e; a[o + 9] = sT * e; a[o + 10] = -fz * cT * e; a[o + 11] = 0;
     a[o + 12] = px; a[o + 13] = py + 0.12 * sT; a[o + 14] = pz; a[o + 15] = 1;
   };
-  function populacao({ n, grafo, geo, mat, vel, desloc, offTipo, livres = 0, sombra = true, respawnLonge = false }) {
+  function populacao({ n, grafo, geo, mat, vel, desloc, offTipo, livres = 0, sombra = true, respawnLonge = false, crianca = null }) {
     const im = malhaInst(geo, mat, n, sombra);
     const x = new Float32Array(n), z = new Float32Array(n), y = new Float32Array(n), hx = new Float32Array(n), hz = new Float32Array(n);
     const alvo = new Int32Array(n), ant = new Int32Array(n), spd = new Float32Array(n), off = new Float32Array(n), esc = new Float32Array(n);
@@ -270,10 +273,18 @@ uniform float uVidaT; uniform float uAnima;`)
       im.geometry.attributes.aAnim.setXY(i, rnd() * TAU, spd[i]);
       alt[i] = 0.94 + rnd() * 0.14;
     }
+    // crianças (crianca(i) → 0 adulto, 1 de mão com o adulto i − 1, 2 sozinha): 0,48–0,7 (pequenas) e 0,65–0,85 (escolares) da altura, ombros na proporção;
+    // a de família anda no ritmo e na trilha do adulto, 0,6 m ao lado
+    const tipoC = new Uint8Array(n), larg = new Float32Array(n).fill(1);
+    const ultX = new Float32Array(n), ultY = new Float32Array(n), ultZ = new Float32Array(n);
+    if (crianca) for (let i = 0; i < n; i++) {
+      tipoC[i] = crianca(i);
+      if (tipoC[i]) { alt[i] = tipoC[i] === 1 ? 0.48 + rnd() * 0.22 : 0.65 + rnd() * 0.2; larg[i] = 0.7 + 0.3 * (alt[i] - 0.48) / 0.37; if (tipoC[i] === 2) spd[i] *= 1.1; }
+    }
     let primeiro = true;
     const pos = { perto: 0 };
     return {
-      im, n, x, z, esc,
+      im, n, x, z, esc, tipoC,
       cores(fn) { for (let i = 0; i < n; i++) fn(i, im.geometry.attributes); for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo']) im.geometry.attributes[k].needsUpdate = true; },
       atualizar(dt, ativos, alvoCam) {
         const A = im.geometry.attributes.aAnim, a = im.instanceMatrix.array;
@@ -306,10 +317,15 @@ uniform float uVidaT; uniform float uAnima;`)
           if (modo[i] === 0) { const va = ant[i], vb = alvo[i]; py = g.Y[va] + (g.Y[vb] - g.Y[va]) * lim(prog[i], 0, 1); }
           else py = altura(px, pz) + 0.02;
           if (py < nivelReno - 0.3) py = nivelReno - 0.3;
-          const e = esc[i];
-          if (caido[i] > 0) matrizCaida(a, i, px, py, pz, caiX[i], caiZ[i], caido[i], e, e * alt[i]);
-          else matriz(im, i, px, py, pz, hx[i], hz[i], e, e * alt[i], e);
-          const vv = v > 0 ? spd[i] : 0;
+          let e = esc[i], qx = px, qy = py, qz = pz, vv = v > 0 ? spd[i] : 0;
+          if (tipoC[i] === 1 && esc[i - 1] > 0.01) { // ao lado do adulto da frente, no mesmo rumo e ritmo
+            const p0 = i - 1; hx[i] = hx[p0]; hz[i] = hz[p0];
+            qx = ultX[p0] - hz[p0] * 0.6; qz = ultZ[p0] + hx[p0] * 0.6; qy = ultY[p0]; x[i] = qx; z[i] = qz; tx[i] = qx + hx[p0]; tz[i] = qz + hz[p0];
+            vv = A.getY(p0) * 1.25; e = Math.min(e, esc[p0]);
+          }
+          ultX[i] = qx; ultY[i] = qy; ultZ[i] = qz;
+          if (caido[i] > 0) matrizCaida(a, i, qx, qy, qz, caiX[i], caiZ[i], caido[i], e * larg[i], e * alt[i]);
+          else matriz(im, i, qx, qy, qz, hx[i], hz[i], e * larg[i], e * alt[i], e * larg[i]);
           if (A.getY(i) !== vv) { A.setY(i, vv); animar = true; }
           if (alvoCam && Math.abs(px - alvoCam.x) < 70 && Math.abs(pz - alvoCam.z) < 70) perto++;
         }
@@ -376,16 +392,18 @@ uniform float uVidaT; uniform float uAnima;`)
   const VIA_CARRO = new Set(['secondary', 'secondary_link', 'tertiary', 'unclassified', 'residential', 'service']);
   const matG = matGente();
   const matC = matGente(0.45);
-  const NPED = leve ? 300 : 1300, NBIKE = leve ? 70 : 280, NCARRO = leve ? 10 : 36;
+  const NPED = leve ? 360 : 1500, NBIKE = leve ? 70 : 280, NCARRO = leve ? 45 : 160; // carros: eram 36 na cidade inteira
   const ped = populacao({ n: NPED, grafo: gPed, geo: geoGente(), mat: matG, sombra: false, vel: [0.95, 1.65], livres: Math.round(NPED * 0.34),
     desloc: (i, r) => (r() < 0.5 ? -1 : 1) * (0.2 + r() * 0.9),
-    offTipo: (t, o) => (VIA_CARRO.has(t) ? Math.sign(o) * (LARG[t] / 2 + 1.1) : o) });
+    offTipo: (t, o) => (VIA_CARRO.has(t) ? Math.sign(o) * (LARG[t] / 2 + 1.1) : o),
+    // Basel tem muita criança na rua: ~18% de mão com um adulto (o índice anterior), ~7% sozinhas (escolares)
+    crianca: (i) => { const h = hash01(i * 7919 + 13); return i > 0 && h < 0.18 ? 1 : h < 0.25 ? 2 : 0; } });
   // pedestres em ruas de carro andam na calçada: afasta do eixo conforme a largura (sorteado uma vez, no vértice)
   const bici = populacao({ n: NBIKE, grafo: gBike, geo: geoBici(), mat: matC, sombra: false, vel: [3.2, 5.6], respawnLonge: true, desloc: (i, r) => 1.1 + r() * 0.5 });
   const carro = populacao({ n: NCARRO, grafo: gCarro, geo: geoCarro(), mat: matC, vel: [4.5, 9], respawnLonge: true, desloc: (i, r) => 1.7 + r() * 0.3 });
   function pintar() {
     const tor = TORSO[S.estacao];
-    ped.cores((i, A) => { poe3(A.aTorso, i, sorteia(tor)); poe3(A.aCalca, i, sorteia(CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); });
+    ped.cores((i, A) => { poe3(A.aTorso, i, sorteia(ped.tipoC[i] ? INFANTIL : tor)); poe3(A.aCalca, i, sorteia(ped.tipoC[i] && hash01(i + 3) < 0.5 ? INFANTIL : CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); });
     bici.cores((i, A) => { poe3(A.aTorso, i, sorteia(TORSO.verao)); poe3(A.aCalca, i, sorteia(CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); });
     carro.cores((i, A) => { poe3(A.aTorso, i, sorteia(CARRO)); poe3(A.aCalca, i, CARRO[0]); poe3(A.aPele, i, CARRO[0]); poe3(A.aCabelo, i, CARRO[0]); });
   }
@@ -861,7 +879,7 @@ uniform float uVidaT; uniform float uAnima;`)
   }
   // a e-bike do jogo e quem anda na vista de rua derrubam gente: quem anda, os ciclistas e quem está parado (os sentados ficam)
   const atropela = (x, z, r, fx, fz) => (ligado ? ped.derruba(x, z, r, fx, fz) + bici.derruba(x, z, r + 0.3, fx, fz) + derrubaParados(x, z, r, fx, fz) : 0);
-  const api = { grupo, atualizar, ligar, info, S, bate, bondePerto: () => (ligado ? bondeInfo.perto : 1e9), atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
+  const api = { grupo, atualizar, ligar, info, S, bate, criancas: () => { const out = []; for (let i = 0; i < ped.n; i++) if (ped.tipoC[i] && ped.esc[i] > 0.5) out.push([ped.tipoC[i], ped.x[i], ped.z[i]]); return out; }, bondePerto: () => (ligado ? bondeInfo.perto : 1e9), atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
   window.vida = api;
   return api;
 }
