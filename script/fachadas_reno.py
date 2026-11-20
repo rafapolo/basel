@@ -3,8 +3,10 @@
    livre, em data/22-fachadas-reno/commons/ (fora do git), com o crédito em data/22-fachadas-reno/fotos.json.
 2. lista: os prédios das ruas da margem na ordem ao longo do rio (posição, frente para o rio, altura e andares do GWR),
    em data/22-fachadas-reno/predios.json, para casar cada casa da foto com o EGID.
-3. aplica: data/22-fachadas-reno/leitura.json (o que se leu das fotos, por EGID) vai para docs/data/retoques.json.
-   uv run --with numpy python script/fachadas_reno.py [baixa|lista|aplica]
+3. casas: prédios com categoria própria no Commons (endereço no nome): baixa até 3 fotos de cada, acha o EGID pelo
+   endereço e a fachada da rua (a parede virada para a rua do endereço, por ruas.json), em data/22-fachadas-reno/casas.json.
+4. aplica: data/22-fachadas-reno/leitura.json (o que se leu das fotos, por EGID) vai para docs/data/retoques.json.
+   uv run --with numpy python script/fachadas_reno.py [baixa|lista|casas|aplica]
 """
 import json, re, sys, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
@@ -110,6 +112,91 @@ def lista():
         print(f"{o['end']:28s} pid {o['pid']:5d} egid {o['egid']} x {o['x']:7.1f} z {o['z']:7.1f} alt {o['alt']} and {o['and']} ano {o['ano']} frentes {o['frentes'][:3]}")
 
 
+# casas com categoria própria no Commons, escolhidas pelo que aparece nas vistas da cidade (Marktplatz, Münsterplatz,
+# Rheinsprung e Augustinergasse, que dão para o Reno)
+CASAS = [
+    "Haus zum Gold (Marktplatz 5, Basel)", "Geschäftsgebäude Marktplatz 11 (Basel)", "Geltenzunft (Marktplatz 13, Basel)",
+    "Geschäftshaus zur Laute (Marktplatz 16/Gerbergasse 1/5, Basel)", "Geschäfts- und Wohnhaus Marktplatz 17 (Basel)",
+    "Wohn- und Geschäftshaus Marktplatz 18 (Basel)", "Wohn- und Geschäftshaus Marktplatz 19 (Basel)",
+    "Wohn- und Geschäftshaus Marktplatz 21/Sattelgasse 1 (Basel)", "Geschäftshaus Marktplatz 30 (Basel)",
+    "Singerhaus (Marktplatz 34/Stadthausgasse 10, Basel)", "Märthof (Marktplatz 36, Basel)",
+    "Haus zur Kapelle (Münsterplatz 1, Basel)", "Haus zur St. Johanns-Kapelle (Münsterplatz 2, Basel)",
+    "Allgemeine Lesegesellschaft (Münsterplatz 8, Basel)", "Falkensteinerhof (Münsterplatz 11, Basel)",
+    "Mentelinhof (Münsterplatz 14, Basel)", "Reischacherhof (Münsterplatz 16, Basel)", "Andlauerhof (Münsterplatz 17, Basel)",
+    "Reinacherhof (Münsterplatz 18, Basel)", "Schürhof (Münsterplatz 19, Basel)", "Rollerhof (Münsterplatz 20, Basel)",
+    "Zum Sonnenfroh (Rheinsprung 2, Basel)", "Haus zum Kranichstreyt (Rheinsprung 7, Basel)", "Zum Brauer (Rheinsprung 14, Basel)",
+    "St. Oswald-Pfruendhus (Rheinsprung 17, Basel)", "Augustinerschütte (Rheinsprung 21, Basel)",
+    "Zur hohen Sonnenluft (Augustinergasse 1–3, Basel)", "Zum goldenen Stauffen (Augustinergasse 5, Basel)",
+    "Zum Rappenfels (Augustinergasse 7, Basel)", "Zu den vier Häusern (Augustinergasse 9, Basel)", "Zum Selbviert (Augustinergasse 11, Basel)",
+    "Zem Wildemann (Augustinergasse 13, Basel)", "Zum guldin Critz (Augustinergasse 15, Basel)", "Haus zur hohen Tanne (Augustinergasse 21, Basel)",
+]
+
+
+def endereco(cat):
+    m = re.search(r"([A-ZÄÖÜ][\wäöüß.\- ]+?) (\d+)", cat.split("(", 1)[1] if "(" in cat and re.search(r"\(.*\d", cat) else cat)
+    return f"{m.group(1).strip()} {m.group(2)}" if m else None
+
+
+def casas():
+    from compacta import le_predios
+    meta = json.loads((RAIZ / "docs/data/predios.json").read_text()); P = meta["predios"]
+    q, ids = le_predios(RAIZ / "docs/data/predios.v2.bin")
+    v = q.astype(float) / meta["escala"]; tris = v.reshape(-1, 3, 3); tid = ids[::3]
+    ruas = json.loads((RAIZ / "docs/data/ruas.json").read_text())["linhas"]
+    pasta = DIR / "casas"; pasta.mkdir(parents=True, exist_ok=True)
+    out = []
+    for cat in CASAS:
+        end = endereco(cat)
+        pids = [i for i, p in enumerate(P) if p.get("end") == end]
+        if not pids:
+            print("sem prédio:", end); continue
+        pid = max(pids, key=lambda i: (tid == i).sum())
+        t = tris[tid == pid]; pts = t.reshape(-1, 3); cx, cz = pts[:, 0].mean(), pts[:, 2].mean()
+        # rumo da rua do endereço a partir do centro do prédio
+        rua = end.rsplit(" ", 1)[0]; melhor = (1e9, 0, 0)
+        for l in ruas:
+            if l.get("n") != rua: continue
+            c = np.array(l["c"]).reshape(-1, 2)
+            d = np.hypot(c[:, 0] - cx, c[:, 1] - cz); k = d.argmin()
+            if d[k] < melhor[0]: melhor = (d[k], c[k, 0], c[k, 1])
+        az_rua = np.degrees(np.arctan2(melhor[1] - cx, -(melhor[2] - cz))) % 360 if melhor[0] < 1e8 else None
+        # a parede do prédio mais alinhada com esse rumo (normal para fora; 0 = norte, 90 = leste)
+        n = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0]); area = np.linalg.norm(n, axis=1) / 2
+        nn = n / np.maximum(1e-9, 2 * area)[:, None]; par = np.abs(nn[:, 1]) < 0.35
+        az = np.degrees(np.arctan2(nn[par, 0], -nn[par, 2])) % 360; ar = area[par]
+        frente = None
+        if az_rua is not None and len(az):
+            dif = np.abs((az - az_rua + 180) % 360 - 180); ok = dif < 50
+            if ok.any(): frente = int(round(float(np.average(az[ok], weights=ar[ok])) if np.ptp(az[ok]) < 180 else float(az_rua)))
+        larg = float(ar[np.abs((az - (frente or 0) + 180) % 360 - 180) < 30].sum() / max(1, P[pid].get("alt") or 10)) if frente is not None else None
+        membros = json_url("https://commons.wikimedia.org/w/api.php?" + urllib.parse.urlencode({
+            "action": "query", "list": "categorymembers", "cmtitle": "Category:" + cat, "cmtype": "file", "cmlimit": 20, "format": "json"}))
+        arqs = [m["title"][5:] for m in membros["query"]["categorymembers"] if m["title"].lower().endswith((".jpg", ".jpeg", ".png"))][:3]
+        fotos = []
+        for arq in arqs:
+            info = json_url("https://commons.wikimedia.org/w/api.php?" + urllib.parse.urlencode({
+                "action": "query", "titles": "File:" + arq, "prop": "imageinfo", "iiprop": "url|extmetadata", "iiurlwidth": 1280, "format": "json"}))
+            ii = next(iter(info["query"]["pages"].values()))["imageinfo"][0]; meta2 = ii.get("extmetadata", {})
+            lic = meta2.get("LicenseShortName", {}).get("value", "")
+            if not any(k in lic for k in LIVRE): continue
+            destino = pasta / f"{re.sub(r'[^a-z0-9]+', '-', end.lower())}-{len(fotos)}.jpg"
+            if not destino.exists():
+                for tt in range(6):
+                    try:
+                        destino.write_bytes(urllib.request.urlopen(urllib.request.Request(ii["thumburl"], headers=UA), timeout=90).read()); break
+                    except urllib.error.HTTPError as e:
+                        if e.code != 429 or tt == 5: raise
+                        time.sleep(20 * (tt + 1))
+                time.sleep(3)
+            autor = re.sub("<[^>]+>", "", meta2.get("Artist", {}).get("value", "")).strip()
+            fotos.append({"foto": f"casas/{destino.name}", "pagina": ii["descriptionurl"], "licenca": lic, "autor": autor})
+        p = P[pid]
+        out.append({"cat": cat, "end": end, "pid": pid, "egid": p.get("egid"), "frente": frente, "largura": round(larg, 1) if larg else None,
+                    "alt": p.get("alt"), "and": p.get("and"), "ano": p.get("ano"), "mat": p.get("mat"), "fotos": fotos})
+        print(f"{end:24s} pid {pid:5d} egid {p.get('egid')} frente {frente} larg {larg and round(larg,1)} and {p.get('and')} fotos {len(fotos)}")
+    (DIR / "casas.json").write_text(json.dumps(out, ensure_ascii=False, indent=1))
+
+
 def aplica():
     leit = json.loads((DIR / "leitura.json").read_text())
     ret = json.loads((RAIZ / "docs/data/retoques.json").read_text())
@@ -125,4 +212,4 @@ def aplica():
 
 
 if __name__ == "__main__":
-    {"baixa": baixa, "lista": lista, "aplica": aplica}[sys.argv[1] if len(sys.argv) > 1 else "baixa"]()
+    {"baixa": baixa, "lista": lista, "casas": casas, "aplica": aplica}[sys.argv[1] if len(sys.argv) > 1 else "baixa"]()
