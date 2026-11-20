@@ -78,26 +78,62 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
       const leve = new URLSearchParams(location.search).get('leve') === '1' || matchMedia('(pointer:coarse)').matches;
       const tam = Math.min(N * LADO, renderer.capabilities.maxTextureSize, leve ? 4096 : 5120);
       const k = tam / (N * LADO);
-      const cv = document.createElement('canvas');
-      cv.width = cv.height = tam;
-      const cx = cv.getContext('2d');
-      const tex = new THREE.CanvasTexture(cv);
+      // sem canvas (eram 105 MB na memória e, a cada rajada de tiles, a textura inteira subia de novo: ~0,4 s de quadro
+      // travado): a foto geral vira a textura de uma vez e cada tile é copiado pela GPU só no seu pedaço, já no tamanho
+      // final, reduzido fora da thread principal pelo createImageBitmap
+      // tiles decodificados num worker (pixels crus, transferidos): o ImageBitmap ia para a GPU decodificando na hora, e cada
+      // envio travava o quadro por 60–230 ms; sem OffscreenCanvas, o caminho antigo
+      const tw = typeof OffscreenCanvas === 'function' && typeof Worker === 'function' ? new Worker(URL.createObjectURL(new Blob([`onmessage = async (e) => {
+  const { id, url, w } = e.data;
+  try {
+    const bmp = await createImageBitmap(await (await fetch(url)).blob(), w ? { resizeWidth: w, resizeHeight: w, resizeQuality: 'high' } : {});
+    const c = new OffscreenCanvas(bmp.width, bmp.height), x = c.getContext('2d'); x.drawImage(bmp, 0, 0);
+    const d = x.getImageData(0, 0, bmp.width, bmp.height).data.buffer;
+    postMessage({ id, width: bmp.width, height: bmp.height, px: d }, [d]);
+  } catch (err) { postMessage({ id, erro: String(err) }); }
+};`], { type: 'text/javascript' }))) : null;
+      const esperando = new Map(); let nId = 0;
+      if (tw) tw.onmessage = (e) => { const f = esperando.get(e.data.id); esperando.delete(e.data.id); e.data.erro ? f.no(e.data.erro) : f.ok(e.data); };
+      const pixels = (nome, w) => (tw ? new Promise((ok, no) => { const id = nId++; esperando.set(id, { ok, no }); tw.postMessage({ id, url: new URL(base + nome, location.href).href, w }); }) : img(nome, w));
+      const img = (nome, w) => fetch(base + nome).then((r) => r.blob()).then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none', ...(w ? { resizeWidth: w, resizeHeight: w, resizeQuality: 'high' } : {}) })); // sem conversão no envio
+      // a textura grande nasce vazia na GPU (FramebufferTexture: só aloca) e recebe a foto geral de 512 px esticada pela própria
+      // GPU; antes eram 105 MB montados num canvas e enviados de uma vez
+      const geral = await img('geral.webp');
+      const tex = new THREE.FramebufferTexture(tam, tam);
       tex.colorSpace = THREE.SRGBColorSpace;
-      tex.flipY = false; // linha 0 do canvas = norte = v 0 (z mínimo)
+      tex.flipY = false; // linha 0 = norte = v 0 (z mínimo)
       tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       tex.generateMipmaps = true;
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
-      const img = (nome) => fetch(base + nome).then((r) => r.blob()).then((b) => createImageBitmap(b));
-
-      cx.drawImage(await img('geral.webp'), 0, 0, tam, tam);
+      tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
       tex.needsUpdate = true;
+      renderer.initTexture(tex);
+      const gl = renderer.getContext(), glTex = () => renderer.properties.get(tex).__webglTexture;
+      // cópia na GPU (blitFramebuffer) de uma textura pequena para um retângulo da grande: entra na fila de comandos, sem a
+      // espera que o texSubImage2D direto na textura em uso causava (até 0,2 s por tile no ANGLE/Metal)
+      const fl = gl.createFramebuffer(), fd = gl.createFramebuffer();
+      const blit = (bmp, x, y, w, h) => {
+        const t = bmp.px ? new THREE.DataTexture(new Uint8Array(bmp.px), bmp.width, bmp.height) : new THREE.Texture(bmp); t.magFilter = THREE.LinearFilter; t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.needsUpdate = true;
+        renderer.initTexture(t);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fl); gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, renderer.properties.get(t).__webglTexture, 0);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, fd); gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, glTex(), 0);
+        gl.blitFramebuffer(0, 0, bmp.width, bmp.height, x, y, x + w, y + h, gl.COLOR_BUFFER_BIT, gl.LINEAR);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+        renderer.resetState();
+        t.dispose(); bmp.close?.();
+      };
+      blit(geral, 0, 0, tam, tam);
+      renderer.state.bindTexture(gl.TEXTURE_2D, glTex()); gl.generateMipmap(gl.TEXTURE_2D);
       U.uOrto.value = tex;
       U.uOrtoRet.value.set(meta.x0, meta.z0, 1 / (meta.x1 - meta.x0), 1 / (meta.z1 - meta.z0));
       U.uOrtoChao.value = 1;
       U.uOrtoTelhado.value = 1;
       pronto = true;
+      const subir = (bmp, x, y) => { if (glTex()) { blit(bmp, x, y, bmp.width, bmp.height); pendente = true; } };
+      // mipmaps refeitos na GPU no máximo a cada 300 ms (não a cada tile)
+      let pendente = false;
+      const mip = setInterval(() => { if (!pendente) return; pendente = false; const glt = renderer.properties.get(tex).__webglTexture; if (glt) { renderer.state.bindTexture(gl.TEXTURE_2D, glt); gl.generateMipmap(gl.TEXTURE_2D); } }, 300);
 
-      // tiles de 1024 px, do mais perto do alvo da câmera ao mais longe; um upload por rajada
+      // tiles de 1024 px, do mais perto do alvo da câmera ao mais longe
       const alvo = controls.target;
       const larg = (meta.x1 - meta.x0) / N, prof = (meta.z1 - meta.z0) / N;
       const fila = [];
@@ -106,24 +142,17 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
         fila.push({ i, j, d });
       }
       fila.sort((a, b) => a.d - b.d);
-      let pendente = false;
-      const sobe = () => {
-        if (pendente) return;
-        pendente = true;
-        setTimeout(() => { pendente = false; tex.needsUpdate = true; }, 350);
-      };
       let feitos = 0;
       const um = async ({ i, j }) => {
-        const b = await img(`t_${i}_${j}.webp`);
-        cx.clearRect(i * LADO * k, j * LADO * k, LADO * k, LADO * k);
-        cx.drawImage(b, i * LADO * k, j * LADO * k, LADO * k, LADO * k);
-        b.close?.();
+        const x0 = Math.round(i * LADO * k), y0 = Math.round(j * LADO * k), w = Math.round((i + 1) * LADO * k) - x0;
+        const b = await pixels(`t_${i}_${j}.webp`, w === LADO ? 0 : w);
+        subir(b, x0, y0);
         feitos++;
-        sobe();
       };
       // 3 downloads em paralelo, sem competir com a abertura
       const trabalha = async () => { while (fila.length) await um(fila.shift()); };
       await Promise.all([trabalha(), trabalha(), trabalha()]);
+      setTimeout(() => { clearInterval(mip); gl.deleteFramebuffer(fl); gl.deleteFramebuffer(fd); tw?.terminate(); }, 400);
       window.ortofotoTiles = feitos;
     },
   };
