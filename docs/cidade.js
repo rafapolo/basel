@@ -50,7 +50,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, PR_MAX));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = leve ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 // celular: o sistema derruba o contexto WebGL quando falta memória ou a aba fica no fundo; em vez de uma tela preta, recarrega
-canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); document.body.classList.add('sem-gl'); });
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); document.body.classList.add('sem-gl'); addEventListener('pointerup', () => location.reload(), { once: true }); }); // o iOS às vezes nunca devolve o contexto: um toque recarrega
 canvas.addEventListener('webglcontextrestored', () => location.reload());
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const cena = new THREE.Scene();
