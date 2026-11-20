@@ -33,6 +33,21 @@ export async function criarArvores({ THREE, cena, camera, altura, dentro = () =>
     { limpo: 0.08, lob: 0, esp: 0, vert: 1, cor: [0.10, 0.24, 0.12], ever: true }, // conífera
     { limpo: 0.14, lob: 5, esp: 0.12, vert: 1.35, cor: [0.34, 0.44, 0.14], ever: false }, // colunar
   ];
+  // calendário de cada espécie em Basel (dia do ano; fenologia da MeteoSwiss, médias recentes): brotar [início, copa cheia],
+  // cor de outono [início, auge] e queda [início, pelada]. O castanheiro abre as folhas primeiro (fim de março, começo de abril)
+  // e escurece já em setembro (a mariposa-minadora); plátano e carvalho brotam por último e seguram a folha até novembro
+  const FENO = [
+    { brota: [98, 122], tinta: [272, 300], cai: [288, 318] },  // tília: amarelo em outubro
+    { brota: [93, 116], tinta: [270, 298], cai: [290, 318] },  // bordo: laranja e vermelho em outubro
+    { brota: [86, 110], tinta: [245, 285], cai: [272, 305] },  // castanheiro: o primeiro a brotar e a cair
+    { brota: [106, 130], tinta: [285, 318], cai: [300, 340] }, // plátano: marrom-amarelado, cai tarde
+    { brota: [108, 132], tinta: [290, 322], cai: [305, 345] }, // carvalho: marrom, segura até o fim de novembro
+    { brota: [92, 118], tinta: [275, 308], cai: [292, 328] },  // outras folhosas (aqui entram as cerejeiras e magnólias dos jardins)
+    null,                                                      // conífera: sempre verde
+    { brota: [90, 112], tinta: [280, 302], cai: [288, 315] },  // colunar (choupo, carpino): amarelo
+  ];
+  // flor de primavera antes da folha, em parte das árvores de jardim (cerejeira, magnólia, ameixeira): fim de março a meados de abril
+  const FLOR = [0, 0, 1, 0, 0, 0.3, 0, 0]; // fração da classe que floresce: castanheiros todos (as velas brancas e rosa, já com folha); um terço das outras folhosas
   const AUTUMN = [[1.0, 0.78, 0.15], [0.95, 0.30, 0.08], [0.62, 0.42, 0.10], [0.82, 0.58, 0.14], [0.55, 0.28, 0.10], [0.80, 0.62, 0.18], [0.1, 0.24, 0.12], [0.98, 0.75, 0.15]];
   const CASCA = [0.20, 0.15, 0.11];
 
@@ -131,13 +146,16 @@ export async function criarArvores({ THREE, cena, camera, altura, dentro = () =>
   }
 
   // ---------- shader: balanço, queda de folha, cor de outono, oclusão falsa e rugosidade com ruído ----------
-  const G = { uT: { value: 0 }, uVento: { value: leve ? 0 : 1 }, uFolha: { value: 1 }, uTinta: { value: 0 }, uBrota: { value: 0 }, uTrans: { value: 0.1 } };
+  const G = { uT: { value: 0 }, uVento: { value: leve ? 0 : 1 }, uFolha: { value: 1 }, uTinta: { value: 0 }, uBrota: { value: 0 }, uTrans: { value: 0.1 }, uFlor: { value: 0 }, uFlorQ: { value: 0 } };
   const GLSL_COMUM = `
-uniform float uT, uVento, uFolha, uTinta, uBrota, uTrans, uEver; uniform vec3 uOutono;
+uniform float uT, uVento, uFolha, uTinta, uBrota, uTrans, uEver, uFlor, uFlorQ; uniform vec3 uOutono;
 varying vec3 vLocal; varying float vRnd, vTipo;
 float h3(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
+// quanto desta árvore está em flor (0..1): só a fração uFlorQ da classe, sorteada pela posição
+float flor(float rnd){ return uFlor * step(1.0 - uFlorQ, fract(rnd * 7.31)); }
 bool folhaCai(vec3 loc, float rnd){
   float dens = uEver > 0.5 ? 1.0 : clamp(uFolha * 1.4 - rnd * 0.4, 0.0, 1.0);
+  dens = max(dens, flor(rnd) * 0.8); // a copa em flor antes das folhas
   // grão fino (1/36 da árvore): em cubos de 1/13 as copas de outono pareciam recortadas em papel
   return h3(floor(loc * 36.0) + rnd * 17.0) > dens * 1.0001;
 }`;
@@ -174,6 +192,10 @@ bool folhaCai(vec3 loc, float rnd){
     // fim do outono: o que sobra na copa escurece para o marrom de folha seca (o amarelo vivo é de outubro)
     c = mix(c, vec3(0.42, 0.28, 0.15) * (0.8 + 0.4 * vRnd), ti * (1.0 - uEver) * 0.6 * smoothstep(0.85, 0.25, uFolha));
     c = mix(c, vec3(0.50, 0.62, 0.16) * (0.7 + 0.5 * vRnd), uBrota * (1.0 - uEver) * 0.55);
+    // flor: rosa (cerejeira japonesa, magnólia) ou branca (cerejeira, ameixeira; as velas do castanheiro), some quando a folha cresce
+    float fl = flor(vRnd), pet = h3(floor(vLocal * 40.0) + vRnd * 5.0);
+    vec3 cFlor = fract(vRnd * 13.7) < 0.45 ? vec3(0.98, 0.72, 0.82) : vec3(0.97, 0.95, 0.90);
+    c = mix(c, cFlor * (0.85 + 0.2 * pet), fl * step(mix(0.25, 0.86, smoothstep(0.4, 0.9, uFolha)), pet)); // com a copa cheia, só pontos (as velas)
     c *= mix(0.55, 1.0, smoothstep(0.0, 0.8, vLocal.y)) * (0.9 + 0.2 * vRnd);   // copa mais escura por baixo e por dentro
     if (!gl_FrontFacing) c *= 0.5; // o lado de dentro da copa, visto pelos vãos das folhas que caíram
     diffuseColor.rgb = c;
@@ -205,6 +227,8 @@ void main() {
   if (vTipoA > 0.5 && h3a(floor(vLocalA * 36.0) + vRndA * 17.0) > clamp(uFolha * 1.4 - vRndA * 0.4, 0.0, 1.0) * 0.985) discard;`);
   };
 
+  // uniforms da estação por classe (cada espécie no seu calendário, FENO); G guarda a média para o G-buffer do GTAO
+  const UC = CLASSES.map((_, ci) => ({ uFolha: { value: 1 }, uTinta: { value: 0 }, uBrota: { value: 0 }, uFlor: { value: 0 }, uFlorQ: { value: FLOR[ci] ?? 0 } }));
   // ---------- malhas: 1 por classe e LOD ----------
   const porClasse = CLASSES.map(() => []);
   for (const a of vivas) porClasse[a.k].push(a);
@@ -217,13 +241,13 @@ void main() {
     for (const lod of LODS) {
       // os dois lados: pelos vãos das folhas que caem aparece o outro lado da copa, e não o vazio de uma casca oca
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
-      const uEver = { value: P.ever ? 1 : 0 }, uOut = { value: new THREE.Vector3(...AUTUMN[ci].map((v, i) => v * [0.8, 0.74, 0.8][i])) };
+      const uEver = { value: P.ever ? 1 : 0 }, uOut = { value: new THREE.Vector3(...AUTUMN[ci].map((v, i) => v * [0.8, 0.74, 0.8][i])) }, F = UC[ci];
       mat.onBeforeCompile = (s) => {
-        injetar(s, { cheio: true }); s.uniforms.uEver = uEver; s.uniforms.uOutono = uOut;
+        injetar(s, { cheio: true }); s.uniforms.uEver = uEver; s.uniforms.uOutono = uOut; Object.assign(s.uniforms, F);
       };
       mat.customProgramCacheKey = () => 'arv';
       const dep = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
-      dep.onBeforeCompile = (s) => { injetar(s, { cheio: false }); s.uniforms.uEver = uEver; };
+      dep.onBeforeCompile = (s) => { injetar(s, { cheio: false }); s.uniforms.uEver = uEver; Object.assign(s.uniforms, F); };
       dep.customProgramCacheKey = () => 'arv-dep';
       const m = new THREE.InstancedMesh(construir(ci, lod), mat, Math.max(1, lista.length));
       m.count = 0; m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.customDepthMaterial = dep;
@@ -259,18 +283,29 @@ void main() {
 
   // ---------- estações: pela data de ceu.estado() ----------
   const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const lawn = { cor: new THREE.Color(), verao: new THREE.Color('#6f8a3c'), outono: new THREE.Color('#8f8b45'), inverno: new THREE.Color('#8c8a62') };
+  // grama: parda no inverno, verde vivo na primavera (abril–junho), mais seca no alto verão, amarelada no outono
+  const lawn = { cor: new THREE.Color(), primavera: new THREE.Color('#5c9a36'), verao: new THREE.Color('#758a3e'), outono: new THREE.Color('#8f8b45'), inverno: new THREE.Color('#8c8a62') };
   let gramaMat = null;
   function estacao(e) {
     const [a, mes, dia] = e.data.split('-').map(Number);
     const doy = Math.round((Date.UTC(a, mes - 1, dia) - Date.UTC(a, 0, 0)) / 86400000);
-    G.uFolha.value = ss(100, 126, doy) * (1 - ss(292, 338, doy)); // Basel: copa cheia até meados de outubro, quase pelada no fim de novembro
+    G.uFolha.value = ss(96, 122, doy) * (1 - ss(292, 335, doy)); // média: copa cheia até meados de outubro, quase pelada no fim de novembro
     G.uTinta.value = doy > 200 ? ss(272, 318, doy) : 0;
-    G.uBrota.value = doy < 200 ? ss(100, 118, doy) * (1 - ss(118, 150, doy)) : 0;
+    G.uBrota.value = doy < 200 ? ss(96, 114, doy) * (1 - ss(114, 150, doy)) : 0;
+    FENO.forEach((f, ci) => {
+      const u = UC[ci]; if (!f) return;
+      const [b0, b1] = f.brota, meio = (b0 + b1) / 2;
+      u.uFolha.value = ss(b0, b1, doy) * (1 - ss(f.cai[0], f.cai[1], doy));
+      u.uTinta.value = doy > 200 ? ss(f.tinta[0], f.tinta[1], doy) : 0;
+      u.uBrota.value = doy < 200 ? ss(b0, meio, doy) * (1 - ss(meio, b1 + 25, doy)) : 0; // verde-claro das folhas novas, maio adentro
+      // flor: das ornamentais, do fim de março a meados de abril; do castanheiro (velas), no fim de abril e começo de maio
+      u.uFlor.value = ci === 2 ? ss(112, 120, doy) * (1 - ss(130, 140, doy)) : ss(78, 88, doy) * (1 - ss(104, 116, doy));
+    });
     G.uTrans.value = 0.1 * e.dia;
     if (gramaMat) {
-      const f = ss(150, 330, doy) * (1 - ss(330, 360, doy)), inv = doy < 90 || doy > 340 ? 1 : 1 - ss(90, 130, doy);
-      lawn.cor.copy(lawn.verao).lerp(lawn.outono, f).lerp(lawn.inverno, inv * 0.8);
+      const pri = ss(75, 110, doy) * (1 - ss(165, 200, doy)), seco = ss(180, 215, doy) * (1 - ss(250, 270, doy));
+      const out = ss(260, 300, doy) * (1 - ss(330, 355, doy)), inv = doy < 75 || doy > 330 ? 1 : (1 - ss(60, 100, doy)) + ss(320, 345, doy);
+      lawn.cor.copy(lawn.verao).lerp(lawn.primavera, pri).lerp(lawn.outono, Math.max(out, 0.35 * seco)).lerp(lawn.inverno, Math.min(1, inv) * 0.85);
       gramaMat.color.copy(lawn.cor).multiplyScalar(0.3 + 0.7 * Math.max(e.dia, 0.25));
     }
   }
