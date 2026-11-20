@@ -20,6 +20,8 @@ export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, contro
   const V = await fetch(base + 'vida.json').then((r) => r.json());
   // lugares onde a gente para (script/pontos.py): rodinhas, Rheinbord, paradas de bonde e focos de quem anda
   const PT = await fetch(base + 'pontos.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  // parques e gramados do OSM (arvores.json → verde): famílias de pé e de piquenique (2026-11-21)
+  const VERDE = await fetch(base + 'arvores.json').then((r) => (r.ok ? r.json() : null)).then((a) => a?.verde ?? []).catch(() => []);
   const rnd = mulberry(1912);
   const parado = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const grupo = new THREE.Group(); grupo.name = 'vida';
@@ -431,10 +433,10 @@ uniform float uVidaT; uniform float uAnima;`)
   };
   const LUG = { x: [], z: [], y: [], hx: [], hz: [], tipo: [], lim: [], alt: [], larg: [], kid: [] };
   // pKid: chance de ser criança (menor, mais estreita e de anoraque colorido, como as que andam)
-  const lugar = (x, z, y, hx, hz, tipo, pKid = 0) => {
-    if (leve && rnd() < 0.5) return;
+  const lugar = (x, z, y, hx, hz, tipo, pKid = 0, lim = null) => {
+    if (leve && lim == null && rnd() < 0.5) return;
     const kid = rnd() < pKid, alt = kid ? 0.5 + rnd() * 0.3 : 0.94 + rnd() * 0.14;
-    LUG.x.push(x); LUG.z.push(z); LUG.y.push(y); LUG.hx.push(hx); LUG.hz.push(hz); LUG.tipo.push(tipo); LUG.lim.push(rnd()); LUG.alt.push(alt);
+    LUG.x.push(x); LUG.z.push(z); LUG.y.push(y); LUG.hx.push(hx); LUG.hz.push(hz); LUG.tipo.push(tipo); LUG.lim.push(lim ?? rnd()); LUG.alt.push(alt); // lim: o mesmo para a família inteira (aparece junta)
     LUG.larg.push(kid ? 0.7 + 0.3 * (alt - 0.5) / 0.3 : 1); LUG.kid.push(kid ? 1 : 0);
   };
   const SENT = []; // os sentados vão numa malha à parte
@@ -452,6 +454,36 @@ uniform float uVidaT; uniform float uAnima;`)
       for (let j = 0; j < k; j++) { const a = rnd() * TAU; lugar(px + (rnd() - 0.5) * 6, pz + (rnd() - 0.5) * 3, null, Math.sin(a), Math.cos(a), 3, 0.15); }
     }
   }
+  // famílias nos parques: um ou dois adultos e de uma a três crianças por perto; quatro em cada dez num piquenique (toalha
+  // xadrez no chão, dois sentados e as crianças em volta). Uma família a cada ~1000 m² de parque ou gramado, até 25 por
+  // parque e 400 no total (120 no leve)
+  const PIQ = []; // [x, z, rumo, sentados (índices em SENT)]
+  {
+    const dentroP = (x, z, p) => { let d = false; for (let i = 1, j = p.length - 2; i < p.length; j = i, i += 2) if ((p[i + 1] > z) !== (p[j + 1] > z) && x < ((p[j] - p[i]) * (z - p[i + 1])) / (p[j + 1] - p[i + 1]) + p[i]) d = !d; return d; };
+    const areaP = (p) => { let a = 0; for (let i = 1, j = p.length - 2; i < p.length; j = i, i += 2) a += (p[j] + p[i]) * (p[j + 1] - p[i + 1]); return Math.abs(a / 2); };
+    let n = 0; const teto = leve ? 120 : 400;
+    for (const p of VERDE) {
+      if (p[0] !== 0 && p[0] !== 2) continue; // parques e gramados públicos (os jardins do OSM são quase todos particulares)
+      let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+      for (let i = 1; i < p.length; i += 2) { x0 = Math.min(x0, p[i]); x1 = Math.max(x1, p[i]); z0 = Math.min(z0, p[i + 1]); z1 = Math.max(z1, p[i + 1]); }
+      const k = Math.min(25, Math.floor(areaP(p) / 1000 + rnd()));
+      for (let j = 0, t = 0; j < k && t < k * 6 && n < teto; t++) {
+        const cx = x0 + rnd() * (x1 - x0), cz = z0 + rnd() * (z1 - z0);
+        if (!dentroP(cx, cz, p) || FORA(cx, cz)) continue;
+        j++; n++;
+        const ang = rnd() * TAU, adultos = 1 + (rnd() < 0.65 ? 1 : 0), criancas = 1 + Math.floor(rnd() * 3), lf = rnd(); // lf: limiar da família
+        if (rnd() < 0.4) { // piquenique: os adultos sentados na toalha, as crianças de pé em volta
+          const sent = [];
+          for (let a = 0; a < adultos; a++) { const aa = ang + a * Math.PI; SENT.push([cx + Math.cos(aa) * 0.5, cz + Math.sin(aa) * 0.5, -Math.cos(aa), -Math.sin(aa), 1, lf]); sent.push(SENT.length - 1); }
+          PIQ.push([cx, cz, ang, lf]);
+          for (let c = 0; c < criancas; c++) { const a = ang + 1.2 + c * 1.1, r = 1.3 + rnd() * 1.2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r; lugar(x, z, null, cx - x, cz - z, 4, 1, lf); }
+        } else { // de pé, conversando, com as crianças em volta
+          for (let a = 0; a < adultos; a++) { const x = cx + (a - 0.5) * 0.7, z = cz + (rnd() - 0.5) * 0.4; lugar(x, z, null, Math.cos(ang), Math.sin(ang), 4, 0, lf); }
+          for (let c = 0; c < criancas; c++) { const a = ang + (rnd() - 0.5) * 2.4, r = 1.0 + rnd() * 2.0, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r; lugar(x, z, null, cx - x, cz - z, 4, 1, lf); }
+        }
+      }
+    }
+  }
   if (ponte) { // debruçados no parapeito da Mittlere, de frente para o rio (o mesmo quadro de marcos.js)
     const { A, B, larg } = ponte, L = Math.hypot(B[0] - A[0], B[1] - A[1]), ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, nx = -uz, nz = ux;
     for (let sP = 18; sP < L - 18; sP += 3.2) for (const sg of [-1, 1]) {
@@ -466,7 +498,18 @@ uniform float uVidaT; uniform float uAnima;`)
   }
   const imPar = nLug ? malhaInst(geoGente(), matG, nLug, false) : null;
   const imSent = SENT.length ? malhaInst(geoSentado(), matG, SENT.length, false) : null;
-  const limSent = SENT.map(() => rnd()), altSent = SENT.map(() => 0.94 + rnd() * 0.14);
+  const limSent = SENT.map((e) => e[5] ?? rnd()), altSent = SENT.map(() => 0.94 + rnd() * 0.14);
+  // toalhas dos piqueniques: xadrez em cores de toalha (vermelho, azul, verde, amarelo), uma por família sentada
+  const imToalha = PIQ.length ? (() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 32; const g = cv.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, 32, 32); g.fillStyle = 'rgba(0,0,0,.45)'; for (let i = 0; i < 4; i++) { g.fillRect(i * 8, 0, 4, 32); g.fillRect(0, i * 8, 32, 4); }
+    const tx = new THREE.CanvasTexture(cv); tx.magFilter = THREE.NearestFilter;
+    const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.9, 1.5).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.95 }), PIQ.length);
+    const CT = ['#c8202a', '#2a5fb0', '#3c8f4a', '#e0a020'].map((c) => new THREE.Color(c));
+    PIQ.forEach((p, i) => m.setColorAt(i, CT[i % CT.length]));
+    m.frustumCulled = false; m.receiveShadow = true; grupo.add(m); return m;
+  })() : null;
+  const yToalha = PIQ.map(([x, z]) => altura(x, z) + 0.03);
   for (let i = 0; i < nLug; i++) if (LUG.y[i] == null) LUG.y[i] = altura(LUG.x[i], LUG.z[i]) + 0.02;
   const ySent = SENT.map(([x, z]) => altura(x, z) + 0.02);
   function pintarParados() {
@@ -509,14 +552,18 @@ uniform float uVidaT; uniform float uAnima;`)
     tParados = agora;
     const f = lim(fp, 0, 1);
     // lotação de cada tipo (0..1); escalas que dão ~250–400 a mais numa tarde de verão
+    // famílias nos parques: de dia (mais à tarde), muito mais no fim de semana e no verão, quase ninguém no inverno
+    const dParque = 0.8 * suave(9.5, 11.5, h) * (1 - suave(18.5, 20.5, h)) * ({ verao: 1, meia: 0.6, inverno: 0.15 })[S.estacao] * (S.dia === 'util' ? 0.5 : 1) * (0.4 + 0.6 * lim(f * 1.5, 0, 1));
     const dens = [
       0.6 * lim(0.12 + 0.95 * f, 0, 1),                                        // rodinhas
       0,
       0.6 * lim(0.15 + 0.9 * f, 0, 1),                                         // parapeito da ponte
       0.5 * lim(0.1 + 0.9 * f, 0, 1),                                          // paradas de bonde
+      dParque,                                                                 // famílias nos parques
     ];
     // Rheinbord: tardes e começo de noite, sobretudo no verão
     const dRio = 0.5 * lim(f * 1.2, 0, 1) * suave(10, 15, h) * (1 - 0.7 * suave(21, 24, h)) * ESTACAO_RIO[S.estacao];
+    if (imToalha) { const m = imToalha.instanceMatrix.array; PIQ.forEach(([x, z, a, lf], i) => { if (lf < dParque) matriz(imToalha, i, x, yToalha[i], z, Math.cos(a), Math.sin(a), 1, 1, 1); else m.fill(0, i * 16, i * 16 + 16); }); imToalha.instanceMatrix.needsUpdate = true; }
     let n = 0;
     if (imPar) {
       const m = imPar.instanceMatrix.array;
@@ -533,7 +580,7 @@ uniform float uVidaT; uniform float uAnima;`)
       const m = imSent.instanceMatrix.array;
       for (let i = 0; i < SENT.length; i++) {
         const [x, z, hx, hz] = SENT[i];
-        if (limSent[i] < dRio) { matriz(imSent, i, x, ySent[i], z, hx, hz, 1, altSent[i], 1); n++; }
+        if (limSent[i] < (SENT[i][4] === 1 ? dParque : dRio)) { matriz(imSent, i, x, ySent[i], z, hx, hz, 1, altSent[i], 1); n++; }
         else m.fill(0, i * 16, i * 16 + 16);
       }
       imSent.instanceMatrix.needsUpdate = true;
