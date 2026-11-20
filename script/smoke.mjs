@@ -1,23 +1,26 @@
 #!/usr/bin/env bun
 // Teste de fumaça do dist/ antes do deploy (CI, .github/workflows/deploy.yml): abre a página num Chromium headless e
 // falha se houver erro de JS, resposta >= 400 do próprio site ou se a cidade não terminar de desenhar em 90 s.
-//   bun script/smoke.mjs http://localhost:8000/
-import { chromium } from 'playwright';
+//   bun script/smoke.mjs http://localhost:8000/ [webkit]
+// Com `webkit` roda no WebKit do Playwright (`bunx playwright install webkit`): o motor do Safari no Mac, não um iPhone
+import { chromium, webkit } from 'playwright';
 
 const url = process.argv[2] || 'http://localhost:8000/';
 const erros = [];
-const b = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
+const b = process.argv[3] === 'webkit' ? await webkit.launch() : await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
 try {
-  const pg = await b.newPage({ viewport: { width: 1280, height: 800 } });
-  pg.on('pageerror', (e) => erros.push(`pageerror: ${e.message}`));
-  pg.on('console', (m) => { if (m.type() === 'error') erros.push(`console: ${m.text()}`); });
-  pg.on('response', (r) => { if (r.status() >= 400 && r.url().startsWith(new URL(url).origin)) erros.push(`${r.status()} ${r.url()}`); });
+  // uma página por consulta: navegar com tiles ainda chegando faz o WebKit rejeitar os downloads abortados ("Load failed")
   for (const q of ['?hora=15&data=2026-06-21', '?lang=de&leve=1']) {
+    const pg = await b.newPage({ viewport: { width: 1280, height: 800 } });
+    pg.on('pageerror', (e) => erros.push(`pageerror: ${e.message}`));
+    pg.on('console', (m) => { if (m.type() === 'error') erros.push(`console: ${m.text()}`); });
+    pg.on('response', (r) => { if (r.status() >= 400 && r.url().startsWith(new URL(url).origin)) erros.push(`${r.status()} ${r.url()}`); });
     await pg.goto(url + q, { waitUntil: 'load', timeout: 60000 });
     await pg.waitForSelector('#carregando.fora', { state: 'attached', timeout: 90000 });
     const ok = await pg.evaluate(() => !!window.ceu && typeof window.ceu.estado === 'function');
     if (!ok) erros.push(`${q}: window.ceu ausente`);
     console.log(`ok ${q}`);
+    await pg.close();
   }
 } catch (e) {
   erros.push(String(e));
