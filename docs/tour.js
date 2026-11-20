@@ -152,6 +152,16 @@ function cenas() {
         'At 4 a.m. sharp every light goes out: only the cliques’ painted lanterns, piccolos and drums.',
         'Punkt 4 Uhr gehen alle Lichter aus: nur die bemalten Laternen der Cliquen, Piccolos und Trommeln.'));
       await em(2200);
+      // na metade da caminhada é segunda à tarde: o Cortège, com os Wagen descendo a Augustinergasse
+      const meio = setTimeout(() => {
+        if (!ativo) return;
+        C.ceu.definirHora(15, { animar: true }); C.fasnacht?.()?.forcarCortege?.(true);
+        legenda(t('Cortège · segunda à tarde', 'Cortège · Monday afternoon', 'Cortège · Montagnachmittag'), t(
+          'À tarde passam os carros alegóricos: os Waggis jogam laranjas, balas e Räppli no público.',
+          'In the afternoon the floats roll by: the Waggis throw oranges, sweets and confetti at the crowd.',
+          'Am Nachmittag rollen die Wagen: die Waggis werfen Orangen, Täfeli und Räppli ins Publikum.'));
+      }, 9000);
+      pendentes.add({ id: meio, falha: () => {} });
       // traçado do OSM: Rheinsprung (de 38,8/7,8), Augustinergasse, Münsterplatz até o meio da praça
       const p0 = C.camera.position;
       await caminhar([[p0.x, p0.z], [54.3, 26.0], [68.4, 43.7], [77.7, 55.0], [94.1, 75.1], [102.9, 86.1], [111.1, 97.6], [120.5, 112.4], [124.9, 125.0], [130.6, 144.6], [139.5, 164.3], [154.4, 188.8], [160, 198]], 19300, [munster[0], 26, munster[2]]);
@@ -159,6 +169,7 @@ function cenas() {
     // 2 · Münster e Pfalz: da praça, sobe em volta da catedral
     { dur: 12000, run: async () => {
       C.ceu.definirHora(14, { animar: true }); // depois do Morgestraich, o dia volta
+      C.fasnacht?.()?.forcarCortege?.(null);
       mover({ alvo: munster, dist: 170, polar: rad(68), az: rad(200) }, 4500, { arco: 0.2 });
       await legenda('Münster · Pfalz', t(
         'O Münster de arenito vermelho e o terraço da Pfalz, uns 20 m acima do Reno.',
@@ -292,6 +303,7 @@ function parar(voltar = true) {
   C.ceu.definirData(salvo.data); C.ceu.definirHora(salvo.hora);
   if (voltar) C.definirNoite(salvo.noite);
   C.ceu.aoVivo = salvo.vivo;
+  C.fasnacht?.()?.forcarCortege?.(null);
   window.vida?.forcarNado?.(false);
   C.controls.enabled = true;
   C.controls.update();

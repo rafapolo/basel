@@ -236,6 +236,86 @@ function clique({ cena, altura, semente = 0, semLuz = false, semGugge = false })
   return { marchar, parar, atualizar, derruba, grupo: g, visivel: () => g.visible, onde: () => (gugge ? [corpo.instanceMatrix.array[12], corpo.instanceMatrix.array[13], corpo.instanceMatrix.array[14]] : lanterna.position.toArray()) };
 }
 
+// ---- Wagen: os carros alegóricos do Cortège (segunda e quarta à tarde): trator puxando uma carreta enfeitada com uma
+// escultura satírica de papel machê, e Waggis em cima (máscara de nariz enorme, cabeleira amarela, camisa azul e branca)
+// jogando laranjas, balas e Räppli para o público
+const SUJETS = [ // a escultura de cima: cabeça de caricatura, pilha de formas, um bicho
+  { tipo: 'cabeca', cor: '#f2c9b8', extra: '#e8102e' }, { tipo: 'pilha', cor: '#1f7ae6', extra: '#ffc81e' },
+  { tipo: 'bicho', cor: '#2fb04a', extra: '#ff6a00' }, { tipo: 'cabeca', cor: '#ffd23f', extra: '#7b2d8b' },
+  { tipo: 'pilha', cor: '#ff2f8a', extra: '#00b3b3' }, { tipo: 'bicho', cor: '#a12dbb', extra: '#f4f1ea' },
+];
+function texLateral(cores, semente) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = cores[0]; g.fillRect(0, 0, 256, 64);
+  for (let i = 0; i < 18; i++) { g.fillStyle = cores[(i + semente) % cores.length]; g.beginPath(); g.arc((i * 61 + semente * 17) % 256, 12 + (i * 23) % 44, 6 + (i % 4) * 4, 0, TAU); g.fill(); }
+  g.fillStyle = '#151515'; g.font = 'bold 20px sans-serif'; g.fillText(['FASNACHT', 'BASEL', 'SUJET', 'DÄSCHER', 'WAGGIS', 'RÄPPLI'][semente % 6], 70, 42);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function wagen({ cena, semente = 0 }) {
+  const g = new THREE.Group(); g.name = 'wagen'; g.visible = false; cena.add(g);
+  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, ...o });
+  const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
+  const roda = (r, w, x, y, z) => { const o = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 14).rotateZ(Math.PI / 2), M(0x1d1d1d)); o.position.set(x, y, z); g.add(o); return o; };
+  // trator (verde, rodas grandes atrás) na frente, +z
+  box(1.4, 1.0, 2.4, M(0x2f7a32), 0, 1.05, 4.6); box(1.1, 1.0, 1.0, M(0x2f7a32), 0, 2.0, 4.0); box(1.0, 0.7, 0.05, M(0x8fb4c4, { roughness: 0.2 }), 0, 2.1, 4.52);
+  roda(0.75, 0.45, 0.85, 0.75, 3.9); roda(0.75, 0.45, -0.85, 0.75, 3.9); roda(0.45, 0.3, 0.7, 0.45, 5.4); roda(0.45, 0.3, -0.7, 0.45, 5.4);
+  // carreta: plataforma de 6 × 2,5 m com laterais pintadas e saia de franjas
+  const S = SUJETS[semente % SUJETS.length], cores = [S.cor, S.extra, '#f4f1ea', '#151515', '#ffc81e'];
+  const lat = new THREE.MeshStandardMaterial({ map: texLateral(cores, semente), roughness: 0.75 });
+  box(2.5, 0.2, 6, M(0x5a3a22), 0, 1.0, 0);
+  for (const sx of [-1, 1]) { const l = box(0.06, 0.8, 6, lat, sx * 1.26, 0.6, 0); l.rotation.y = 0; }
+  for (const sz of [-1, 1]) box(2.5, 0.8, 0.06, lat, 0, 0.6, sz * 3.0);
+  for (const z of [-2, 2]) { roda(0.4, 0.3, 1.1, 0.4, z); roda(0.4, 0.3, -1.1, 0.4, z); }
+  // escultura de cima
+  const mc = M(S.cor, { roughness: 0.6 }), me = M(S.extra, { roughness: 0.6 });
+  if (S.tipo === 'cabeca') { // cabeça de caricatura com nariz comprido e chapéu
+    const c = new THREE.Mesh(new THREE.SphereGeometry(1.4, 18, 14).scale(1, 1.15, 1), mc); c.position.set(0, 3.4, -1.2); g.add(c);
+    const n = new THREE.Mesh(new THREE.ConeGeometry(0.4, 2.2, 12).rotateX(Math.PI / 2), mc); n.position.set(0, 3.3, 0.6); g.add(n);
+    const ch = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.8, 14), me); ch.position.set(0, 5.2, -1.2); g.add(ch);
+    for (const sx of [-1, 1]) { const o = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), M(0xffffff)); o.position.set(sx * 0.5, 3.8, 0.0); g.add(o); const p = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), M(0x151515)); p.position.set(sx * 0.5, 3.8, 0.28); g.add(p); }
+  } else if (S.tipo === 'pilha') { // pilha torta de caixas e uma bola, o sujet do ano
+    for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(1.8 - i * 0.3, 0.9, 1.8 - i * 0.3), i % 2 ? me : mc); b.position.set((i % 2 ? 0.2 : -0.2), 1.6 + i * 0.9, -1.4); b.rotation.y = i * 0.35; g.add(b); }
+    const bola = new THREE.Mesh(new THREE.SphereGeometry(0.6, 14, 10), me); bola.position.set(0, 5.4, -1.4); g.add(bola);
+  } else { // bicho: corpo, cabeça, orelhas
+    const corpo = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12).scale(1.6, 1, 1), mc); corpo.position.set(0, 2.6, -1.4); corpo.rotation.y = Math.PI / 2; g.add(corpo);
+    const cab = new THREE.Mesh(new THREE.SphereGeometry(0.8, 14, 10), mc); cab.position.set(0, 3.6, 0.6); g.add(cab);
+    for (const sx of [-1, 1]) { const o = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.9, 8), me); o.position.set(sx * 0.45, 4.4, 0.6); g.add(o); }
+  }
+  // Waggis em cima da carreta: camisa azul e branca, cabeleira amarela, nariz enorme, braço que joga
+  const waggis = [];
+  for (let i = 0; i < 4; i++) {
+    const w = new THREE.Group(), x = (i % 2 ? 0.8 : -0.8), z = i < 2 ? 2.0 : 0.6;
+    const corpo = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 1.0, 10), new THREE.MeshStandardMaterial({ map: texPadrao({ padrao: 'listra', a: '#1f5aa6', b: '#f4f1ea' }), roughness: 0.8 })); corpo.position.y = 0.6;
+    const cab = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10).scale(1, 1.2, 1), M(0xf2c9b8)); cab.position.y = 1.4;
+    const nar = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.55, 8).rotateX(Math.PI / 2), M(0xf2c9b8)); nar.position.set(0, 1.35, 0.42);
+    const cab2 = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.13, 6, 14).rotateX(Math.PI / 2), M(0xffc81e, { roughness: 1 })); cab2.position.y = 1.62;
+    const braco = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.6, 6).translate(0, 0.3, 0), M(0xf4f1ea)); braco.position.set(0.25, 1.0, 0);
+    w.add(corpo, cab, nar, cab2, braco); w.position.set(x, 1.1, z); w.rotation.y = (i % 2 ? -1 : 1) * 1.2; g.add(w); waggis.push({ w, braco, fase: i * 1.7 });
+  }
+  // laranjas voando: 18 por carro, em arco, dos Waggis para a calçada
+  const NL = 18, pl = new Float32Array(NL * 3), gl = new THREE.BufferGeometry(); gl.setAttribute('position', new THREE.BufferAttribute(pl, 3));
+  const laranjas = new THREE.Points(gl, new THREE.PointsMaterial({ color: 0xff8a1a, size: 0.16, sizeAttenuation: true })); laranjas.frustumCulled = false; cena.add(laranjas); laranjas.visible = false;
+  return { g, waggis, laranjas, pl, gl, NL };
+}
+// os carros seguem o caminho (pontos x,z) num vaivém, a ~1,1 m/s (o passo do Cortège)
+function andarWagen(W, cam, s, agora, altura) {
+  const { pts, acum, total } = cam; let ss = ((s % (2 * total)) + 2 * total) % (2 * total), volta = false; if (ss > total) { ss = 2 * total - ss; volta = true; }
+  let i = 1; while (i < acum.length - 1 && acum[i] < ss) i++;
+  const a = pts[i - 1], b = pts[i], k = (ss - acum[i - 1]) / Math.max(1e-6, acum[i] - acum[i - 1]);
+  const x = a[0] + (b[0] - a[0]) * k, z = a[1] + (b[1] - a[1]) * k; let rumo = Math.atan2(b[0] - a[0], b[1] - a[1]); if (volta) rumo += Math.PI;
+  W.g.position.set(x, altura(x, z), z); W.g.rotation.y = rumo;
+  const t = agora / 1000;
+  for (const q of W.waggis) q.braco.rotation.x = -1.2 - 1.1 * Math.max(0, Math.sin(t * 2.2 + q.fase)); // o braço que joga
+  // laranjas: cada uma num arco de 1,4 s, saindo de um Waggis para um lado da rua
+  const sx = Math.sin(rumo), sz = Math.cos(rumo), nx = sz, nz = -sx;
+  for (let j = 0; j < W.NL; j++) {
+    const u = ((t * 0.7 + j / W.NL) % 1), lado = j % 2 ? 1 : -1, w = W.waggis[j % 4].w.position, d = 1 + 6 * u;
+    const ox = x + sx * w.z + nx * (w.x + lado * d), oz = z + sz * w.z + nz * (w.x + lado * d);
+    W.pl[j * 3] = ox; W.pl[j * 3 + 1] = altura(x, z) + 2.6 + 3.2 * u - 6 * u * u; W.pl[j * 3 + 2] = oz;
+  }
+  W.gl.attributes.position.needsUpdate = true;
+}
+
 // ---- som: tambor de marcha (ruído em rajadas com acento), da Clique mais perto ----
 let ac = null, ganho = null, ultCompasso = 0;
 function somVol(v) { if (ganho) ganho.gain.setTargetAtTime(v, ac.currentTime, 0.3); }
@@ -312,6 +392,16 @@ export function criarFasnacht({ cena, altura, ruas, ceu }) {
   band.frustumCulled = false; band.visible = false; band.name = 'bandeirinhas'; cena.add(band);
   const gV = new THREE.BufferGeometry(); gV.setAttribute('position', new THREE.Float32BufferAttribute(pv, 3));
   const varal = new THREE.LineSegments(gV, new THREE.LineBasicMaterial({ color: 0x3a3a3a })); varal.visible = false; varal.frustumCulled = false; cena.add(varal);
+  // Cortège: os Wagen saem nas tardes de segunda e quarta (13h30–18h30) pelas ruas largas; no tour, também na Augustinergasse
+  const RUAS_WAGEN = ['Freie Strasse', 'Gerbergasse', 'Clarastrasse', 'Steinenvorstadt', 'Marktplatz', 'Barfüsserplatz', 'Steinenberg', 'Greifengasse', 'Augustinergasse', 'Münsterplatz'];
+  const camW = RUAS_WAGEN.map((n) => ruaPorNome(ruas, n)).filter(Boolean).map((pts) => { const acum = [0]; for (let i = 1; i < pts.length; i++) acum.push(acum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, acum, total: acum.at(-1) }; });
+  let carros = null, cortegeOn = false, forcarCortege = null;
+  const ehCortege = (data, hora) => { const [a, m, d] = data.split('-').map(Number), seg = segundaFasnacht(a), dia = Math.round((Date.UTC(a, m - 1, d) - seg) / 86400000); return (dia === 0 || dia === 2) && hora >= 13.5 && hora < 18.5; };
+  function cortege(on) {
+    if (on === cortegeOn) return; cortegeOn = on;
+    if (on && !carros) carros = camW.flatMap((c, i) => [0, 1].map((k) => ({ W: wagen({ cena, semente: i * 2 + k }), c, s0: k * c.total * 0.5 + i * 23, v: 1.0 + ((i + k) % 3) * 0.12 })));
+    carros?.forEach(({ W }) => { W.g.visible = on; W.laranjas.visible = on; });
+  }
   let ligada = false, forcar = null;
   function ligar(on) {
     if (on === ligada) return; ligada = on; rappli.visible = on; band.visible = on; varal.visible = on;
@@ -330,6 +420,8 @@ export function criarFasnacht({ cena, altura, ruas, ceu }) {
     const e = ceu.estado();
     ligar(forcar ?? ehFasnacht(e.data, e.hora));
     morgestraich(ligada && apagao > 0.5);
+    cortege(ligada && (forcarCortege ?? ehCortege(e.data, e.hora)));
+    if (cortegeOn) for (const k of carros) andarWagen(k.W, k.c, k.s0 + (agora / 1000) * k.v, agora, altura);
     if (!ligada) return;
     const brilho = Math.max(noite, apagao); // no apagão as lanternas brilham como de noite
     rappli.material.color.setScalar(1 - 0.8 * brilho); // o confete do chão não tem luz própria: no escuro, escuro
@@ -340,5 +432,5 @@ export function criarFasnacht({ cena, altura, ruas, ceu }) {
     somVol(prox * prox * 0.35);
   }
   const derruba = (x, z, r, fx, fz) => (ligada ? [...cs, ...(extrasOn ? extras : [])].reduce((k, c) => k + c.derruba(x, z, r, fx, fz), 0) : 0);
-  return { atualizar, derruba, forcar: (v) => { forcar = v; }, cliques: cs.length, ativa: () => ligada, morgestraich: () => extrasOn, onde: () => [...cs, ...(extrasOn ? extras : [])].map((c) => c.onde()) };
+  return { atualizar, derruba, forcar: (v) => { forcar = v; }, forcarCortege: (v) => { forcarCortege = v; }, cortege: () => cortegeOn, cliques: cs.length, ativa: () => ligada, morgestraich: () => extrasOn, onde: () => [...cs, ...(extrasOn ? extras : [])].map((c) => c.onde()) };
 }
