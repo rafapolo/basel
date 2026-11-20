@@ -86,9 +86,12 @@ function estacoes(ms, ano) {
   rotulo.classList.add('on');
   const mes = new Intl.DateTimeFormat(document.documentElement.lang, { month: 'long', timeZone: 'UTC' });
   // a data não corre reta: chega à segunda da Fasnacht quando começa o passeio a pé (12 s) e fica nos três dias até o fim
-  // dele (34 s): as Cliques passam pela Augustinergasse e se ouvem os tambores; depois o ano segue até dezembro
+  // dele (34 s): as Cliques passam pela Augustinergasse e se ouvem os tambores. Em volta do Münster (34–46 s) passa
+  // de março a abril e as árvores da Münsterplatz e da Pfalz brotam (arvores.js: de 10/abr a 6/mai); no voo pelo Reno
+  // (69–81 s) é julho e agosto, o auge do Rheinschwimmen; depois o ano segue até dezembro
   const DIA = 86400000, seg = window.cidade.fasnachtSegunda?.(ano) ?? Date.UTC(ano, 1, 23);
-  const KF = [[0, Date.UTC(ano, 0, 15)], [12000 / TOTAL, seg + 0.4 * DIA], [34000 / TOTAL, seg + 2.4 * DIA], [40000 / TOTAL, seg + 9 * DIA], [ms / TOTAL, Date.UTC(ano, 11, 28)]];
+  const KF = [[0, Date.UTC(ano, 0, 15)], [12000 / TOTAL, seg + 0.4 * DIA], [34000 / TOTAL, seg + 2.4 * DIA], [36000 / TOTAL, Date.UTC(ano, 2, 25)],
+    [46000 / TOTAL, Date.UTC(ano, 4, 10)], [69000 / TOTAL, Date.UTC(ano, 6, 5)], [81000 / TOTAL, Date.UTC(ano, 7, 12)], [ms / TOTAL, Date.UTC(ano, 11, 28)]];
   const dataEm = (t) => { let i = 1; while (i < KF.length - 1 && KF[i][0] < t) i++; const [ta, da] = KF[i - 1], [tb, db] = KF[i]; return da + (db - da) * Math.min(1, Math.max(0, (t - ta) / (tb - ta))); };
   const t0 = performance.now();
   let ult = 0, mesAnt = -1;
@@ -184,6 +187,7 @@ function cenas() {
     } },
     // 5 · o Reno: voo baixo rio abaixo, da Wettsteinbrücke até depois da Mittlere
     { dur: 12000, run: async () => {
+      window.vida?.forcarNado?.(true); // é verão: o rio cheio de gente de boia (Wickelfisch) descendo com a corrente
       mover({ alvo: [420, 0, 120], dist: 220, polar: rad(76), az: rad(60) }, 4000, { arco: 0.3 });
       await legenda('Rhein', t(
         'No verão, a gente desce o rio nadando; as balsas cruzam presas a um cabo, levadas só pela corrente.',
@@ -194,6 +198,7 @@ function cenas() {
     } },
     // 6 · Marktplatz e Rathaus
     { dur: 13000, run: async () => {
+      window.vida?.forcarNado?.(false);
       mover({ alvo: rathaus, dist: 200, polar: rad(62), az: rad(250) }, 4500, { arco: 0.25 });
       await legenda('Marktplatz · Rathaus', t(
         'A prefeitura vermelha e a praça do mercado, com as rodinhas de gente.',
@@ -285,6 +290,7 @@ function parar(voltar = true) {
   C.ceu.definirData(salvo.data); C.ceu.definirHora(salvo.hora);
   if (voltar) C.definirNoite(salvo.noite);
   C.ceu.aoVivo = salvo.vivo;
+  window.vida?.forcarNado?.(false);
   C.controls.enabled = true;
   C.controls.update();
   $('tour').classList.remove('on');

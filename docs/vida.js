@@ -806,6 +806,7 @@ uniform float uVidaT; uniform float uAnima;`)
   for (let i = 0; i < NNAD; i++) { poe3(nad.geometry.attributes.aTorso, i, sorteia(BOIA)); poe3(nad.geometry.attributes.aPele, i, sorteia(PELE)); poe3(nad.geometry.attributes.aCabelo, i, sorteia(TOUCA)); poe3(nad.geometry.attributes.aCalca, i, CALCA[0]); nad.geometry.attributes.aAnim.setXY(i, 0, 0); }
   const zonasNado = V.nado.map((p) => p.map(([x, z]) => [x, z]));
   const noNado = (x, z) => zonasNado.some((p) => dentro(x, z, p));
+  let nadoForcado = 0; // o tour, quando fala do Reno no verão, põe todo mundo de boia na água
   const nd = Array.from({ length: NNAD }, () => ({ x: 0, z: 0, vida: 0, ph: rnd() * TAU, v: 1 + rnd() * 0.5, esc: 0 }));
   const fl = { x: 0, z: 0 };
   function lancar(s) {
@@ -867,7 +868,7 @@ uniform float uVidaT; uniform float uAnima;`)
     bondes(sd);
     const nAve = Math.round(NAVE * suave(-4, 8, S.alt ?? 40) * (S.noite > 0.9 ? 0 : 1));
     gaivotas(sd, nAve);
-    const nNad = nadadores(sd, nadoQuer());
+    const nNad = nadadores(sd, Math.max(nadoQuer(), nadoForcado));
     info.pessoas = Math.round(nPed); info.bicicletas = nBici; info.carros = nCarro; info.bondes = bondeInfo.n; info.gaivotas = nAve; info.nadadores = nNad;
     // contexto para o som ambiente (a cada ~0,4 s)
     if (agora - tCtx > 400) {
@@ -891,7 +892,7 @@ uniform float uVidaT; uniform float uAnima;`)
   }
   // a e-bike do jogo e quem anda na vista de rua derrubam gente: quem anda, os ciclistas e quem está parado (os sentados ficam)
   const atropela = (x, z, r, fx, fz) => (ligado ? ped.derruba(x, z, r, fx, fz) + bici.derruba(x, z, r + 0.3, fx, fz) + derrubaParados(x, z, r, fx, fz) : 0);
-  const api = { grupo, atualizar, ligar, info, S, bate, bondePerto: () => (ligado ? bondeInfo.perto : 1e9), atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
+  const api = { grupo, atualizar, ligar, info, S, bate, forcarNado: (v) => { nadoForcado = v ? 1 : 0; }, bondePerto: () => (ligado ? bondeInfo.perto : 1e9), atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
   window.vida = api;
   return api;
 }
