@@ -315,6 +315,7 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
       vec2 g = onda(p, uTempo, px);
       // ondas menores perto da margem/pilar (água abrigada) e mais agitadas ao meio
       g *= mix(0.5, 1.0, smoothstep(0.0, 14.0, dPil));
+      if (uRefl < 0.5) g *= 0.65; // sem o reflexo das casas, as ondas fortes viravam faixas regulares de céu
       vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
       vec3 V = normalize(cameraPosition - vMundo);
       float cosv = clamp(dot(N, V), 0.0, 1.0);
@@ -327,7 +328,14 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
       // brilho contido: o halo largo e o disco somados estouravam um rastro branco no Reno inteiro nas vistas altas
       vec3 brilho = min(uSolCor * uSolI * (pow(sd, 900.0) * 18.0 + pow(sd, 80.0) * 0.25), vec3(2.2));
       vec3 refl = ceuR;
-      if (uRefl > 0.5) {
+      if (uRefl < 0.5) {
+        // modo leve, sem a textura espelhada (2026-11-20): só o céu azul refletido deixava o Reno inteiro azul vivo. Perto da
+        // margem, o raio refletido rasante encontra as casas e as árvores da beira: tom escuro, quente e verde, que some
+        // para o meio do rio e para os raios que sobem para o céu
+        float beira = (1.0 - smoothstep(4.0, 46.0, dMargem)) * (1.0 - smoothstep(0.04, 0.32, Rv.y));
+        vec3 margemR = mix(vec3(0.20, 0.19, 0.15), vec3(0.17, 0.21, 0.14), smoothstep(0.4, 0.6, vn(p * 0.05))) * (0.08 + 0.92 * uLuz);
+        refl = mix(mix(ceuR, uHoriz * 0.62, 0.55) * vec3(0.84, 0.94, 0.88), margemR, beira * 0.85); // o reflexo da cidade inteira, na média, puxa o céu para o verde-cinza do modo completo
+      } else {
         vec2 uv = vUvR.xy / vUvR.w + g * 0.035;
         vec4 tr = texture2D(tDiffuse, uv);
         refl = mix(ceuR, tr.rgb, tr.a);
