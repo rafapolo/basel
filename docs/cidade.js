@@ -625,7 +625,8 @@ function quadro(agora) {
   // só bondes e gente mudam): ~4 ms a menos por quadro no modo completo. Câmera andando: todo quadro
   { const m = camera.matrixWorld.elements; let mudou = false;
     for (let i = 0; i < 16; i++) if (Math.abs(m[i] - camAnt[i]) > 1e-4) { mudou = true; camAnt[i] = m[i]; }
-    renderer.shadowMap.needsUpdate = mudou || (++nQuadro & 1) === 0; }
+    // perto de um bonde andando (a < 150 m do alvo, câmera a < 300 m) a sombra dele pularia 0,5 m a cada dois quadros: todo quadro
+    renderer.shadowMap.needsUpdate = mudou || (++nQuadro & 1) === 0 || (camSom.dist < 300 && VIDA.bondePerto() < 150); }
   ceu.render();
 }
 const camAnt = new Float32Array(16); let nQuadro = 0;
