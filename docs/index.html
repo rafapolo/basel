@@ -71,6 +71,7 @@
   #sol-info { font-variant-numeric: tabular-nums; }
   body.noite #sol-ctl, body.noite #sol-ctl output { color: #c9c0ac; }
   .nota { font-size: 11px; color: var(--suave); margin: 10px 0 0; border-top: 1px solid var(--linha); padding-top: 8px; }
+  .nota a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
   #ficha { position: fixed; left: 16px; bottom: 44px; width: min(330px, calc(100vw - 32px)); z-index: 11; background: var(--papel); border: 1px solid var(--tinta); border-radius: 6px; padding: 12px 14px; box-shadow: 4px 4px 0 var(--tinta); }
   #ficha[hidden] { display: none; }
@@ -87,7 +88,8 @@
   #carregando { position: fixed; inset: 0; display: grid; place-items: center; z-index: 50; background: var(--papel); font: italic 22px 'IM Fell English', Georgia, serif; transition: opacity .6s; }
   #carregando.fora { opacity: 0; pointer-events: none; }
   body.sem-gl::after { content: '↻'; position: fixed; inset: 0; display: grid; place-items: center; z-index: 60; background: var(--papel); font: 48px Georgia, serif; color: var(--ouro); }
-  #carregando .caixa { display: grid; justify-items: center; gap: 14px; padding: 0 16px; }
+  #carregando { transition: opacity .6s, background-color .5s; }
+  #carregando .caixa { display: grid; justify-items: center; gap: 14px; padding: 14px 22px; margin: 0 16px; border-radius: 8px; background: rgba(239,230,210,.86); }
   #carregando .barra { width: min(280px, 70vw); height: 4px; border-radius: 2px; background: rgba(40,30,20,.14); overflow: hidden; }
   #carregando .barra i { display: block; height: 100%; background: var(--ouro); transform: scaleX(0); transform-origin: left; transition: transform .35s ease-out; }
   #carregando small { font: 500 12px system-ui, sans-serif; font-style: normal; opacity: .6; min-height: 1.2em; }
@@ -155,13 +157,17 @@
 // barra de progresso da abertura: os bytes das malhas grandes (compacta.js) levam até 68%; as etapas de montagem
 // (cidade.js, carga.etapa) o resto. Nunca anda para trás.
 (() => {
-  const arq = new Map(); let feito = 0;
+  // véu: opaco até a cidade ter uma prévia desenhada atrás (cidade.js chama carga.vista()); daí fica transparente com o
+  // progresso e, no fim, já se vê a vista inicial (a da Pfalz, a do ?cam ou a do # do link) antes de o véu sumir
+  const arq = new Map(); let feito = 0, vista = false;
   const pinta = (f) => {
     feito = Math.max(feito, Math.min(1, f));
     const el = document.querySelector('#carregando .barra');
     if (!el) return;
     el.firstElementChild.style.transform = `scaleX(${feito})`;
     el.setAttribute('aria-valuenow', Math.round(feito * 100));
+    const a = vista ? Math.max(0.08, 1 - 0.92 * Math.min(1, (feito - 0.84) / 0.14)) : 1;
+    document.getElementById('carregando').style.backgroundColor = `rgba(239,230,210,${a.toFixed(2)})`;
   };
   window.carga = {
     bytes(url, n, total) {
@@ -170,6 +176,7 @@
       if (b) pinta(0.04 + 0.64 * a / b);
     },
     etapa(f, txt) { pinta(f); const e = document.getElementById('carga-etapa'); if (e && txt) e.textContent = txt; },
+    vista() { if (!vista) { vista = true; pinta(feito); } },
   };
 })();
 </script>
@@ -197,7 +204,7 @@
     <label class="chave"><input type="checkbox" id="c-ambiente" checked> <span data-i18n="ambiente">som ambiente</span></label>
     <label class="chave"><input type="checkbox" id="c-leve"> <span data-i18n="leve">modo leve</span></label>
   </div>
-  <p class="nota" data-i18n="nota"></p>
+  <p class="nota" data-i18n-html="nota"></p>
 </aside>
 <script>{const p=document.getElementById('painel'),a=document.getElementById('agora'),m=matchMedia('(max-width: 640px)');if(m.matches){p.classList.add('fechado');a.setAttribute('role','button');a.tabIndex=0}const s=()=>a.setAttribute('aria-expanded',String(!p.classList.contains('fechado'))),t=()=>{if(!m.matches)return;p.classList.toggle('fechado');s()};a.addEventListener('click',t);a.addEventListener('keydown',e=>{if(m.matches&&(e.key==='Enter'||e.key===' ')){e.preventDefault();t()}});if(m.matches)s()}</script>
 

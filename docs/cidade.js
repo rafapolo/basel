@@ -70,6 +70,38 @@ controls.maxDistance = 2600;
 controls.screenSpacePanning = false;
 // como num mapa (pedido de 2026-11-19): botão esquerdo arrasta o mapa, o direito gira; no toque, um dedo arrasta e dois giram e dão zoom
 controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+
+// ---------- câmera: posição por alvo, distância, rumo (az) e inclinação (polar) ----------
+const esf = new THREE.Spherical();
+function lerCamera() {
+  esf.setFromVector3(camera.position.clone().sub(controls.target));
+  return { alvo: controls.target.toArray(), dist: esf.radius, az: esf.theta, polar: esf.phi };
+}
+function porCamera({ alvo, dist, az, polar }) {
+  controls.target.fromArray(alvo);
+  esf.set(dist, polar, az);
+  camera.position.setFromSpherical(esf).add(controls.target);
+  camera.lookAt(controls.target);
+}
+// vista inicial: da Pfalz, atrás do Münster, olhando o Reno e a Mittlere Brücke (eco da vista de Merian)
+// (a Mittlere Brücke fica em x≈25, z≈−204; o Münster em x≈213, z≈211; a câmera fica um pouco além e acima dele)
+// celular em pé: o campo horizontal é estreito e a vista de paisagem mostrava só o Reno; mais longe e mais do alto
+const RETRATO = innerHeight > innerWidth * 1.2;
+const VISTA_PFALZ = { alvo: [25, 4, -190], dist: RETRATO ? 900 : 540, az: THREE.MathUtils.degToRad(24), polar: THREE.MathUtils.degToRad(RETRATO ? 58 : 70) };
+porCamera(VISTA_PFALZ);
+// vista do link (#x/y/z/distância/rumo/inclinação, ver VISTA abaixo): já aqui, para a abertura mostrar a cidade dela
+{ const p = location.hash.slice(1).split('/').map(Number);
+  if (p.length === 6 && p.every(Number.isFinite) && p[3] > 0) porCamera({ alvo: p.slice(0, 3), dist: p[3], az: THREE.MathUtils.degToRad(p[4]), polar: THREE.MathUtils.degToRad(p[5]) }); }
+// prévia durante a abertura (uma, com a cidade quase montada, ~0,5 s que em boa parte só adianta o envio à GPU): desenha a
+// cena como está (sem pós-processamento) atrás do véu, que vai ficando transparente
+// shaders compilados em paralelo antes (compileAsync): desenhar direto compilava tudo de uma vez e atrasava a abertura em ~2 s
+async function previa() {
+  try {
+    renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    await renderer.compileAsync(cena, camera).catch(() => {});
+    renderer.render(cena, camera); window.carga?.vista?.();
+  } catch { /* segue sem prévia */ }
+}
 controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
 const orto = criaOrtofoto(THREE, renderer, controls); // foto aérea no chão e nos telhados (docs/ortofoto.js)
 
@@ -541,24 +573,6 @@ function andarRua(dt) {
 }
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && RUA.on) sairRua(); });
 
-// ---------- câmera: posição por alvo, distância, rumo (az) e inclinação (polar) ----------
-const esf = new THREE.Spherical();
-function lerCamera() {
-  esf.setFromVector3(camera.position.clone().sub(controls.target));
-  return { alvo: controls.target.toArray(), dist: esf.radius, az: esf.theta, polar: esf.phi };
-}
-function porCamera({ alvo, dist, az, polar }) {
-  controls.target.fromArray(alvo);
-  esf.set(dist, polar, az);
-  camera.position.setFromSpherical(esf).add(controls.target);
-  camera.lookAt(controls.target);
-}
-// vista inicial: da Pfalz, atrás do Münster, olhando o Reno e a Mittlere Brücke (eco da vista de Merian)
-// (a Mittlere Brücke fica em x≈25, z≈−204; o Münster em x≈213, z≈211; a câmera fica um pouco além e acima dele)
-// celular em pé: o campo horizontal é estreito e a vista de paisagem mostrava só o Reno; mais longe e mais do alto
-const RETRATO = innerHeight > innerWidth * 1.2;
-const VISTA_PFALZ = { alvo: [25, 4, -190], dist: RETRATO ? 900 : 540, az: THREE.MathUtils.degToRad(24), polar: THREE.MathUtils.degToRad(RETRATO ? 58 : 70) };
-porCamera(VISTA_PFALZ);
 // ?cam=<nome>: uma das 6 câmeras fixas de cameras.js (tarefa 21), para comparar com fotos da cidade real
 const CAM = q.get('cam') && (await import('./cameras.js')).CAMERAS[q.get('cam')];
 
@@ -672,7 +686,7 @@ const ROCHE = q.get('roche') === '0' ? null : await criarRoche({ cena, U, recort
   cena.traverse((o) => { if ((o.isMesh || o.isInstancedMesh) && o !== CH.malha && !o.userData.semNeve) for (const m of [o.material].flat()) comNeve(m); });
 }
 // gente e movimento (tarefa 19, docs/vida.js): bondes pelo horário do GTFS, pedestres, bicicletas, carros, gaivotas e nadadores
-carga?.etapa(0.96, t('gente e bondes…', 'people and trams…', 'Menschen und Trams…'));
+await previa(); carga?.etapa(0.96, t('gente e bondes…', 'people and trams…', 'Menschen und Trams…'));
 const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE, recorte: REC });
 $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
 // Fasnacht (fasnacht.js): Cliques pelas ruas do centro nos três dias reais, ou quando o tour chega em fevereiro
@@ -683,12 +697,37 @@ if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
 for (const o of cena.children) if (!antesDetalhes.has(o) && o !== ROCHE?.malha) ceu.semAO.push(o);
 relogio(ceu.estado()); ceu.aoMudar(relogio);
 if (q.get('noite')) definirNoite(true);
-if (CAM) {
+if (CAM && !(location.hash.length > 1)) {
   const a = typeof CAM.alvo === 'string' ? centro(CAM.alvo) : [...CAM.alvo];
   if (a[1] === null) a[1] = altura(a[0], a[2]);
   porCamera({ alvo: a, dist: CAM.dist, az: THREE.MathUtils.degToRad(CAM.az), polar: THREE.MathUtils.degToRad(CAM.polar) });
   controls.update();
 }
+// ---------- vista na URL (como em geoglifos-amazonia): a câmera no #x/y/z/distância/rumo/inclinação, e na query a data e a
+// hora quando não estão ao vivo, a noite e o prédio da ficha (?predio=<EGID>); o endereço acompanha a navegação, então
+// copiar o link compartilha exatamente esta vista. O tour e a vista de rua não escrevem (o tour volta à câmera de antes).
+const VISTA = (() => {
+  const g = THREE.MathUtils.radToDeg;
+  if (location.hash.length > 1 && !CAM) controls.update(); // a câmera do # já foi posta no começo
+  let ult = '';
+  const escrever = () => {
+    if (document.body.classList.contains('touring') || RUA.on || window.jogo?.ativo?.()) return;
+    const c = lerCamera(), e = ceu.estado(), u = new URLSearchParams(location.search);
+    const hash = `#${c.alvo.map((v) => v.toFixed(1)).join('/')}/${c.dist.toFixed(1)}/${g(c.az).toFixed(1)}/${g(c.polar).toFixed(1)}`;
+    u.delete('cam');
+    if (ceu.aoVivo) { u.delete('data'); u.delete('hora'); } else { u.set('data', e.data); u.set('hora', String(+e.hora.toFixed(2))); }
+    if (noiteAlvo) u.set('noite', '1'); else u.delete('noite');
+    const sel = U.uSel.value >= 0 && !$('ficha').hidden ? P[U.uSel.value]?.egid : null;
+    if (sel) u.set('predio', sel); else u.delete('predio');
+    const url = location.pathname + (u.size ? `?${u}` : '') + hash;
+    if (url !== ult) { ult = url; history.replaceState(history.state, '', url); }
+  };
+  setInterval(escrever, 700); // pega qualquer movimento (arrastar, rolar, botões, voos), sem depender de eventos de cada um
+  // ?predio=<EGID>: abre a ficha (a câmera é a do #, de quem compartilhou)
+  const eg = +q.get('predio');
+  if (eg) { const i = P.findIndex((p) => p.egid === eg); if (i >= 0) abrirFicha(i); }
+  return { escrever };
+})();
 // shaders compilados antes de tirar a tela de abertura, em paralelo quando o navegador tem KHR_parallel_shader_compile: sem
 // isso o primeiro quadro compilava tudo de uma vez e a cidade aparecia congelada (1,3 s num M4; vários no celular)
 carga?.etapa(0.98, t('preparando a luz e as cores…', 'preparing light and colour…', 'Licht und Farben…'));
