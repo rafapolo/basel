@@ -29,12 +29,20 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
     chao(malha) {
       encadeia(malha.material, (s) => {
         s.vertexShader = s.vertexShader
-          .replace('#include <common>', '#include <common>\nvarying vec2 vOrtoP;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvOrtoP = position.xz;');
+          .replace('#include <common>', '#include <common>\nvarying vec2 vOrtoP; varying float vOrtoY;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvOrtoP = position.xz; vOrtoY = position.y;');
         s.fragmentShader = s.fragmentShader
-          .replace('#include <common>', `#include <common>\nvarying vec2 vOrtoP; ${DECL}`)
+          .replace('#include <common>', `#include <common>\nvarying vec2 vOrtoP; varying float vOrtoY; ${DECL}`)
+          // na altura dos olhos, perto da câmera, a foto aérea vira mancha: carros, guarda-sóis das barracas e as sombras da
+          // hora da foto deitados no chão. Ali o calçamento desenhado (chao.js) pesa mais; de longe ou do alto, a foto inteira
           .replace('#include <color_fragment>', `#include <color_fragment>
-  diffuseColor.rgb = mix(diffuseColor.rgb, ${amostra('vOrtoP')}, uOrtoChao);`);
+  { float baixo = 1.0 - smoothstep(6.0, 30.0, cameraPosition.y - vOrtoY);
+    float perto = 1.0 - smoothstep(30.0, 140.0, length(vec3(vOrtoP.x, vOrtoY, vOrtoP.y) - cameraPosition));
+    vec3 foto = ${amostra('vOrtoP')};
+    // fica a cor média da foto (o tom da praça), sem o desenho das manchas
+    float lum = dot(foto, vec3(0.299, 0.587, 0.114)), lumC = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+    vec3 suave = diffuseColor.rgb * clamp(lum / max(lumC, 0.02), 0.85, 1.15);
+    diffuseColor.rgb = mix(diffuseColor.rgb, mix(foto, suave, 0.85 * baixo * perto), uOrtoChao); }`);
       }, 'chao');
     },
     // prédios: só as faces com normal para cima (telhados), no ramo "de pé" (não nos lotes pálidos)
