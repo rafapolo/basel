@@ -33,7 +33,7 @@ let [meta, ruas, bin, rel, RETOQUES] = await Promise.all([
   fetch('data/retoques.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
 ]);
 const P = meta.predios;
-for (const p of P) { const r = p.egid && RETOQUES[p.egid]; if (r) { if (r.mat != null) p.mat = r.mat; if (r.parede) p.cor = r.parede; if (r.telhado) p.telha = r.telhado; for (const k of ['and', 'jan', 'ven', 'frente']) if (r[k] != null) p[k] = r[k]; } } // and/jan/ven/frente: fachadas do Reno (script/fachadas_reno.py)
+for (const p of P) { const r = p.egid && RETOQUES[p.egid]; if (r) { if (r.mat != null) p.mat = r.mat; if (r.parede) p.cor = r.parede; if (r.telhado) p.telha = r.telhado; for (const k of ['and', 'jan', 'ven', 'frente', 'lj']) if (r[k] != null) p[k] = r[k]; if (r.and != null) p.andFoto = 1; } } // and/jan/ven/frente/lj: fachadas lidas de foto (script/fachadas_reno.py)
 // recorte em coordenadas locais (predios.json): desde 2026-11-19 vai da Allschwilerplatz (oeste) à SBB (sul)
 const REC = (() => { const [e0, n0, e1, n1] = meta.recorte_lv95, [oe, on] = meta.origem_lv95; return { x0: e0 - oe, x1: e1 - oe, z0: -(n1 - on), z1: -(n0 - on) }; })();
 const foraREC = (x, z, f = 0) => x < REC.x0 + f || x > REC.x1 - f || z < REC.z0 + f || z > REC.z1 - f;

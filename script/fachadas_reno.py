@@ -202,7 +202,7 @@ def aplica():
     ret = json.loads((RAIZ / "docs/data/retoques.json").read_text())
     for egid, d in leit.items():
         r = ret.setdefault(str(egid), {})
-        for k in ("parede", "telhado", "mat", "and", "jan", "ven", "frente"):
+        for k in ("parede", "telhado", "mat", "and", "jan", "ven", "frente", "lj"):
             if k in d:
                 r[k] = d[k]
         r["fonte"] = d["fonte"]

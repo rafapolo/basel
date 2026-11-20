@@ -97,7 +97,7 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
   // ---- 2. por parede: comprimento, beiral (aresta horizontal mais alta que cruza a parede) e andares ----
   // beiral: a cota (em dm) mais alta cuja faixa de vértices cobre metade da parede; cotas distintas são poucas por parede,
   // então busca linear em arrays reaproveitados (era um Map, um spread e um sort por parede)
-  const fotoMax = new Map(); // prédio → comprimento do maior pedaço da fachada lida de foto
+  const fotoMax = new Map(); // EGID → { direção, u mínimo e máximo } da fachada lida de foto
   let yk = new Int32Array(64), umn = new Float64Array(64), umx = new Float64Array(64);
   for (const g of grupos) {
     const len = g.umax - g.umin;
@@ -125,8 +125,8 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
     const p = P[g.id];
     let nF = p.and > 0 ? p.and : Math.round(hW / 3.1);
     nF = Math.max(1, Math.min(nF, 40));
-    if (hW / nF < 2.5) nF = Math.max(1, Math.round(hW / 2.9));
-    if (hW / nF > 4.6) nF = Math.max(1, Math.round(hW / 4.0));
+    if (!p.andFoto && hW / nF < 2.5) nF = Math.max(1, Math.round(hW / 2.9)); // andares lidos de foto valem como estão
+    if (!p.andFoto && hW / nF > 4.6) nF = Math.max(1, Math.round(hW / 4.0));
     g.len = len; g.hW = hW; g.nF = nF;
     g.seed = hash(g.id * 977 + Math.round(g.umin * 3) + Math.round(g.ymin));
     // sem registro no GWR (sem EGID nem ano): muro, cais ou terraço do swissBUILDINGS3D (o muro da Pfalz sob o
@@ -139,23 +139,31 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
       const az = Math.atan2(g.tz, g.tx) * 180 / Math.PI; // normal para fora = (tz, −tx): az = atan2(nx, −nz), 0 = −z (norte), 90 = +x (leste)
       const dif = Math.abs(((az - p.frente) % 360 + 540) % 360 - 180);
       if (dif < 35) {
-        g.jan = p.jan ?? 0; // por enquanto o total; abaixo vira proporcional ao comprimento de cada pedaço
-        if (g.jan) fotoMax.set(g.id, Math.max(fotoMax.get(g.id) ?? 0, len));
+        g.jan = Math.min(60, p.jan ?? 0); // colunas na largura da fachada inteira (grade comum, abaixo)
+        if (g.jan) {
+          // largura da fachada do prédio (EGID: o swissBUILDINGS3D parte um prédio em vários sólidos), na direção desta parede
+          const k = p.egid ?? -g.id - 1, f = fotoMax.get(k) ?? { tx: g.tx, tz: g.tz, a: Infinity, b: -Infinity };
+          for (const t of g.tris) for (let q = 0; q < 3; q++) {
+            const u = posicoes[t * 9 + q * 3] * f.tx + posicoes[t * 9 + q * 3 + 2] * f.tz;
+            if (u < f.a) f.a = u; if (u > f.b) f.b = u;
+          }
+          fotoMax.set(k, f); g.fotoK = k;
+        }
         if (p.ven) { const c = new THREE.Color(p.ven); g.ven = 1 + (Math.round(c.r * 15) << 8 | Math.round(c.g * 15) << 4 | Math.round(c.b * 15)); }
       }
     }
   }
-  // a fachada lida de foto pode vir partida em pedaços (parede não plana no LOD2): as janelas da foto valem para o maior,
-  // e cada pedaço ganha colunas no mesmo espaçamento
-  for (const g of grupos) if (g.jan) g.jan = Math.min(60, Math.max(1, Math.round((g.len * g.jan) / fotoMax.get(g.id))));
+  // a fachada lida de foto vem partida em pedaços e sólidos (o Reischacherhof somava 45 colunas para 10 eixos): todos os
+  // pedaços usam uma grade só, com u a partir da borda da fachada inteira e as `jan` colunas da foto na largura toda
   for (let t = 0; t < nTris; t++) {
     const gi = triParede[t];
     if (gi >= 0) {
       const g = grupos[gi];
       for (let k = 0; k < 3; k++) {
         const v = (t * 3 + k) * 4;
-        fa[v] = posicoes[t * 9 + k * 3] * g.tx + posicoes[t * 9 + k * 3 + 2] * g.tz - g.umin;
-        fa[v + 1] = posicoes[t * 9 + k * 3 + 1] - g.ymin; fa[v + 2] = g.len; fa[v + 3] = g.hW;
+        const f = g.jan ? fotoMax.get(g.fotoK) : null;
+        fa[v] = f ? posicoes[t * 9 + k * 3] * f.tx + posicoes[t * 9 + k * 3 + 2] * f.tz - f.a : posicoes[t * 9 + k * 3] * g.tx + posicoes[t * 9 + k * 3 + 2] * g.tz - g.umin;
+        fa[v + 1] = posicoes[t * 9 + k * 3 + 1] - g.ymin; fa[v + 2] = f ? Math.max(g.len, f.b - f.a) : g.len; fa[v + 3] = g.hW;
         fb[v] = g.nF; fb[v + 1] = g.mat; fb[v + 2] = g.loja + 10 * (g.jan ?? 0) + 1000 * (g.ven ?? 0); fb[v + 3] = g.seed;
       }
       continue;
