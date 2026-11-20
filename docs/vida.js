@@ -288,11 +288,12 @@ uniform float uVidaT; uniform float uAnima;`)
       cores(fn) { for (let i = 0; i < n; i++) fn(i, im.geometry.attributes); for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo']) im.geometry.attributes[k].needsUpdate = true; },
       atualizar(dt, ativos, alvoCam) {
         const A = im.geometry.attributes.aAnim, a = im.instanceMatrix.array;
-        let animar = false, perto = 0;
+        let animar = false, perto = 0, ult = -1;
         for (let i = 0; i < n; i++) {
           const quer = i < ativos ? 1 : 0;
           if (primeiro) esc[i] = quer; else esc[i] += lim(quer - esc[i], -dt / 1.6, dt / 1.6);
           if (esc[i] <= 0.01) { a.fill(0, i * 16, i * 16 + 16); if (!quer) esc[i] = 0; continue; }
+          ult = i;
           let v = spd[i];
           if (caido[i] > 0) { caido[i] = Math.max(0, caido[i] - dt); v = 0; }
           if (modo[i] === 1 && pausa[i] > 0) { pausa[i] -= dt; v = 0; if (pausa[i] <= 0) { proximoLivre(i); } }
@@ -330,6 +331,8 @@ uniform float uVidaT; uniform float uAnima;`)
           if (alvoCam && Math.abs(px - alvoCam.x) < 70 && Math.abs(pz - alvoCam.z) < 70) perto++;
         }
         primeiro = false;
+        // só desenha até o último visível: instância de escala zero ainda roda o vertex shader (~2 ms com 1500 pedestres)
+        im.count = ult + 1;
         im.instanceMatrix.needsUpdate = true;
         if (animar) A.needsUpdate = true;
         pos.perto = perto;
@@ -426,10 +429,13 @@ uniform float uVidaT; uniform float uAnima;`)
     partes.push({ g: mat4(new THREE.SphereGeometry(0.124, 7, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.66 + dy, 0.015), parte: 4 });
     return unir(partes);
   };
-  const LUG = { x: [], z: [], y: [], hx: [], hz: [], tipo: [], lim: [], alt: [] };
-  const lugar = (x, z, y, hx, hz, tipo) => {
+  const LUG = { x: [], z: [], y: [], hx: [], hz: [], tipo: [], lim: [], alt: [], larg: [], kid: [] };
+  // pKid: chance de ser criança (menor, mais estreita e de anoraque colorido, como as que andam)
+  const lugar = (x, z, y, hx, hz, tipo, pKid = 0) => {
     if (leve && rnd() < 0.5) return;
-    LUG.x.push(x); LUG.z.push(z); LUG.y.push(y); LUG.hx.push(hx); LUG.hz.push(hz); LUG.tipo.push(tipo); LUG.lim.push(rnd()); LUG.alt.push(0.94 + rnd() * 0.14);
+    const kid = rnd() < pKid, alt = kid ? 0.5 + rnd() * 0.3 : 0.94 + rnd() * 0.14;
+    LUG.x.push(x); LUG.z.push(z); LUG.y.push(y); LUG.hx.push(hx); LUG.hz.push(hz); LUG.tipo.push(tipo); LUG.lim.push(rnd()); LUG.alt.push(alt);
+    LUG.larg.push(kid ? 0.7 + 0.3 * (alt - 0.5) / 0.3 : 1); LUG.kid.push(kid ? 1 : 0);
   };
   const SENT = []; // os sentados vão numa malha à parte
   if (PT) {
@@ -437,13 +443,13 @@ uniform float uVidaT; uniform float uAnima;`)
       const k = 2 + Math.floor(rnd() * 4), r = 0.45 + 0.12 * k, a0 = rnd() * TAU;
       for (let j = 0; j < k; j++) {
         const a = a0 + (TAU * j) / k + (rnd() - 0.5) * 0.5, x = cx + Math.sin(a) * r, z = cz + Math.cos(a) * r;
-        lugar(x, z, null, cx - x, cz - z, 0);
+        lugar(x, z, null, cx - x, cz - z, 0, 0.22);
       }
     }
     for (const [x, z, ang] of PT.sentados) SENT.push([x, z, Math.sin(ang), Math.cos(ang)]);
     for (const [px, pz] of PT.paradas) { // 1 a 4 à espera, olhando para lados quaisquer
       const k = 1 + Math.floor(rnd() * 4);
-      for (let j = 0; j < k; j++) { const a = rnd() * TAU; lugar(px + (rnd() - 0.5) * 6, pz + (rnd() - 0.5) * 3, null, Math.sin(a), Math.cos(a), 3); }
+      for (let j = 0; j < k; j++) { const a = rnd() * TAU; lugar(px + (rnd() - 0.5) * 6, pz + (rnd() - 0.5) * 3, null, Math.sin(a), Math.cos(a), 3, 0.15); }
     }
   }
   if (ponte) { // debruçados no parapeito da Mittlere, de frente para o rio (o mesmo quadro de marcos.js)
@@ -454,6 +460,10 @@ uniform float uVidaT; uniform float uAnima;`)
     }
   }
   const nLug = LUG.x.length;
+  { // em ordem de limiar: quem aparece primeiro fica no começo e o resto sai do desenho (count), não só some com escala zero
+    const ord = LUG.lim.map((_, i) => i).sort((p, q) => LUG.lim[p] - LUG.lim[q]);
+    for (const k in LUG) LUG[k] = ord.map((i) => LUG[k][i]);
+  }
   const imPar = nLug ? malhaInst(geoGente(), matG, nLug, false) : null;
   const imSent = SENT.length ? malhaInst(geoSentado(), matG, SENT.length, false) : null;
   const limSent = SENT.map(() => rnd()), altSent = SENT.map(() => 0.94 + rnd() * 0.14);
@@ -464,7 +474,7 @@ uniform float uVidaT; uniform float uAnima;`)
     for (const im of [imPar, imSent]) {
       if (!im) continue;
       const A = im.geometry.attributes;
-      for (let i = 0; i < im.count; i++) { poe3(A.aTorso, i, sorteia(tor)); poe3(A.aCalca, i, sorteia(CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); A.aAnim.setXY(i, rnd() * TAU, 0.3 + rnd() * 0.25); } // ninguém fica estátua: braços e pernas mexem de leve
+      for (let i = 0; i < A.aTorso.count; i++) { const kid = im === imPar && LUG.kid[i]; poe3(A.aTorso, i, sorteia(kid ? INFANTIL : tor)); poe3(A.aCalca, i, sorteia(kid && rnd() < 0.5 ? INFANTIL : CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); A.aAnim.setXY(i, rnd() * TAU, 0.3 + rnd() * 0.25); } // ninguém fica estátua: braços e pernas mexem de leve
       for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo', 'aAnim']) A[k].needsUpdate = true;
     }
   }
@@ -480,8 +490,8 @@ uniform float uVidaT; uniform float uAnima;`)
     for (let i = 0; i < nLug; i++) {
       if (caidoP[i] <= 0) continue;
       caidoP[i] = Math.max(0, caidoP[i] - dt);
-      if (caidoP[i] > 0) { algumCaidoP = true; matrizCaida(m, i, LUG.x[i], LUG.y[i], LUG.z[i], caiPX[i], caiPZ[i], caidoP[i], 1, LUG.alt[i]); }
-      else matriz(imPar, i, LUG.x[i], LUG.y[i], LUG.z[i], LUG.hx[i], LUG.hz[i], 1, LUG.alt[i], 1);
+      if (caidoP[i] > 0) { algumCaidoP = true; matrizCaida(m, i, LUG.x[i], LUG.y[i], LUG.z[i], caiPX[i], caiPZ[i], caidoP[i], LUG.larg[i], LUG.alt[i]); }
+      else matriz(imPar, i, LUG.x[i], LUG.y[i], LUG.z[i], LUG.hx[i], LUG.hz[i], LUG.larg[i], LUG.alt[i], LUG.larg[i]);
     }
     imPar.instanceMatrix.needsUpdate = true;
   }
@@ -510,11 +520,13 @@ uniform float uVidaT; uniform float uAnima;`)
     let n = 0;
     if (imPar) {
       const m = imPar.instanceMatrix.array;
+      let ult = -1;
       for (let i = 0; i < nLug; i++) {
-        if (caidoP[i] > 0) { n++; continue; } // no chão: caidosParados() cuida
-        if (LUG.lim[i] < dens[LUG.tipo[i]]) { matriz(imPar, i, LUG.x[i], LUG.y[i], LUG.z[i], LUG.hx[i], LUG.hz[i], 1, LUG.alt[i], 1); n++; }
+        if (caidoP[i] > 0) { n++; ult = i; continue; } // no chão: caidosParados() cuida
+        if (LUG.lim[i] < dens[LUG.tipo[i]]) { matriz(imPar, i, LUG.x[i], LUG.y[i], LUG.z[i], LUG.hx[i], LUG.hz[i], LUG.larg[i], LUG.alt[i], LUG.larg[i]); n++; ult = i; }
         else m.fill(0, i * 16, i * 16 + 16);
       }
+      imPar.count = ult + 1;
       imPar.instanceMatrix.needsUpdate = true;
     }
     if (imSent) {
@@ -879,7 +891,7 @@ uniform float uVidaT; uniform float uAnima;`)
   }
   // a e-bike do jogo e quem anda na vista de rua derrubam gente: quem anda, os ciclistas e quem está parado (os sentados ficam)
   const atropela = (x, z, r, fx, fz) => (ligado ? ped.derruba(x, z, r, fx, fz) + bici.derruba(x, z, r + 0.3, fx, fz) + derrubaParados(x, z, r, fx, fz) : 0);
-  const api = { grupo, atualizar, ligar, info, S, bate, criancas: () => { const out = []; for (let i = 0; i < ped.n; i++) if (ped.tipoC[i] && ped.esc[i] > 0.5) out.push([ped.tipoC[i], ped.x[i], ped.z[i]]); return out; }, bondePerto: () => (ligado ? bondeInfo.perto : 1e9), atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
+  const api = { grupo, atualizar, ligar, info, S, bate, bondePerto: () => (ligado ? bondeInfo.perto : 1e9), atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
   window.vida = api;
   return api;
 }
