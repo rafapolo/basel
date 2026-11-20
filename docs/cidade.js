@@ -148,11 +148,13 @@ const ruasObj = new THREE.Group();
   // próximas e põe por baixo uma laje de concreto que cobre de uma borda à outra, com 1,2 m de espessura.
   {
     const lin = ruas.linhas.filter((l) => l.ponte && l.c.length >= 4 && Math.hypot(l.c.at(-2) - l.c[0], l.c.at(-1) - l.c[1]) > 30);
-    const grupos = [];
+    // só junta linhas quase paralelas (< 12°): a Markthallenbrücke cruza a Elisabethenanlage a 54° e a laje única das duas
+    // virava um retângulo de 45 m por cima da rua, escuro e torto (2026-11-20)
+    const grupos = [], rumo = (l) => { const dx = l.c.at(-2) - l.c[0], dz = l.c.at(-1) - l.c[1], L = Math.hypot(dx, dz); return [dx / L, dz / L]; };
     for (const l of lin) {
-      const mx = (l.c[0] + l.c.at(-2)) / 2, mz = (l.c[1] + l.c.at(-1)) / 2;
-      let g = grupos.find((G) => Math.hypot(G.mx - mx, G.mz - mz) < 40);
-      if (!g) grupos.push((g = { mx, mz, ls: [] }));
+      const mx = (l.c[0] + l.c.at(-2)) / 2, mz = (l.c[1] + l.c.at(-1)) / 2, [ux, uz] = rumo(l);
+      let g = grupos.find((G) => Math.hypot(G.mx - mx, G.mz - mz) < 40 && Math.abs(G.ux * ux + G.uz * uz) > 0.978);
+      if (!g) grupos.push((g = { mx, mz, ux, uz, ls: [] }));
       g.ls.push(l);
     }
     const cConc = new THREE.Color('#8b877e');
@@ -160,15 +162,19 @@ const ruasObj = new THREE.Group();
       if (G.ls.some((l) => l.n === 'Mittlere Rheinbrücke')) continue;
       const ref = G.ls.reduce((a, b) => (Math.hypot(b.c.at(-2) - b.c[0], b.c.at(-1) - b.c[1]) > Math.hypot(a.c.at(-2) - a.c[0], a.c.at(-1) - a.c[1]) ? b : a));
       const ax = ref.c[0], az = ref.c[1], dx = ref.c.at(-2) - ax, dz = ref.c.at(-1) - az, L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L, nx = -uz, nz = ux;
-      let b0 = Infinity, b1 = -Infinity, s0 = Infinity, s1 = -Infinity;
+      // pontos das linhas a cada 2 m, em (s ao longo da ponte, b de lado, meia largura): a laje segue as linhas em fatias de
+      // 8 m, e uma rampa curva não vira mais um retângulo reto de ponta a ponta (eram 26–30 m de laje no vazio)
+      const amostras = []; let s0 = Infinity, s1 = -Infinity;
       for (const l of G.ls) {
         const meia = (LARGURA[l.t] || 2) / 2;
-        for (let i = 0; i < l.c.length; i += 2) {
-          const px = l.c[i] - ax, pz = l.c[i + 1] - az, s = px * ux + pz * uz, b = px * nx + pz * nz;
-          b0 = Math.min(b0, b - meia); b1 = Math.max(b1, b + meia); s0 = Math.min(s0, s); s1 = Math.max(s1, s);
+        for (let i = 0; i < l.c.length - 2; i += 2) {
+          const x0 = l.c[i], z0 = l.c[i + 1], x1 = l.c[i + 2], z1 = l.c[i + 3], k = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 2));
+          for (let j = 0; j <= k; j++) {
+            const px = x0 + ((x1 - x0) * j) / k - ax, pz = z0 + ((z1 - z0) * j) / k - az, s = px * ux + pz * uz;
+            amostras.push([s, px * nx + pz * nz, meia]); s0 = Math.min(s0, s); s1 = Math.max(s1, s);
+          }
         }
       }
-      b0 -= 0.8; b1 += 0.8;
       const hA = cotaPonta(altura, ax, az, ax + ux * 4, az + uz * 4), hB = cotaPonta(altura, ax + dx, az + dz, ax + dx - ux * 4, az + dz - uz * 4);
       const yTop = (s) => hA + (hB - hA) * (s / L) + 0.55; // 5 cm sob as faixas (0,6 m)
       const P = (s, b, y) => [ax + ux * s + nx * b, y, az + uz * s + nz * b];
@@ -176,6 +182,9 @@ const ruasObj = new THREE.Group();
       const n = Math.max(1, Math.ceil((s1 - s0) / 8));
       for (let i = 0; i < n; i++) {
         const sa = s0 + ((s1 - s0) * i) / n, sb = s0 + ((s1 - s0) * (i + 1)) / n, ya = yTop(sa), yb = yTop(sb);
+        let b0 = Infinity, b1 = -Infinity;
+        for (const [s, b, meia] of amostras) if (s >= sa - 1 && s <= sb + 1) { b0 = Math.min(b0, b - meia - 0.8); b1 = Math.max(b1, b + meia + 0.8); }
+        if (b0 === Infinity) continue;
         quad(P(sa, b0, ya), P(sa, b1, ya), P(sb, b1, yb), P(sb, b0, yb));                         // topo
         quad(P(sa, b0, ya - 1.2), P(sb, b0, yb - 1.2), P(sb, b1, yb - 1.2), P(sa, b1, ya - 1.2)); // fundo
         quad(P(sa, b0, ya), P(sb, b0, yb), P(sb, b0, yb - 1.2), P(sa, b0, ya - 1.2));             // lados
@@ -224,9 +233,21 @@ let q16 = new Int16Array(nVert * 3);
     const a = idx[t], b = idx[t + 1], c = idx[t + 2];
     vol[cid[a]] += cx[a] * (cy[b] * cz[c] - cz[b] * cy[c]) - cy[a] * (cx[b] * cz[c] - cz[b] * cx[c]) + cz[a] * (cx[b] * cy[c] - cy[b] * cx[c]);
   }
+  // sólidos abertos (5 na cidade: Peter Merian-Strasse 23, Buchenstrasse 9, Clarastrasse 25…) têm volume com sinal que
+  // engana: o telhado saía virado para baixo, sumia visto de cima e o prédio ficava oco. Confere o topo: a soma de n.y·área
+  // dos triângulos no terço de cima tem de dar positiva depois do giro; se não der, gira ao contrário
+  const y0 = new Int32Array(P.length).fill(1 << 30), y1 = new Int32Array(P.length).fill(-(1 << 30)), topo = new Float64Array(P.length);
+  for (let v = 0; v < idx.length; v++) { const k = idx[v], id = cid[k]; if (cy[k] < y0[id]) y0[id] = cy[k]; if (cy[k] > y1[id]) y1[id] = cy[k]; }
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t], b = idx[t + 1], c = idx[t + 2], id = cid[a];
+    if ((cy[a] + cy[b] + cy[c]) / 3 < y0[id] + 0.66 * (y1[id] - y0[id])) continue;
+    topo[id] += (cz[b] - cz[a]) * (cx[c] - cx[a]) - (cx[b] - cx[a]) * (cz[c] - cz[a]); // n.y (·2·área)
+  }
+  const gira = new Uint8Array(P.length);
+  for (let i = 0; i < P.length; i++) { const g = vol[i] < 0, tt = g ? -topo[i] : topo[i]; gira[i] = tt < -1024 ? !g : g; } // 1024 = 2 m² em 1/16 m
   for (let v = 0; v < nVert; v++) {
     const r = v % 3, k0 = idx[v - r];
-    const k = vol[cid[k0]] < 0 && r ? idx[v - r + 3 - r] : idx[v]; // do avesso: troca o 2º e o 3º vértice
+    const k = gira[cid[k0]] && r ? idx[v - r + 3 - r] : idx[v]; // do avesso: troca o 2º e o 3º vértice
     q16[v * 3] = cx[k]; q16[v * 3 + 1] = cy[k]; q16[v * 3 + 2] = cz[k]; ids16[v] = cid[k];
   }
 }
