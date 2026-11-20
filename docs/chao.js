@@ -15,12 +15,12 @@ export function cotaPonta(altura, x, z, xi, zi) {
   return Math.max(altura(x, z), altura(x + (dx / L) * 2, z + (dz / L) * 2));
 }
 
-export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, base = 'data/', binTerreno = null }) {
+export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, base = 'data/', binTerreno = null, fora = null }) {
   const T = meta.terreno;
   const REC = (() => { const [e0, n0, e1, n1] = meta.recorte_lv95, [oe, on] = meta.origem_lv95; return { x0: e0 - oe, x1: e1 - oe, z0: -(n1 - on), z1: -(n0 - on) }; })();
   // terreno.v2.bin (script/compacta.py): mesmos vértices e triângulos do terreno.bin.gz, em ~55% dos bytes
-  const { cols, idx } = decodifica(await (binTerreno ?? baixaBin(base + 'terreno.v2.bin')), 3, 3); // binTerreno: já pedido no começo (cidade.js), junto com os prédios
-  const nv = cols[0].length, nt = idx.length / 3;
+  let { cols, idx } = decodifica(await (binTerreno ?? baixaBin(base + 'terreno.v2.bin')), 3, 3); // binTerreno: já pedido no começo (cidade.js), junto com os prédios
+  const nv = cols[0].length; let nt = idx.length / 3;
   const [col, lin, hh] = cols.map((c) => new Uint16Array(c.buffer));
   const pos = new Float32Array(nv * 3), cores = new Float32Array(nv * 3);
   const cChao = new THREE.Color('#dcd0b2'), cAgua = new THREE.Color('#6f8e99'), cMargem = new THREE.Color('#c9bd9c'), c = new THREE.Color();
@@ -34,6 +34,19 @@ export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, ba
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(cores, 3));
+  // fora da Suíça (França ao noroeste): os triângulos com o centro num dos polígonos de `fora` (script/fronteira.py) saem;
+  // a cidade acaba na fronteira, como o país
+  if (fora?.length) {
+    const polis = fora.map((a) => { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (let i = 0; i < a.length; i += 2) { x0 = Math.min(x0, a[i]); x1 = Math.max(x1, a[i]); z0 = Math.min(z0, a[i + 1]); z1 = Math.max(z1, a[i + 1]); } return { a, x0, x1, z0, z1 }; });
+    const dentroP = (p, x, z) => { if (x < p.x0 || x > p.x1 || z < p.z0 || z > p.z1) return false; let d = false; const a = p.a; for (let i = 0, j = a.length - 2; i < a.length; j = i, i += 2) if ((a[i + 1] > z) !== (a[j + 1] > z) && x < ((a[j] - a[i]) * (z - a[i + 1])) / (a[j + 1] - a[i + 1]) + a[i]) d = !d; return d; };
+    let k = 0;
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = idx[t] * 3, b = idx[t + 1] * 3, d = idx[t + 2] * 3, x = (pos[a] + pos[b] + pos[d]) / 3, z = (pos[a + 2] + pos[b + 2] + pos[d + 2]) / 3;
+      if (polis.some((p) => dentroP(p, x, z))) continue;
+      idx[k++] = idx[t]; idx[k++] = idx[t + 1]; idx[k++] = idx[t + 2];
+    }
+    idx = idx.slice(0, k); nt = k / 3;
+  }
   // triângulos por bloco de 300 m (blocos.js): cada bloco é descartado fora da vista e de cada cascata de sombra
   const { ordem, faixas } = ordenarPorBloco(nt, (t, s) => { const a = idx[t * 3] * 3, b = idx[t * 3 + 1] * 3, d = idx[t * 3 + 2] * 3; s[0] = pos[a] + pos[b] + pos[d]; s[1] = pos[a + 2] + pos[b + 2] + pos[d + 2]; }, 900);
   permutar(idx, ordem, 3);

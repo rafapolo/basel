@@ -12,6 +12,7 @@ import { criarArvores } from './arvores.js';
 import { criarChao, cotaPonta } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
 import { criarMuralha } from './muralha.js';
+import { criarFronteira } from './fronteira.js';
 import { decodifica, baixaBin } from './compacta.js';
 import { atualizarNuvens, TEMPO } from './nuvens.js';
 import { injetarNeve, atualizarNeve } from './neve.js';
@@ -25,13 +26,15 @@ const q = new URLSearchParams(location.search);
 const carga = window.carga;
 carga?.etapa(0.03, t('baixando os dados…', 'downloading the data…', 'Daten werden geladen…'));
 let binTerreno = baixaBin('data/terreno.v2.bin'); // em paralelo com os prédios: a barra da abertura conta os dois
-let [meta, ruas, bin, rel, RETOQUES] = await Promise.all([
+let [meta, ruas, bin, rel, RETOQUES, FRONTEIRA] = await Promise.all([
   fetch('data/predios.json').then((r) => r.json()),
   fetch('data/ruas.json').then((r) => r.json()),
   baixaBin('data/predios.v2.bin'),
   fetch('data/relevo.bin').then((r) => r.arrayBuffer()),
   // retoques por prédio (EGID → cor da parede, do telhado, material), tirados de fotos reais do Commons (script/casa_referencias.py)
   fetch('data/retoques.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+  // fronteiras (script/fronteira.py): a nacional e a de Basel-Stadt, e os pedaços do terreno fora da Suíça (cortados)
+  fetch('data/fronteira.json').then((r) => (r.ok ? r.json() : null)).catch(() => null),
 ]);
 const P = meta.predios;
 for (const p of P) { const r = p.egid && RETOQUES[p.egid]; if (r) { if (r.mat != null) p.mat = r.mat; else if (r.parede && p.mat === 1) p.mat = 0; if (r.parede) p.cor = r.parede; if (r.telhado) p.telha = r.telhado; for (const k of ['and', 'jan', 'ven', 'frente', 'lj', 'jw', 'jh']) if (r[k] != null) p[k] = r[k]; if (r.and != null) p.andFoto = 1; } } // and/jan/ven/frente/lj: fachadas lidas de foto (script/fachadas_reno.py); cor lida de foto sem `mat` é reboco: o arenito (mat 1, público antes de 1900) ignorava a cor e pintava o Reinacherhof de tijolo
@@ -136,7 +139,7 @@ const AGUA = await criaAgua({ THREE, cena, renderer, camera, meta, altura, ruas,
 {
   const larg = (R.nx - 1) * R.passo, prof = (R.ny - 1) * R.passo;
   // relevo fino e ruas como áreas: docs/chao.js (tarefa 15); o relevo de 5 m (relevo.bin) fica só como reserva
-  CH = await criarChao(THREE, { meta, ruas, orto, nivelReno: NIVEL_RENO, ajuste: AGUA.relevo, binTerreno }); // ajuste: leito e margem do Reno (agua.js)
+  CH = await criarChao(THREE, { meta, ruas, orto, nivelReno: NIVEL_RENO, ajuste: AGUA.relevo, binTerreno, fora: FRONTEIRA?.fora }); // ajuste: leito e margem do Reno (agua.js)
   binTerreno = null; // o arquivo baixado (8 MB) não fica preso na memória
   cena.add(CH.malha);
 }
@@ -405,6 +408,10 @@ if (MURALHA) {
   ligaMuralha(q.get('muralha') !== '0');
   cm.addEventListener('change', (e) => ligaMuralha(e.target.checked));
 } else $('c-muralha')?.closest('label')?.remove();
+// fronteiras: a nacional e a de Basel-Stadt (fronteira.js); ?fronteiras=0 abre sem elas
+const FRONT = criarFronteira({ cena, dados: FRONTEIRA });
+if (FRONT) { const cf = $('c-fronteira'); const liga = (on) => { FRONT.ligar(on); cf.checked = on; }; liga(q.get('fronteiras') !== '0'); cf.addEventListener("change", (e) => liga(e.target.checked)); }
+else $('c-fronteira')?.closest('label')?.remove();
 
 // relógio e estação no painel: a hora de Basel (ceu.js segue o relógio real até alguém mexer)
 const ESTACAO = { inverno: ['inverno', 'winter', 'Winter'], primavera: ['primavera', 'spring', 'Frühling'], verao: ['verão', 'summer', 'Sommer'], outono: ['outono', 'autumn', 'Herbst'] };

@@ -73,6 +73,11 @@ h[noRio & ~dentro] = nivel - 3.0  # leito escavado
 
 # água fora do recorte, em triângulos (x, z), y = nível
 agua = rio.difference(box(RC.X0 + 1, RC.Z0 + 1, RC.X1 - 1, RC.Z1 - 1)).simplify(2.0)
+# só a parte suíça (2026-11-20): rio abaixo da fronteira e a metade alemã rio acima ficam de fora (script/fronteira.py)
+_ch = RAIZ / "data/23-fronteira/ch_local.json"
+if _ch.exists():
+    from shapely.geometry import shape as _shape
+    agua = agua.intersection(_shape(json.loads(_ch.read_text())).buffer(0))
 tri = []
 for p in (agua.geoms if hasattr(agua, "geoms") else [agua]):
     if p.geom_type != "Polygon" or p.area < 500: continue
