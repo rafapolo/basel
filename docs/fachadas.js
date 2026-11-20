@@ -39,6 +39,7 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
       set(c, x) { let i = (Math.imul((c / 65536) | 0, 0x9e3779b1) ^ (c & 0xffff) * 0x85eb) & mask; while (v[i] >= 0) i = (i + 1) & mask; k[i] = c; v[i] = x; },
     };
   };
+  const VIZ = [0, -1, 1, -65536, 65536, -81 * 65536, 81 * 65536]; // d ±0,2 m, nz ±1, nx ±1 (as diagonais custavam 25 ms e quase nada juntavam)
   const bitsTab = Math.max(10, Math.ceil(Math.log2(nTris))); // ~2 triângulos por grupo: carga < 30%
   const paredes = tabela(bitsTab), telhados = tabela(bitsTab);
   const triParede = new Int32Array(nTris).fill(-1);
@@ -62,9 +63,10 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
       const h = Math.hypot(nx, nz), tx = -nz / h, tz = nx / h;
       const d = nx * ax + nz * az;
       const chave = ((id * 81 + Math.round(nx * 40) + 40) * 81 + Math.round(nz * 40) + 40) * 65536 + Math.round(d * 5) + 32768;
-      // parede quase plana partida entre faixas vizinhas de d (0,2 m): junta com a vizinha que já existe, senão cada pedaço
-      // tinha comprimento e beiral próprios e triângulos inteiros ficavam sem janela
-      let gi = paredes.get(chave) ?? paredes.get(chave - 1) ?? paredes.get(chave + 1);
+      // parede quase plana partida entre baldes vizinhos (normal a ±1,4°, d a ±0,2 m): junta com o vizinho que já existe,
+      // senão cada pedaço tinha comprimento e beiral próprios e triângulos inteiros ficavam sem janela
+      let gi = paredes.get(chave);
+      for (let i = 1; gi === undefined && i < VIZ.length; i++) gi = paredes.get(chave + VIZ[i]);
       if (gi === undefined) {
         gi = grupos.length; paredes.set(chave, gi);
         grupos.push({ id, tx, tz, umin: 1e9, umax: -1e9, ymin: 1e9, ymax: -1e9, tris: [] });
