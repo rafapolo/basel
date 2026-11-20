@@ -403,16 +403,16 @@ uniform float uVidaT; uniform float uAnima;`)
     // peças opcionais (aOpc = 10·grupo + estilo; ver o shader): 1x cabelo, 2x chapéu, 3x casaco, 4x extra; parte 5 = aAcess
     const O = (g, parte, opc) => partes.push({ g, parte, opc });
     O(mat4(new THREE.BoxGeometry(0.22, 0.3, 0.06), 0, 1.55 + DY, -0.095 + DZ), 4, 11);                       // cabelo comprido
-    O(mat4(new THREE.SphereGeometry(0.06, 6, 4), 0, 1.75 + DY, -0.1 + DZ), 4, 12);                           // coque
-    O(mat4(new THREE.SphereGeometry(0.134, 8, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.665 + DY, DZ), 5, 21);    // gorro
-    O(mat4(new THREE.SphereGeometry(0.04, 5, 4), 0, 1.81 + DY, DZ), 5, 21);                                   // pompom
-    O(mat4(cil(0.128, 0.128, 0.07, 9), 0, 1.73 + DY, DZ), 5, 22);                                             // boné
+    O(mat4(new THREE.SphereGeometry(0.06, 4, 3), 0, 1.75 + DY, -0.1 + DZ), 4, 12);                           // coque
+    O(mat4(new THREE.SphereGeometry(0.134, 6, 3, 0, TAU, 0, Math.PI * 0.55), 0, 1.665 + DY, DZ), 5, 21);    // gorro
+    O(mat4(new THREE.SphereGeometry(0.04, 4, 2), 0, 1.81 + DY, DZ), 5, 21);                                   // pompom
+    O(mat4(cil(0.128, 0.128, 0.07, 6), 0, 1.73 + DY, DZ), 5, 22);                                             // boné
     O(mat4(new THREE.BoxGeometry(0.17, 0.02, 0.13), 0, 1.705 + DY, 0.15 + DZ), 5, 22);                        // aba do boné
-    O(mat4(cil(0.23, 0.23, 0.02, 12), 0, 1.71 + DY, DZ), 5, 23);                                              // chapéu: aba larga
-    O(mat4(cil(0.12, 0.13, 0.13, 9), 0, 1.78 + DY, DZ), 5, 23);                                               // copa
-    O(mat4(new THREE.TorusGeometry(0.1, 0.045, 5, 10).rotateX(Math.PI / 2), 0, 1.5 + DY, DZ), 5, 41);       // cachecol
-    O(mat4(cil(0.205, 0.27, 0.52, 9), 0, 0.68, 0, 1.15, 1, 0.82), 1, 31);                                  // casaco comprido
-    O(mat4(cil(0.19, 0.31, 0.46, 10), 0, 0.68, 0, 1.1, 1, 0.9), 1, 32);                                      // vestido
+    O(mat4(cil(0.23, 0.23, 0.02, 8), 0, 1.71 + DY, DZ), 5, 23);                                              // chapéu: aba larga
+    O(mat4(cil(0.12, 0.13, 0.13, 6), 0, 1.78 + DY, DZ), 5, 23);                                               // copa
+    O(mat4(new THREE.TorusGeometry(0.1, 0.045, 3, 7).rotateX(Math.PI / 2), 0, 1.5 + DY, DZ), 5, 41);       // cachecol
+    O(mat4(cil(0.205, 0.27, 0.52, 7), 0, 0.68, 0, 1.15, 1, 0.82), 1, 31);                                  // casaco comprido
+    O(mat4(cil(0.19, 0.31, 0.46, 7), 0, 0.68, 0, 1.1, 1, 0.9), 1, 32);                                      // vestido
     O(mat4(new THREE.BoxGeometry(0.3, 0.36, 0.14), 0, 1.22, -0.2), 5, 42);                                    // mochila
     O(mat4(new THREE.BoxGeometry(0.07, 0.22, 0.22), 0.27, 0.98, 0.02), 5, 43);                                // bolsa de lado
     return unir(partes);
@@ -481,14 +481,14 @@ uniform float uVidaT; uniform float uAnima;`)
     // peças opcionais (aOpc = 10·grupo + estilo; ver o shader): 1x cabelo, 2x chapéu, 3x casaco, 4x extra; parte 5 = aAcess
     const O = (g, parte, opc) => partes.push({ g, parte, opc });
     O(mat4(new THREE.BoxGeometry(0.22, 0.3, 0.06), 0, 1.55 + DY, -0.095 + DZ), 4, 11);                       // cabelo comprido
-    O(mat4(new THREE.SphereGeometry(0.06, 6, 4), 0, 1.75 + DY, -0.1 + DZ), 4, 12);                           // coque
-    O(mat4(new THREE.SphereGeometry(0.134, 8, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.665 + DY, DZ), 5, 21);    // gorro
-    O(mat4(new THREE.SphereGeometry(0.04, 5, 4), 0, 1.81 + DY, DZ), 5, 21);                                   // pompom
-    O(mat4(cil(0.128, 0.128, 0.07, 9), 0, 1.73 + DY, DZ), 5, 22);                                             // boné
+    O(mat4(new THREE.SphereGeometry(0.06, 4, 3), 0, 1.75 + DY, -0.1 + DZ), 4, 12);                           // coque
+    O(mat4(new THREE.SphereGeometry(0.134, 6, 3, 0, TAU, 0, Math.PI * 0.55), 0, 1.665 + DY, DZ), 5, 21);    // gorro
+    O(mat4(new THREE.SphereGeometry(0.04, 4, 2), 0, 1.81 + DY, DZ), 5, 21);                                   // pompom
+    O(mat4(cil(0.128, 0.128, 0.07, 6), 0, 1.73 + DY, DZ), 5, 22);                                             // boné
     O(mat4(new THREE.BoxGeometry(0.17, 0.02, 0.13), 0, 1.705 + DY, 0.15 + DZ), 5, 22);                        // aba do boné
-    O(mat4(cil(0.23, 0.23, 0.02, 12), 0, 1.71 + DY, DZ), 5, 23);                                              // chapéu: aba larga
-    O(mat4(cil(0.12, 0.13, 0.13, 9), 0, 1.78 + DY, DZ), 5, 23);                                               // copa
-    O(mat4(new THREE.TorusGeometry(0.1, 0.045, 5, 10).rotateX(Math.PI / 2), 0, 1.5 + DY, DZ), 5, 41);       // cachecol
+    O(mat4(cil(0.23, 0.23, 0.02, 8), 0, 1.71 + DY, DZ), 5, 23);                                              // chapéu: aba larga
+    O(mat4(cil(0.12, 0.13, 0.13, 6), 0, 1.78 + DY, DZ), 5, 23);                                               // copa
+    O(mat4(new THREE.TorusGeometry(0.1, 0.045, 3, 7).rotateX(Math.PI / 2), 0, 1.5 + DY, DZ), 5, 41);       // cachecol
     return unir(partes);
   };
   const LUG = { x: [], z: [], y: [], hx: [], hz: [], tipo: [], lim: [], alt: [], larg: [], kid: [] };
@@ -926,7 +926,7 @@ uniform float uVidaT; uniform float uAnima;`)
   }
   // nadadores (Wickelfisch laranja ou amarelo, touca de cor)
   // no auge do verão, milhares descem o Reno ao mesmo tempo (o "Rheinschwimmen", da Tinguely à Johanniterbrücke); de resto, poucos
-  const NNAD = leve ? 1000 : 5000;
+  const NNAD = leve ? 1500 : 8000; // 2026-11-21: num sábado quente de agosto passam milhares ao mesmo tempo
   // cabeça e ombros fora d'água, um braço por cima do Wickelfisch (o saco-boia em forma de peixe, ~0,8 m, que leva a roupa)
   const geoNad = unir([ // poucos lados: 5000 deles, e de longe cada um é um ponto colorido
     { g: mat4(new THREE.SphereGeometry(0.11, 6, 4), 0, 0.1, 0.12), parte: 0 },
@@ -975,7 +975,7 @@ uniform float uVidaT; uniform float uAnima;`)
     // auge: julho e agosto (dia ~ 217–278), à tarde; fora dele uns poucos por cento. Ao vivo, o calor de agora pesa
     const auge = suave(205, 225, dia) * (1 - suave(270, 290, dia)), tarde = suave(11, 14, hora()) * (1 - suave(19, 21, hora()));
     const temp = window.nuvens?.vivo && window.TEMPO_BASEL ? lim((window.TEMPO_BASEL.temp - 18) / 12, 0.05, 1) : 1;
-    const base = verao * suave(8, 11, hora()) * (1 - suave(19, 21.5, hora())) * suave(18, 30, S.alt ?? 40) * (S.dia === 'util' ? 0.75 : 1);
+    const base = verao * suave(8, 11, hora()) * (1 - suave(19, 21.5, hora())) * suave(18, 30, S.alt ?? 40) * (S.dia === 'util' ? 0.85 : 1);
     return base * (0.02 + 0.98 * auge * tarde) * temp;
   };
   function nadadores(dt, quer, cam) {

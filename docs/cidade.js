@@ -416,8 +416,7 @@ if (MURALHA) {
 } else $('c-muralha')?.closest('label')?.remove();
 // fronteiras: a nacional e a de Basel-Stadt (fronteira.js); ?fronteiras=0 abre sem elas
 const FRONT = criarFronteira({ cena, dados: FRONTEIRA });
-if (FRONT) { const cf = $('c-fronteira'); const liga = (on) => { FRONT.ligar(on); cf.checked = on; }; liga(q.get('fronteiras') !== '0'); cf.addEventListener("change", (e) => liga(e.target.checked)); }
-else $('c-fronteira')?.closest('label')?.remove();
+FRONT?.ligar(q.get('fronteiras') !== '0'); // sempre ligadas (sem chave no painel desde 2026-11-21)
 
 // relógio e estação no painel: a hora de Basel (ceu.js segue o relógio real até alguém mexer)
 const ESTACAO = { inverno: ['inverno', 'winter', 'Winter'], primavera: ['primavera', 'spring', 'Frühling'], verao: ['verão', 'summer', 'Sommer'], outono: ['outono', 'autumn', 'Herbst'] };
@@ -748,11 +747,11 @@ const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, alt
   liga(q.get('linhas') === '1');
   cl.addEventListener('change', (e) => liga(e.target.checked));
 }
-$('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
+// gente e bondes: sempre ligados (sem chave desde 2026-11-21); ?vida=0 ainda abre sem eles, para medir
 // Fasnacht (fasnacht.js): Cliques pelas ruas do centro nos três dias reais, ou quando o tour chega em fevereiro
 const MOD_FAS = await import('./fasnacht.js'), FAS = MOD_FAS.criarFasnacht({ cena, altura, ruas, ceu }), FAS_SEG = MOD_FAS.segundaFasnacht;
 { const ap = (e) => { apagaAlvo = MOD_FAS.ehMorgestraich(e.data, e.hora) ? 1 : 0; }; ap(ceu.estado()); ceu.aoMudar(ap); }
-if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
+if (q.get('vida') === '0') VIDA.ligar(false);
 // fora do G-buffer do GTAO: tudo o que entrou na cena desde os detalhes (postes, bancos, gente, bondes, Cliques, o Reno de
 // fora), menos as torres da Roche, que fazem sombra de contato de verdade
 for (const o of cena.children) if (!antesDetalhes.has(o) && o !== ROCHE?.malha) ceu.semAO.push(o);

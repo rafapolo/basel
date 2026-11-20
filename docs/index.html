@@ -83,7 +83,7 @@
   #agora { font: 400 54px/1 'IM Fell English', Georgia, serif; display: flex; align-items: baseline; gap: 10px; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
   #agora small { font: 500 12px Inter, sans-serif; color: var(--suave); }
   /* estação: etiqueta com ícone (as cores da estação, discretas) */
-  #estacao.tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px; border: 1px solid var(--linha); font-weight: 600; color: var(--tinta); align-self: center; }
+  #estacao.tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px; border: 1px solid var(--linha); font-weight: 600; color: var(--tinta); align-self: flex-start; margin-left: auto; } /* no canto de cima à direita do painel */
   #estacao svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; flex: none; }
   #estacao.inverno { background: #e3e9f0; color: #2f4a6b; } #estacao.primavera { background: #e4efd9; color: #3d6b2a; }
   #estacao.verao { background: #f6e6b8; color: #7a5a10; } #estacao.outono { background: #f3dcc8; color: #8a4219; }
@@ -110,8 +110,8 @@
   #sol-info { font-variant-numeric: tabular-nums; }
   body.noite #sol-ctl, body.noite #sol-ctl output { color: #c9c0ac; }
   .nota { font-size: 11px; color: var(--suave); margin: 10px 0 0; border-top: 1px solid var(--linha); padding-top: 8px; }
-  #legenda-linhas { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0; }
-  #legenda-linhas span { min-width: 22px; padding: 1px 6px; border-radius: 4px; background: var(--c); color: #fff; font: 700 11px Inter, sans-serif; text-align: center; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
+  #legenda-linhas { display: flex; flex-wrap: nowrap; gap: 2px; margin: 8px 0 0; }
+  #legenda-linhas span { flex: 1 1 0; min-width: 0; padding: 1px 0; border-radius: 4px; background: var(--c); color: #fff; font: 700 11px Inter, sans-serif; text-align: center; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
   #legenda-linhas[hidden] { display: none; }
   .nota a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
@@ -181,7 +181,7 @@
     #painel { left: 16px; right: 16px; width: auto; bottom: 12px; padding: 10px 12px; }
     /* no telefone o painel abre recolhido (só o relógio): ocupava metade da tela; tocar no relógio abre e fecha */
     #agora { cursor: pointer; display: flex; align-items: baseline; gap: 8px; }
-    #agora::after { content: "▾"; margin-left: auto; font: 16px Inter, sans-serif; opacity: .6; transition: transform .2s; }
+    #agora::after { content: "▾"; margin-left: 6px; font: 16px Inter, sans-serif; opacity: .6; transition: transform .2s; }
     #painel.fechado #agora::after { transform: rotate(180deg); }
     #painel.fechado #sol-ctl, #painel.fechado .chaves { display: none; }
     #painel.fechado #agora { margin: 0; font-size: 30px; }
@@ -245,9 +245,7 @@
   </div>
   <div class="chaves">
     <label class="chave"><input type="checkbox" id="c-ruas" checked> <span data-i18n="ruas">ruas e bondes</span></label>
-    <label class="chave"><input type="checkbox" id="c-vida" checked> <span data-i18n="vida">gente e bondes</span></label>
     <label class="chave"><input type="checkbox" id="c-muralha" checked> <span data-i18n="muralha">muralha de 1400</span></label>
-    <label class="chave"><input type="checkbox" id="c-fronteira" checked> <span data-i18n="fronteira">fronteiras</span></label>
     <label class="chave"><input type="checkbox" id="c-linhas"> <span data-i18n="linhas">cores das linhas</span></label>
   </div>
   <div id="legenda-linhas" hidden aria-label="linhas de bonde"></div>
