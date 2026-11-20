@@ -615,8 +615,15 @@ function quadro(agora) {
     }
   }
   AGUA.atualizar(agora);
+  // sombras (2026-11-20): com a câmera parada, o mapa de sombras é redesenhado em quadro sim, quadro não (o sol anda devagar;
+  // só bondes e gente mudam): ~4 ms a menos por quadro no modo completo. Câmera andando: todo quadro
+  { const m = camera.matrixWorld.elements; let mudou = false;
+    for (let i = 0; i < 16; i++) if (Math.abs(m[i] - camAnt[i]) > 1e-4) { mudou = true; camAnt[i] = m[i]; }
+    renderer.shadowMap.needsUpdate = mudou || (++nQuadro & 1) === 0; }
   ceu.render();
 }
+const camAnt = new Float32Array(16); let nQuadro = 0;
+renderer.shadowMap.autoUpdate = false;
 // entorno (entorno.js): o chão em volta e o Reno da fronteira alemã à francesa; a cidade não termina mais numa borda
 const ENTORNO = q.get('entorno') === '0' ? null : await criarEntorno({ cena }).catch(() => null);
 // torres da Roche (roche.js)
@@ -660,7 +667,7 @@ carga?.etapa(0.98, t('preparando a luz e as cores…', 'preparing light and colo
 ceu.ligarSombras?.();
 if (orto.querKTX2()) await orto.prepararKTX2().catch(() => {}); // foto aérea comprimida (celular): a detecção espera a GPU, melhor aqui
 await renderer.compileAsync(cena, camera).catch(() => {});
-try { ceu.render(); } catch {} // um quadro ainda atrás da abertura: compila o que sobra (sombras, G-buffer do GTAO, composer)
+renderer.shadowMap.needsUpdate = true; try { ceu.render(); } catch {} // um quadro ainda atrás da abertura: compila o que sobra (sombras, G-buffer do GTAO, composer)
 requestAnimationFrame(quadro);
 orto.carrega(); // tiles chegam depois da abertura
 carga?.etapa(1, '');
