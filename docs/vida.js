@@ -583,20 +583,39 @@ uniform float uVidaT; uniform float uAnima;`)
       return r;
     } };
   };
-  function corpoBonde(cBase, cFaixa) {
-    const b = geoBonde();
-    b.caixa(2.4, 0.4, LM, 0, 0.55, 0, '#3a3d40');                       // saia
-    b.caixa(2.4, 2.35, LM, 0, 1.95, 0, cBase);                          // carroceria
-    b.caixa(2.42, 0.12, LM - 0.05, 0, 1.42, 0, cFaixa);                 // friso
-    for (const l of [-1, 1]) {
-      b.caixa(0.03, 0.95, LM - 1.0, l * 1.205, 2.2, 0, '#1b242b', 1);   // janelas
-      for (const z of [-2.9, 0, 2.9]) b.caixa(0.04, 1.8, 0.1, l * 1.205, 1.9, z, '#c9cdd0'); // colunas
+  // bonde no desenho do histórico verde da BVB (motor 1914 com reboque, foto do depósito Wiesenplatz): carroceria de madeira
+  // pintada, janelas altas com colunas, teto em arco com lanternim, plataformas abertas nas pontas, farol redondo, truques à mostra
+  function corpoBonde(cBase, cEscuro) {
+    const b = geoBonde(), meio = LM / 2, plat = 0.85, corpo = LM - 2 * plat;
+    b.caixa(2.0, 0.32, LM - 0.4, 0, 0.42, 0, '#2c2d2e');                          // chassi
+    for (const z of [-1, 1]) {                                                    // truque: rodas, molas e caixa de eixo
+      b.caixa(2.05, 0.5, 2.1, 0, 0.36, z * (meio - 2.1), '#3b3c3d');
+      for (const x of [-1, 1]) for (const dz of [-0.55, 0.55]) b.caixa(0.12, 0.62, 0.62, x * 0.86, 0.33, z * (meio - 2.1) + dz, '#1d1e1f');
     }
-    b.caixa(2.2, 0.18, LM - 0.3, 0, 3.22, 0, '#b8bcc0');                // teto
-    b.caixa(1.3, 0.08, 1.2, 0, 3.36, 0, '#222');                        // equipamento do teto
+    b.caixa(2.3, 0.95, corpo, 0, 1.12, 0, cBase);                                 // painel de baixo
+    b.caixa(2.32, 0.06, corpo, 0, 1.62, 0, cEscuro);                              // friso sob as janelas
+    b.caixa(2.3, 0.28, corpo, 0, 2.95, 0, cBase);                                 // faixa sobre as janelas
+    const nJ = 6, passo = corpo / nJ;
+    for (const l of [-1, 1]) {
+      b.caixa(0.03, 1.2, corpo - 0.1, l * 1.15, 2.22, 0, '#24302f', 1);            // vidros (acesos à noite)
+      for (let i = 0; i <= nJ; i++) b.caixa(0.06, 1.24, 0.13, l * 1.165, 2.22, -corpo / 2 + i * passo, cBase); // colunas
+    }
+    b.caixa(2.36, 0.07, corpo + 0.1, 0, 3.12, 0, cEscuro);                        // beiral do teto
+    b.caixa(2.2, 0.16, LM - 0.1, 0, 3.22, 0, '#7a7d7e');                          // teto (cobre as plataformas)
+    b.caixa(1.1, 0.26, corpo - 0.6, 0, 3.42, 0, '#686b6c');                       // lanternim
+    for (const l of [-1, 1]) b.caixa(0.02, 0.14, corpo - 0.8, l * 0.56, 3.42, 0, '#1e2627', 1); // janelinhas do lanternim
+    b.caixa(0.12, 0.12, 3.2, 0, 3.62, 0, '#2a2a2a');                              // base do pantógrafo
+    b.caixa(0.06, 0.06, 2.0, 0, 3.95, -0.6, '#2a2a2a');                           // haste
     for (const z of [-1, 1]) {
-      b.caixa(1.6, 0.35, 0.04, 0, 1.0, z * (LM / 2 + 0.01), '#e8e4d8', 1); // faróis/luz traseira
-      b.caixa(0.5, 0.2, 0.05, 0, 2.5, z * (LM / 2 + 0.01), '#f0c24a', 1);  // letreiro
+      const zp = z * (meio - plat / 2);
+      b.caixa(2.1, 1.0, 0.12, 0, 1.15, z * (meio - 0.06), cBase);                  // anteparo da plataforma (painel do maquinista)
+      b.caixa(2.1, 1.25, 0.04, 0, 2.25, z * (meio - 0.05), '#24302f', 1);           // para-brisa em três vidros
+      for (const x of [-0.36, 0.36]) b.caixa(0.09, 1.25, 0.07, x, 2.25, z * (meio - 0.03), cBase);
+      for (const x of [-1, 1]) b.caixa(0.1, 2.3, 0.1, x * 1.0, 1.95, z * (meio - 0.08), cBase); // cantos
+      b.caixa(2.0, 0.14, plat, 0, 0.66, zp, '#3a3b3c');                             // piso da plataforma e degrau
+      b.caixa(0.28, 0.28, 0.08, 0, 1.25, z * (meio + 0.01), '#f4ecd0', 1);          // farol redondo
+      b.caixa(1.0, 0.22, 0.05, 0, 3.3, z * (meio + 0.0), '#f2f0e8', 1);             // placa de destino no teto
+      b.caixa(1.8, 0.12, 0.25, 0, 0.3, z * (meio + 0.08), '#2c2d2e');               // para-choque e engate
     }
     return b.fim();
   }
@@ -611,8 +630,8 @@ uniform float uVidaT; uniform float uAnima;`)
     m.customProgramCacheKey = () => 'vida-bonde';
     return m;
   };
-  const mBVB = new THREE.InstancedMesh(corpoBonde('#2f8a56', '#e9e4d2'), matBonde(), NBOND * MOD);
-  const mBLT = new THREE.InstancedMesh(corpoBonde('#f0c21c', '#3b3b3b'), matBonde(), NBOND * MOD);
+  const mBVB = new THREE.InstancedMesh(corpoBonde('#69b33c', '#2f6b26'), matBonde(), NBOND * MOD);
+  const mBLT = new THREE.InstancedMesh(corpoBonde('#f0c21c', '#6b5a1c'), matBonde(), NBOND * MOD); // BLT: o mesmo desenho, no amarelo dela
   for (const m of [mBVB, mBLT]) {
     m.frustumCulled = false; m.castShadow = !leve; m.receiveShadow = true; m.count = 0; m.name = 'bondes';
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); grupo.add(m);
@@ -842,7 +861,7 @@ uniform float uVidaT; uniform float uAnima;`)
   }
   // a e-bike do jogo e quem anda na vista de rua derrubam gente: quem anda, os ciclistas e quem está parado (os sentados ficam)
   const atropela = (x, z, r, fx, fz) => (ligado ? ped.derruba(x, z, r, fx, fz) + bici.derruba(x, z, r + 0.3, fx, fz) + derrubaParados(x, z, r, fx, fz) : 0);
-  const api = { grupo, atualizar, ligar, info, S, bate, atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
+  const api = { grupo, atualizar, ligar, info, S, bate, bondePerto: () => (ligado ? bondeInfo.perto : 1e9), atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
   window.vida = api;
   return api;
 }
