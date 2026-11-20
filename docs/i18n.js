@@ -36,6 +36,7 @@
     'som-titulo': ['Som do tour (liga/desliga)', 'Tour sound (on/off)', 'Ton der Tour (ein/aus)'],
     'aria-painel': ['Basel agora', 'Basel now', 'Basel jetzt'],
     hora: ['hora do dia', 'time of day', 'Tageszeit'],
+    data: ['dia do ano', 'day of the year', 'Tag im Jahr'],
     vida: ['gente e bondes', 'people and trams', 'Leben und Tram'],
     ambiente: ['som ambiente', 'ambient sound', 'Umgebungsgeräusche'],
     leve: ['modo leve', 'light mode', 'Leichtmodus'],

@@ -328,16 +328,25 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
   }
 
   // controles na página (hora, data, modo leve)
-  const hr = document.getElementById('c-hora'), dt = document.getElementById('c-data'), tx = document.getElementById('hora-txt'), info = document.getElementById('sol-info'), lv = document.getElementById('c-leve');
+  const hr = document.getElementById('c-hora'), dt = document.getElementById('c-data'), dtx = document.getElementById('data-txt'), tx = document.getElementById('hora-txt'), info = document.getElementById('sol-info'), lv = document.getElementById('c-leve');
   function atualizarUI(e) {
     if (hr && document.activeElement !== hr) hr.value = e.hora;
     const cn = document.getElementById('c-noite'); if (cn) cn.checked = e.noite > 0.5;
     if (tx) tx.textContent = hhmm(e.hora);
-    if (dt && dt.value !== e.data) dt.value = e.data;
+    // data: só dia e mês num slider (dia 0–364 de um ano comum; o ano fica o que já era, e 29/2 cai em 1/3)
+    const [, m, d] = e.data.split('-').map(Number), doy = Math.round((Date.UTC(2025, m - 1, d) - Date.UTC(2025, 0, 1)) / 86400000);
+    if (dt && document.activeElement !== dt) dt.value = doy;
+    if (dtx) dtx.textContent = fmtDia(m, d);
     if (info) info.textContent = `${Math.round(e.altitudeGraus)}° · ${e.nascer ? hhmm(e.nascer) : '—'} → ${e.poente ? hhmm(e.poente) : '—'}`;
   }
   hr?.addEventListener('input', () => ceu.definirHora(+hr.value));
-  dt?.addEventListener('change', () => ceu.definirData(dt.value));
+  const fmtDia = (m, d) => new Intl.DateTimeFormat(document.documentElement.lang || 'pt', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(Date.UTC(2025, m - 1, d)).replace('.', '');
+  let pedido = 0; // arrastar o slider recalcula sol, árvores e roupas: no máximo uma vez por quadro
+  dt?.addEventListener('input', () => {
+    const x = new Date(Date.UTC(2025, 0, 1 + +dt.value)), mm = String(x.getUTCMonth() + 1).padStart(2, '0'), dd = String(x.getUTCDate()).padStart(2, '0');
+    if (dtx) dtx.textContent = fmtDia(x.getUTCMonth() + 1, x.getUTCDate());
+    cancelAnimationFrame(pedido); pedido = requestAnimationFrame(() => ceu.definirData(`${S.data.slice(0, 4)}-${mm}-${dd}`));
+  });
   if (lv) {
     lv.checked = leve;
     lv.addEventListener('change', () => { const p = new URLSearchParams(location.search); p.set('leve', lv.checked ? '1' : '0'); location.search = p.toString(); });

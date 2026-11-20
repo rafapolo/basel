@@ -51,23 +51,20 @@
   #agora { font: 400 54px/1 'IM Fell English', Georgia, serif; display: flex; align-items: baseline; gap: 10px; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
   #agora small { font: 500 12px Inter, sans-serif; color: var(--suave); }
   .chaves { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  /* chaves: interruptor deslizante; o rótulo inteiro é clicável e ganha fundo quando ligado */
-  .chave { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; line-height: 1.2; cursor: pointer; padding: 6px 8px 6px 10px; border: 1px solid var(--linha); border-radius: 8px; user-select: none; transition: background .2s var(--ease), border-color .2s var(--ease); }
-  .chave:hover { background: rgba(29,24,18,.05); }
-  .chave:has(input:checked) { background: rgba(29,24,18,.07); border-color: rgba(29,24,18,.32); }
-  .chave span { order: -1; }
-  .chave input { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 30px; height: 18px; margin: 0; border-radius: 999px; background: rgba(29,24,18,.22); cursor: pointer; transition: background .2s var(--ease); }
-  .chave input::before { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fffaf0; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .2s var(--ease); }
-  .chave input:checked { background: var(--tinta); }
-  .chave input:checked::before { transform: translateX(12px); }
-  .chave input:focus-visible { outline: 2px solid var(--ouro); outline-offset: 2px; }
-  @media (prefers-reduced-motion: reduce) { .chave, .chave input, .chave input::before { transition: none; } }
+  /* chaves: o rótulo inteiro é o botão (sem interruptor desenhado): contorno quando desligado, preenchido quando ligado; a
+     caixa de seleção fica invisível, mas segue lá para o teclado e o leitor de tela */
+  .chave { position: relative; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13px; line-height: 1.2; cursor: pointer; padding: 7px 10px; border: 1px solid var(--linha); border-radius: 8px; user-select: none; transition: background .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease); }
+  .chave:hover { background: rgba(29,24,18,.06); }
+  .chave input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+  .chave:has(input:checked) { background: var(--tinta); border-color: var(--tinta); color: var(--papel); }
+  .chave:has(input:checked):hover { background: #3a3128; }
+  .chave:has(input:focus-visible) { outline: 2px solid var(--ouro); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .chave { transition: none; } }
   #sol-ctl { margin: 0 0 10px; font-size: 12px; color: var(--suave); }
   #sol-ctl label { display: flex; justify-content: space-between; }
   #sol-ctl output { font-variant-numeric: tabular-nums; color: var(--tinta); font-weight: 600; }
-  #c-hora { width: 100%; margin: 4px 0; accent-color: var(--ouro); }
+  #c-hora, #c-data { width: 100%; margin: 4px 0; accent-color: var(--ouro); }
   .sol-linha { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  #c-data { font: 12px Inter, sans-serif; color: inherit; background: transparent; border: 1px solid var(--linha); border-radius: 6px; padding: 3px 6px; }
   #sol-info { font-variant-numeric: tabular-nums; }
   body.noite #sol-ctl, body.noite #sol-ctl output { color: #c9c0ac; }
   .nota { font-size: 11px; color: var(--suave); margin: 10px 0 0; border-top: 1px solid var(--linha); padding-top: 8px; }
@@ -97,9 +94,7 @@
   body.noite #marca, body.noite #painel { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
   body.noite .chave { border-color: rgba(232,225,208,.18); }
   body.noite .chave:hover { background: rgba(232,225,208,.06); }
-  body.noite .chave:has(input:checked) { background: rgba(232,225,208,.1); border-color: rgba(232,225,208,.32); }
-  body.noite .chave input { background: rgba(232,225,208,.25); }
-  body.noite .chave input:checked { background: var(--ouro); }
+  body.noite .chave:has(input:checked) { background: var(--ouro); border-color: var(--ouro); color: #1d1812; }
   body.noite #marca p, body.noite #agora small, body.noite .nota, body.noite #creditos { color: #a99f8c; }
   body.noite .btn:not(#tour-abrir):not(#jogo-abrir) { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
 
@@ -195,7 +190,9 @@
 <div id="sol-ctl">
     <label for="c-hora"><span data-i18n="hora">hora</span> <output id="hora-txt"></output></label>
     <input id="c-hora" type="range" min="0" max="24" step="0.05" value="15" aria-label="Hora do dia" data-i18n-aria="aria-hora">
-    <div class="sol-linha"><input id="c-data" type="date" value="2026-06-21" aria-label="Data" data-i18n-aria="aria-data"><span id="sol-info" title="altura do sol · nascer → poente"></span></div>
+    <label for="c-data"><span data-i18n="data">dia</span> <output id="data-txt"></output></label>
+    <input id="c-data" type="range" min="0" max="364" step="1" value="171" aria-label="Data" data-i18n-aria="aria-data">
+    <div class="sol-linha"><span id="sol-info" title="altura do sol · nascer → poente"></span></div>
   </div>
   <div class="chaves">
     <label class="chave"><input type="checkbox" id="c-noite"> <span data-i18n="noite">noite</span></label>
