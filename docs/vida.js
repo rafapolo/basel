@@ -579,6 +579,31 @@ uniform float uVidaT; uniform float uAnima;`)
     kf.push([Math.max(p.T, tp), (xs.length - 1) * DS, 3]);
     return { xs, ys, zs, total: (xs.length - 1) * DS, kf, p };
   });
+  // linhas coloridas (desligadas por padrão; chave no painel): uma fita por linha sobre os trilhos, só no sentido 0 (o de
+  // volta passa pelos mesmos trilhos), deslocada para o lado pela posição da linha na lista, para as que dividem a rua
+  // aparecerem lado a lado. Cores distintas, aproximadas do mapa da rede (não as oficiais)
+  const COR_LINHA = { 1: '#8c5a2b', 2: '#c9a227', 3: '#1f3f8f', 6: '#2a7fd4', 8: '#d6408f', 10: '#f2c200', 11: '#d62828', 14: '#7a3fb0', 15: '#2e9e4f', 16: '#8cc63f', 17: '#20b2aa' };
+  const linhasCor = (() => {
+    const nums = [...new Set(padroes.map((p) => p.l))].sort((a, b) => +a - +b), g = new THREE.Group(); g.name = 'linhas de bonde'; g.visible = false;
+    nums.forEach((l, slot) => {
+      const P = [], I = [], off = ((slot % 5) - 2) * 2.0, w = 1.8;
+      for (const tr of trilhos) {
+        if (tr.p.l !== l || tr.p.d) continue;
+        const n = tr.xs.length;
+        for (let i = 0; i < n; i++) {
+          const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1), dx = tr.xs[i1] - tr.xs[i0], dz = tr.zs[i1] - tr.zs[i0], L = Math.hypot(dx, dz) || 1, nx = -dz / L, nz = dx / L, v = P.length / 3, y = tr.ys[i] + 0.12;
+          P.push(tr.xs[i] + nx * (off - w / 2), y, tr.zs[i] + nz * (off - w / 2), tr.xs[i] + nx * (off + w / 2), y, tr.zs[i] + nz * (off + w / 2));
+          if (i) I.push(v - 2, v - 1, v, v - 1, v + 1, v);
+        }
+      }
+      if (!P.length) return;
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setIndex(I);
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: COR_LINHA[l] ?? '#888', side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, fog: true }));
+      m.renderOrder = 1; m.material.userData.semNeve = true; g.add(m);
+    });
+    cena.add(g); // fora do grupo da vida: as cores ficam mesmo com gente e bondes desligados
+    return { g, nums };
+  })();
   function posS(tr, s, o) {
     const f = lim(s / DS, 0, tr.xs.length - 1.001), i = Math.floor(f), u = f - i;
     o.x = tr.xs[i] + (tr.xs[i + 1] - tr.xs[i]) * u; o.y = tr.ys[i] + (tr.ys[i + 1] - tr.ys[i]) * u; o.z = tr.zs[i] + (tr.zs[i + 1] - tr.zs[i]) * u;
@@ -928,7 +953,7 @@ uniform float uVidaT; uniform float uAnima;`)
   }
   // a e-bike do jogo e quem anda na vista de rua derrubam gente: quem anda, os ciclistas e quem está parado (os sentados ficam)
   const atropela = (x, z, r, fx, fz) => (ligado ? ped.derruba(x, z, r, fx, fz) + bici.derruba(x, z, r + 0.3, fx, fz) + derrubaParados(x, z, r, fx, fz) : 0);
-  const api = { grupo, atualizar, ligar, info, S, bate, fluxo: (x, z) => { const o = { x: 0, z: 0 }; fluxo(x, z, o); return o; }, forcarNado: (v) => { nadoForcado = v ? 1 : 0; }, bondePerto: () => (ligado ? bondeInfo.perto : 1e9), atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
+  const api = { grupo, atualizar, ligar, info, S, bate, linhasCores: (on) => { linhasCor.g.visible = on; }, coresLinhas: () => linhasCor.nums.map((l) => [l, COR_LINHA[l] ?? '#888']), fluxo: (x, z) => { const o = { x: 0, z: 0 }; fluxo(x, z, o); return o; }, forcarNado: (v) => { nadoForcado = v ? 1 : 0; }, bondePerto: () => (ligado ? bondeInfo.perto : 1e9), atropela, perfil: () => ({ ped: V.contagem.ped, velo: V.contagem.velo }), padroes: () => trilhos.map((t) => ({ l: t.p.l, e: t.p.e, cab: t.p.cab, total: t.total })), ehAgua, nadadores: () => nd.filter((s) => s.esc > 0.5).map((s) => [s.x, s.z]), gaivotas: () => ave.map((v) => { const b = bandoPos[v.bando]; return [b.x + Math.cos(v.ang) * v.raio, b.z + Math.sin(v.ang) * v.raio]; }) };
   window.vida = api;
   return api;
 }

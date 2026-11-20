@@ -22,6 +22,7 @@
     som: ['som', 'sound', 'Ton'],
     muralha: ['muralha de 1400', 'city wall, 1400', 'Stadtmauer, 1400'],
     fronteira: ['fronteiras', 'borders', 'Grenzen'],
+    linhas: ['cores das linhas', 'tram line colours', 'Tramlinien farbig'],
     agora: ['agora', 'now', 'jetzt'],
     tour: ['Tour de 2 min', '2-min tour', '2-Min-Tour'],
     jogo: ['Pedalar', 'Ride an e-bike', 'E-Bike fahren'],

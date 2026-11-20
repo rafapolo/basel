@@ -738,6 +738,14 @@ const ROCHE = q.get('roche') === '0' ? null : await criarRoche({ cena, U, recort
 // gente e movimento (tarefa 19, docs/vida.js): bondes pelo horário do GTFS, pedestres, bicicletas, carros, gaivotas e nadadores
 await previa(); carga?.etapa(0.96, t('gente e bondes…', 'people and trams…', 'Menschen und Trams…'));
 const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, altura, ruas, camera, controls, nivelReno: AGUA.nivel + 0.05, nivelRio: AGUA.nivel, leve, cotaPonte: MARC.cotaPonte, ponte: MITTLERE, recorte: REC });
+// cores das linhas de bonde: desligadas por padrão; ligadas, a legenda dos números aparece embaixo das chaves (?linhas=1)
+{
+  const cl = $('c-linhas'), leg = $('legenda-linhas');
+  leg.innerHTML = VIDA.coresLinhas().map(([l, c]) => `<span style="--c:${c}">${l}</span>`).join('');
+  const liga = (on) => { VIDA.linhasCores(on); cl.checked = on; leg.hidden = !on; };
+  liga(q.get('linhas') === '1');
+  cl.addEventListener('change', (e) => liga(e.target.checked));
+}
 $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
 // Fasnacht (fasnacht.js): Cliques pelas ruas do centro nos três dias reais, ou quando o tour chega em fevereiro
 const MOD_FAS = await import('./fasnacht.js'), FAS = MOD_FAS.criarFasnacht({ cena, altura, ruas, ceu }), FAS_SEG = MOD_FAS.segundaFasnacht;

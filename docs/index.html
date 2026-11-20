@@ -110,6 +110,9 @@
   #sol-info { font-variant-numeric: tabular-nums; }
   body.noite #sol-ctl, body.noite #sol-ctl output { color: #c9c0ac; }
   .nota { font-size: 11px; color: var(--suave); margin: 10px 0 0; border-top: 1px solid var(--linha); padding-top: 8px; }
+  #legenda-linhas { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0; }
+  #legenda-linhas span { min-width: 22px; padding: 1px 6px; border-radius: 4px; background: var(--c); color: #fff; font: 700 11px Inter, sans-serif; text-align: center; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
+  #legenda-linhas[hidden] { display: none; }
   .nota a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
   #ficha { position: fixed; left: 16px; bottom: 44px; width: min(330px, calc(100vw - 32px)); z-index: 11; background: var(--papel); border: 1px solid var(--tinta); border-radius: 6px; padding: 12px 14px; box-shadow: 4px 4px 0 var(--tinta); }
@@ -245,7 +248,9 @@
     <label class="chave"><input type="checkbox" id="c-vida" checked> <span data-i18n="vida">gente e bondes</span></label>
     <label class="chave"><input type="checkbox" id="c-muralha" checked> <span data-i18n="muralha">muralha de 1400</span></label>
     <label class="chave"><input type="checkbox" id="c-fronteira" checked> <span data-i18n="fronteira">fronteiras</span></label>
+    <label class="chave"><input type="checkbox" id="c-linhas"> <span data-i18n="linhas">cores das linhas</span></label>
   </div>
+  <div id="legenda-linhas" hidden aria-label="linhas de bonde"></div>
   <p class="nota" data-i18n-html="nota"></p>
 </aside>
 <script>{const p=document.getElementById('painel'),a=document.getElementById('agora'),m=matchMedia('(max-width: 640px)');if(m.matches){p.classList.add('fechado');a.setAttribute('role','button');a.tabIndex=0}const s=()=>a.setAttribute('aria-expanded',String(!p.classList.contains('fechado'))),t=()=>{if(!m.matches)return;p.classList.toggle('fechado');s()};a.addEventListener('click',t);a.addEventListener('keydown',e=>{if(m.matches&&(e.key==='Enter'||e.key===' ')){e.preventDefault();t()}});if(m.matches)s()}</script>
