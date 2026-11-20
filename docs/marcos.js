@@ -1,3 +1,4 @@
+import { desenharStab } from './baselstab.js';
 // Marcos em alta definição (tarefa 18): Münster, Rathaus, Mittlere Brücke (arcos e Käppelijoch) e as igrejas de
 // São Martinho, São Pedro e São Leonardo. Modelagem própria, procedural, no estilo do resto (sem arquivo externo,
 // sem licença de terceiros). A geometria vem de duas fontes, ambas do swissBUILDINGS3D / OSM já no projeto:
@@ -202,9 +203,7 @@ function texRathausFrente() {
       for (const s of [-1, 1]) { g.beginPath(); g.moveTo(X(uc + s * 0.7 * k), Y(v + 0.9 * k)); g.quadraticCurveTo(X(uc + s * 2.1 * k), Y(v + 1.9 * k), X(uc + s * 2.0 * k), Y(v - 0.2 * k)); g.quadraticCurveTo(X(uc + s * 1.4 * k), Y(v + 0.4 * k), X(uc + s * 0.7 * k), Y(v - 0.4 * k)); g.fill(); }
       g.fillStyle = '#c9a13b'; g.beginPath(); g.moveTo(X(uc - 1.05 * k), Y(v + 1.45 * k)); g.lineTo(X(uc + 1.05 * k), Y(v + 1.45 * k)); g.lineTo(X(uc + 1.05 * k), Y(v - 0.2 * k)); g.quadraticCurveTo(X(uc + 1.05 * k), Y(v - 1.4 * k), X(uc), Y(v - 1.75 * k)); g.quadraticCurveTo(X(uc - 1.05 * k), Y(v - 1.4 * k), X(uc - 1.05 * k), Y(v - 0.2 * k)); g.fill();
       g.fillStyle = '#f1ece0'; g.beginPath(); g.moveTo(X(uc - 0.9 * k), Y(v + 1.3 * k)); g.lineTo(X(uc + 0.9 * k), Y(v + 1.3 * k)); g.lineTo(X(uc + 0.9 * k), Y(v - 0.2 * k)); g.quadraticCurveTo(X(uc + 0.9 * k), Y(v - 1.25 * k), X(uc), Y(v - 1.55 * k)); g.quadraticCurveTo(X(uc - 0.9 * k), Y(v - 1.25 * k), X(uc - 0.9 * k), Y(v - 0.2 * k)); g.fill();
-      g.fillStyle = '#151515'; g.fillRect(X(uc - 0.12 * k), Y(v + 0.6 * k), X(0.24 * k), X(1.9 * k));
-      g.lineWidth = 6 * k; g.strokeStyle = '#151515'; g.beginPath(); g.arc(X(uc + 0.12 * k), Y(v + 0.65 * k), 0.4 * k * ppm, Math.PI, 0.2 * Math.PI, true); g.stroke();
-      g.fillRect(X(uc - 0.35 * k), Y(v - 1.25 * k), X(0.7 * k), X(0.18 * k));
+      desenharStab(g, X(uc), Y(v + 1.12 * k), 2.3 * k * ppm, '#151515');
       g.fillStyle = '#e0b894'; g.beginPath(); g.ellipse(X(uc), Y(v + 1.75 * k), 0.2 * k * ppm, 0.24 * k * ppm, 0, 0, 7); g.fill(); // cabeça do anjo
     }
     // dos lados do relógio: janelas da Vordere Ratsstube, a sala onde fica a Justitia
@@ -245,7 +244,7 @@ function texBrasoes() {
       g.fillStyle = fig;
       if (tipo === 'cruz') { g.fillRect(x + w / 2 - 5, 18, 10, 40); g.fillRect(x + 16, 33, w - 32, 10); }
       else if (tipo === 'faixa') g.fillRect(x, 6, w, 30);
-      else if (tipo === 'baculo') { g.fillRect(x + w / 2 - 3, 26, 6, 40); g.lineWidth = 6; g.strokeStyle = fig; g.beginPath(); g.arc(x + w / 2 + 3, 26, 9, Math.PI, 0.2 * Math.PI, true); g.stroke(); }
+      else if (tipo === 'baculo') desenharStab(g, x + w / 2, 12, 56, fig);
       else { g.beginPath(); g.ellipse(x + w / 2, 44, 14, 18, 0, 0, 7); g.fill(); }
       g.restore();
     });
@@ -311,7 +310,7 @@ function texSpalenEsculturas() {
     const vb = 1.0;
     g.fillStyle = '#c9a13b'; g.beginPath(); g.moveTo(X(cx - 0.55), Y(vb + 0.65)); g.lineTo(X(cx + 0.55), Y(vb + 0.65)); g.lineTo(X(cx + 0.55), Y(vb - 0.1)); g.quadraticCurveTo(X(cx + 0.55), Y(vb - 0.65), X(cx), Y(vb - 0.85)); g.quadraticCurveTo(X(cx - 0.55), Y(vb - 0.65), X(cx - 0.55), Y(vb - 0.1)); g.fill();
     g.fillStyle = '#f1ece0'; g.beginPath(); g.moveTo(X(cx - 0.45), Y(vb + 0.55)); g.lineTo(X(cx + 0.45), Y(vb + 0.55)); g.lineTo(X(cx + 0.45), Y(vb - 0.1)); g.quadraticCurveTo(X(cx + 0.45), Y(vb - 0.55), X(cx), Y(vb - 0.72)); g.quadraticCurveTo(X(cx - 0.45), Y(vb - 0.55), X(cx - 0.45), Y(vb - 0.1)); g.fill();
-    g.fillStyle = '#151515'; g.fillRect(X(cx - 0.06), Y(vb + 0.35), X(0.12), X(0.9)); g.lineWidth = 7; g.strokeStyle = '#151515'; g.beginPath(); g.arc(X(cx + 0.06), Y(vb + 0.33), 0.18 * ppm, Math.PI, 0.2 * Math.PI, true); g.stroke();
+    desenharStab(g, X(cx), Y(vb + 0.47), 1.05 * ppm, '#151515');
     g.fillStyle = '#b5a07c';
     for (const s of [-1, 1]) { // leões de pé, segurando o escudo
       g.beginPath(); g.ellipse(X(cx + s * 0.95), Y(vb), 0.3 * ppm, 0.55 * ppm, s * 0.25, 0, 7); g.fill();

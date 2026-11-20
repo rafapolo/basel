@@ -38,6 +38,7 @@ for (const f of CLASSICOS) {
 
 // ── 3. dados, e cópias .gz das malhas com zopfli quando o `uv` existe (o CI instala) ─────────────────────────────
 cpSync(join(SRC, 'data'), join(DIST, 'data'), { recursive: true });
+for (const f of ['favicon.svg', 'favicon-32.png', 'apple-touch-icon.png', 'og.jpg']) cpSync(join(SRC, f), join(DIST, f)); // ícones e a imagem de compartilhamento
 const MALHAS = ['data/predios.v2.bin', 'data/terreno.v2.bin'];
 const z = Bun.spawnSync(['uv', 'run', '--quiet', '--with', 'zopfli', 'python', join(ROOT, 'script/comprime_malhas.py'), ...MALHAS.map((m) => join(DIST, m))], { cwd: ROOT });
 const comGz = z.exitCode === 0;

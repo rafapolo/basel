@@ -1,3 +1,4 @@
+import { desenharStab } from './baselstab.js';
 // Detalhes de rua (tarefa 17): fontanários com água e jatos, postes de luz que acendem de noite (com poça de luz no chão e brilho
 // no bloom), bancos, lixeiras, bicicletários (data.bs.ch 100241), toldos e mesas de café com guarda-sol no verão, letreiros
 // de loja por categoria (sem marcas), bandeiras de Basel nos prédios públicos, balsas de cabo do Reno e navios.
@@ -293,11 +294,7 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 170;
     const g = cv.getContext('2d');
     g.fillStyle = '#f5f2ea'; g.fillRect(0, 0, 256, 170);
-    g.strokeStyle = '#141414'; g.fillStyle = '#141414'; g.lineCap = 'round'; g.lineWidth = 15;
-    g.beginPath(); g.moveTo(128, 152); g.lineTo(128, 62); g.stroke();                       // haste
-    g.beginPath(); g.arc(103, 62, 25, 0, Math.PI * 1.15, true); g.stroke();                  // voluta do báculo
-    for (let k = 0; k < 5; k++) { const a = -0.15 + k * 0.38; g.beginPath(); g.arc(103 + Math.cos(a) * 36, 62 - Math.sin(a) * 36, 6.5, 0, 6.3); g.fill(); } // "Krabben"
-    g.lineWidth = 9; g.beginPath(); g.moveTo(112, 128); g.lineTo(144, 128); g.stroke();
+    desenharStab(g, 128, 14, 142, '#141414');
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
     // pano: plano paralelo à fachada, preso ao fim do mastro, com onda que cresce para a ponta livre
     const pano = new THREE.PlaneGeometry(1.5, 1.0, 14, 2).translate(0.8, -0.18, 1.95); // pende do fim do mastro, paralela à fachada
