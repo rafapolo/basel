@@ -345,7 +345,8 @@ function colorir() {
 colorir(); cores = null; // só uma vez; o atributo solta o array depois de subir (soltarAposSubir)
 
 // destaque do prédio da ficha e noite, no shader (a cidade é a de hoje: sem máquina do tempo)
-const U = { uSel: { value: -1 }, uNoite: { value: 0 } };
+const U = { uSel: { value: -1 }, uNoite: { value: 0 }, uApagao: { value: 0 } }; // uApagao: Morgestraich, a cidade às escuras
+let apagaAlvo = 0; // 1 durante o Morgestraich (fasnacht.js), ver laço
 performance.mark('fachadas'); // tempo de montagem: performance.getEntriesByName('fachadas', 'measure')
 const FACH = criarFachadas({ cena, meta, posicoes, ids16, U });
 performance.measure('fachadas', 'fachadas');
@@ -367,7 +368,7 @@ function injetar(shader, cheio) {
     .replace('#include <common>', `#include <common>\n${VERT_DECL}`)
     .replace('#include <begin_vertex>', VERT_CORPO);
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', `#include <common>\nvarying float vEstado; varying float vSel; varying vec3 vMundo; varying float vPid; uniform float uNoite;`)
+    .replace('#include <common>', `#include <common>\nvarying float vEstado; varying float vSel; varying vec3 vMundo; varying float vPid; uniform float uNoite; uniform float uApagao;`)
 
   if (!cheio) return;
   shader.fragmentShader = shader.fragmentShader
@@ -692,7 +693,8 @@ function quadro(agora) {
   Object.assign(camSom, { dist: c.dist, polar: c.polar, az: c.az });
   MARC.atualiza(U.uSel.value);
   VIDA.atualizar(agora);
-  FAS?.atualizar(agora, camera, U.uNoite.value);
+  U.uApagao.value += (apagaAlvo - U.uApagao.value) * 0.06; // apaga em ~1 s, como o comando às 4h em ponto
+  FAS?.atualizar(agora, camera, U.uNoite.value, U.uApagao.value);
   atualizarNuvens(agora, ceu);
   atualizarNeve(agora, ceu, cena, camera, leve);
   ceu.atualizar(agora);
@@ -749,6 +751,7 @@ const VIDA = await (await import('./vida.js')).criarVida({ THREE, cena, ceu, alt
 $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
 // Fasnacht (fasnacht.js): Cliques pelas ruas do centro nos três dias reais, ou quando o tour chega em fevereiro
 const MOD_FAS = await import('./fasnacht.js'), FAS = MOD_FAS.criarFasnacht({ cena, altura, ruas, ceu }), FAS_SEG = MOD_FAS.segundaFasnacht;
+{ const ap = (e) => { apagaAlvo = MOD_FAS.ehMorgestraich(e.data, e.hora) ? 1 : 0; }; ap(ceu.estado()); ceu.aoMudar(ap); }
 if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
 // fora do G-buffer do GTAO: tudo o que entrou na cena desde os detalhes (postes, bancos, gente, bondes, Cliques, o Reno de
 // fora), menos as torres da Roche, que fazem sombra de contato de verdade

@@ -474,7 +474,7 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
 
   const GLSL_NOITE = `#include <emissivemap_fragment>
   if (uNoite > 0.01 && fachJan > 0.0) {
-    totalEmissiveRadiance += vec3(1.0, 0.72, 0.38) * fachJan * fachAcesa * uNoite * 1.5;
+    totalEmissiveRadiance += vec3(1.0, 0.72, 0.38) * fachJan * fachAcesa * uNoite * 1.5 * (1.0 - uApagao); // Morgestraich: tudo apagado
   }`;
 
   return {

@@ -85,12 +85,12 @@ function estacoes(ms, ano) {
   const rotulo = $('tour-ano');
   rotulo.classList.add('on');
   const mes = new Intl.DateTimeFormat(document.documentElement.lang, { month: 'long', timeZone: 'UTC' });
-  // a data não corre reta: chega à segunda da Fasnacht quando começa o passeio a pé (12 s) e fica nos três dias até o fim
-  // dele (34 s): as Cliques passam pela Augustinergasse e se ouvem os tambores. Em volta do Münster (34–46 s) passa
+  // a data não corre reta: chega à segunda da Fasnacht quando começa o passeio a pé (12 s) e fica nela até o fim dele
+  // (34 s): é o Morgestraich, às 4h, a cidade apagada e as Cliques com as lanternas acesas pela Augustinergasse. Em volta do Münster (34–46 s) passa
   // de março a abril e as árvores da Münsterplatz e da Pfalz brotam (arvores.js: de 10/abr a 6/mai); no voo pelo Reno
   // (69–81 s) é julho e agosto, o auge do Rheinschwimmen; depois o ano segue até dezembro
   const DIA = 86400000, seg = window.cidade.fasnachtSegunda?.(ano) ?? Date.UTC(ano, 1, 23);
-  const KF = [[0, Date.UTC(ano, 0, 15)], [12000 / TOTAL, seg + 0.4 * DIA], [34000 / TOTAL, seg + 2.4 * DIA], [36000 / TOTAL, Date.UTC(ano, 2, 25)],
+  const KF = [[0, Date.UTC(ano, 0, 15)], [12000 / TOTAL, seg + 0.2 * DIA], [34000 / TOTAL, seg + 0.25 * DIA], [36000 / TOTAL, Date.UTC(ano, 2, 25)],
     [46000 / TOTAL, Date.UTC(ano, 4, 10)], [69000 / TOTAL, Date.UTC(ano, 6, 5)], [81000 / TOTAL, Date.UTC(ano, 7, 12)], [ms / TOTAL, Date.UTC(ano, 11, 28)]];
   const dataEm = (t) => { let i = 1; while (i < KF.length - 1 && KF[i][0] < t) i++; const [ta, da] = KF[i - 1], [tb, db] = KF[i]; return da + (db - da) * Math.min(1, Math.max(0, (t - ta) / (tb - ta))); };
   const t0 = performance.now();
@@ -146,10 +146,11 @@ function cenas() {
     { dur: 22000, run: async () => {
       C.porCamera({ alvo: [70, 12, 46], dist: 60, az: rad(215), polar: rad(55) });
       mover({ alvo: [44.5, C.altura(44.5, 14) + 1.7, 14], dist: 7, az: rad(222), polar: rad(87) }, 2200); // câmera chega a ~(39,9), no Rheinsprung
-      await legenda(t('Fasnacht · a pé pela Altstadt', 'Fasnacht · on foot through the old town', 'Fasnacht · zu Fuss durch die Altstadt'), t(
-        'Três dias de Larven, pífaros e tambores: as Cliques descem as vielas até a praça da catedral.',
-        'Three days of masks, piccolos and drums: the cliques march down the lanes to the cathedral square.',
-        'Drei Tage Larven, Piccolos und Trommeln: die Cliquen ziehen durch die Gassen zum Münsterplatz.'));
+      C.ceu.definirHora(4.05); // Morgestraich: segunda, 4h em ponto, a cidade apaga as luzes
+      await legenda(t('Morgestraich · 4h, a pé pela Altstadt', 'Morgestraich · 4 a.m., on foot through the old town', 'Morgestraich · 4 Uhr, zu Fuss durch die Altstadt'), t(
+        'Às 4h em ponto a cidade apaga as luzes: só as lanternas pintadas das Cliques, os pífaros e os tambores.',
+        'At 4 a.m. sharp every light goes out: only the cliques’ painted lanterns, piccolos and drums.',
+        'Punkt 4 Uhr gehen alle Lichter aus: nur die bemalten Laternen der Cliquen, Piccolos und Trommeln.'));
       await em(2200);
       // traçado do OSM: Rheinsprung (de 38,8/7,8), Augustinergasse, Münsterplatz até o meio da praça
       const p0 = C.camera.position;
@@ -157,6 +158,7 @@ function cenas() {
     } },
     // 2 · Münster e Pfalz: da praça, sobe em volta da catedral
     { dur: 12000, run: async () => {
+      C.ceu.definirHora(14, { animar: true }); // depois do Morgestraich, o dia volta
       mover({ alvo: munster, dist: 170, polar: rad(68), az: rad(200) }, 4500, { arco: 0.2 });
       await legenda('Münster · Pfalz', t(
         'O Münster de arenito vermelho e o terraço da Pfalz, uns 20 m acima do Reno.',

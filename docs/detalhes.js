@@ -12,7 +12,7 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
   const D = await fetch(base + 'detalhes.json').then((r) => r.json());
   const grupo = new THREE.Group(); grupo.name = 'detalhes';
   cena.add(grupo);
-  const UL = { uNoite: U.uNoite, uLuz: { value: 0 }, uTempo: { value: 0 }, uPx: { value: 400 } };
+  const UL = { uNoite: U.uNoite, uApagao: U.uApagao ?? { value: 0 }, uLuz: { value: 0 }, uTempo: { value: 0 }, uPx: { value: 400 } };
   const estat = { instancias: 0, malhas: 0 };
   const rnd = (i) => { let x = Math.imul(i + 1, 0x9e3779b1); x ^= x >>> 15; x = Math.imul(x, 0x85ebca6b); return ((x ^ (x >>> 13)) >>> 0) / 4294967296; };
 
@@ -279,8 +279,8 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
       s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute float iCat;')
         .replace('#include <uv_vertex>', '#include <uv_vertex>\nvMapUv = (vMapUv + vec2(mod(iCat, 5.0), 4.0 - floor(iCat / 5.0))) / 5.0;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>');
-      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNoite;')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.3 * uNoite;');
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNoite; uniform float uApagao;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.3 * uNoite * (1.0 - uApagao);');
     };
     mat.customProgramCacheKey = () => 'det-letreiro';
     const itens = D.letreiros.map(([x, z, a, cat, bid]) => ({ x, z, y: altura(x, z), r: a }));
@@ -457,7 +457,7 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
     ultimo = agora;
     const est = ceu.estado(), noite = est.noite;
     UL.uTempo.value = t;
-    const ligada = noite < 0.15 ? 0 : Math.min(1, (noite - 0.15) / 0.45);
+    const ligada = (noite < 0.15 ? 0 : Math.min(1, (noite - 0.15) / 0.45)) * (1 - UL.uApagao.value); // Morgestraich: postes apagados
     UL.uLuz.value = ligada * 4.5; // acima de 1: entra no bloom noturno (limiar 0,9)
     if (pocas) { pocas.visible = ligada > 0.02; matPocas(ligada); }
     UL.uPx.value = renderer.domElement.height * 0.5;

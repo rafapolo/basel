@@ -17,6 +17,12 @@ function pascoa(a) {
 }
 // segunda-feira da Fasnacht (Morgestraich), em ms UTC
 export const segundaFasnacht = (a) => pascoa(a) - 41 * 86400000;
+// Morgestraich: segunda às 4h em ponto a cidade apaga as luzes (janelas, postes, vitrines) e as Cliques saem no escuro
+// com as lanternas acesas; a luz volta com o dia (~6h45 no fim de fevereiro)
+export function ehMorgestraich(data, hora) {
+  const [a, m, d] = data.split('-').map(Number), seg = new Date(pascoa(a) - 41 * 86400000);
+  return seg.getUTCMonth() === m - 1 && seg.getUTCDate() === d && hora >= 4 && hora < 6.75;
+}
 // é Fasnacht em Basel nesta data e hora? (de segunda 4h a quinta 4h)
 export function ehFasnacht(data, hora) {
   const [a, m, d] = data.split('-').map(Number);
@@ -72,12 +78,12 @@ const texTambor = (() => { let t = null; return () => { if (t) return t;
   g.fillStyle = '#c8102e'; g.fillRect(0, 0, 256, 8); g.fillRect(0, 56, 256, 8);
   t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }; })();
 
-function clique({ cena, altura, semente = 0 }) {
+function clique({ cena, altura, semente = 0, semLuz = false, semGugge = false }) {
   const T = TEMAS[semente % TEMAS.length];
   const g = new THREE.Group(); g.name = 'clique'; g.visible = false; cena.add(g);
   // ---- quem é quem: [papel, fileira (m atrás da frente), deslocamento lateral (m)] ----
   // Clique de pífaros e tambores (com a lanterna na frente) ou, uma a cada quatro, Guggenmusik: metais e bumbos, sem lanterna
-  const gugge = semente % 4 === 3, M = [];
+  const gugge = !semGugge && semente % 4 === 3, M = []; // no Morgestraich não há Guggenmusik: só pífaros e tambores
   if (!gugge) {
     for (const b of [-0.9, 0.9]) for (const f of [-1.1, 1.1]) M.push(['carregador', f, b]);
     M.push(['tambormor', 4.5, 0]);
@@ -108,6 +114,9 @@ function clique({ cena, altura, semente = 0 }) {
   const cabeca = inst(new THREE.SphereGeometry(0.3, 16, 12).scale(1.05, 1.3, 1.05).translate(0, 1.72, 0), n, matLarve);
   const nariz = inst(new THREE.ConeGeometry(0.1, 0.62, 8).rotateX(Math.PI / 2).translate(0, 1.67, 0.55), n, matNariz);
   const cabelo = inst(new THREE.TorusGeometry(0.3, 0.13, 6, 14).rotateX(Math.PI / 2).translate(0, 1.94, -0.04), n, matCabelo);
+  // Kopfladärne: a lanterninha acesa presa no alto do chapéu (no escuro do Morgestraich é ela que mostra quem passa)
+  const matKopf = new THREE.MeshStandardMaterial({ color: 0xfff0c8, emissive: 0xffd27a, emissiveIntensity: 0.2, roughness: 0.5 });
+  const kopf = inst(new THREE.BoxGeometry(0.2, 0.24, 0.2).translate(0, T.padrao === 'liso' ? 2.26 : 2.72, 0), n, matKopf); kopf.castShadow = false;
   const chapeu = inst(T.padrao === 'liso' ? new THREE.CylinderGeometry(0.34, 0.36, 0.14, 3).translate(0, 2.05, 0) : new THREE.ConeGeometry(0.28, 0.62, 8).translate(0, 2.32, 0), n, matChapeu); // tricórnio ou chapéu de ponta
   // braços e o que cada um leva, na pose do papel (ombros a 1,38 m)
   const braco = (a, b, rr = 0.055) => { const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b), L = va.distanceTo(vb); const c = new THREE.CylinderGeometry(rr, rr * 0.85, L, 6); c.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize())); return c.translate((va.x + vb.x) / 2, (va.y + vb.y) / 2, (va.z + vb.z) / 2); };
@@ -150,7 +159,8 @@ function clique({ cena, altura, semente = 0 }) {
   const madeira = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.9 });
   for (const b of [-0.9, 0.9]) lanterna.add(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 3.0).translate(b, 1.25, 0), madeira));
   lanterna.add(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.06, 0.08).translate(0, 1.27, 0.6), madeira), new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.06, 0.08).translate(0, 1.27, -0.6), madeira));
-  const luzL = new THREE.PointLight(0xffe2a8, 0, 14, 2); luzL.position.set(0, 2.5, 0); lanterna.add(luzL);
+  // luz de verdade só nas Cliques de sempre (cada luz a mais pesa em todos os materiais); as extras do Morgestraich só brilham
+  const luzL = semLuz ? { intensity: 0 } : new THREE.PointLight(0xffe2a8, 0, 14, 2); if (!semLuz) { luzL.position.set(0, 2.5, 0); lanterna.add(luzL); }
   g.add(lanterna);
   lanterna.visible = !gugge;
   // variação leve de tom entre os membros (o tema é o mesmo; tecido e tinta mudam um pouco)
@@ -201,15 +211,15 @@ function clique({ cena, altura, semente = 0 }) {
       }
       const k = tipo === 'tambormor' ? 1.2 : 1;
       esc.set(k, k, k); m4.compose(v.set(x, y + pulo, z), q, esc);
-      for (const im of [corpo, pernas, cabeca, nariz, cabelo, chapeu]) im.setMatrixAt(i, m4);
+      for (const im of [corpo, pernas, cabeca, nariz, cabelo, chapeu, kopf]) im.setMatrixAt(i, m4);
       bracos[tipo].setMatrixAt(idx[i], m4); if (acess[tipo]) acess[tipo].setMatrixAt(idx[i], m4);
       if (tipo === 'tambor') tambor.setMatrixAt(iT++, m4);
       if (tipo === 'tambormor') { bastao.position.set(x + P.hx * 0.4, y + 1.2 + Math.sin(fase * 2) * 0.35, z + P.hz * 0.4); bastao.rotation.set(Math.sin(fase) * 0.4, 0, 0.2); }
       if (camera) dMin = Math.min(dMin, Math.hypot(x - camera.position.x, z - camera.position.z));
     });
-    for (const im of [corpo, pernas, cabeca, nariz, cabelo, chapeu, tambor, ...Object.values(bracos), ...Object.values(acess)]) im.instanceMatrix.needsUpdate = true;
+    for (const im of [corpo, pernas, cabeca, nariz, cabelo, chapeu, kopf, tambor, ...Object.values(bracos), ...Object.values(acess)]) im.instanceMatrix.needsUpdate = true;
     em(s, P); lanterna.position.set(P.x, altura(P.x, P.z) + Math.abs(Math.sin((agora / 1000) * vel * 1.9 * Math.PI)) * 0.04, P.z); lanterna.rotation.y = Math.atan2(P.hx, P.hz);
-    luzL.intensity = 6 * noite; matL.emissiveIntensity = 0.35 + 1.4 * noite;
+    luzL.intensity = 6 * noite; matL.emissiveIntensity = 0.35 + 1.4 * noite; matKopf.emissiveIntensity = 0.15 + 2.6 * noite;
     return dMin;
   }
   // derruba quem estiver a menos de r de (x, z); devolve quantos
@@ -308,15 +318,27 @@ export function criarFasnacht({ cena, altura, ruas, ceu }) {
     cs.forEach((c, i) => (on ? c.marchar(caminhos[i], { inicio: i * 37, velocidade: 1.0 + (i % 3) * 0.08, idaEVolta: true }) : c.parar()));
     if (!on) somVol(0);
   }
-  function atualizar(agora, camera, noite = 0) {
+  // Morgestraich: às 4h saem muitas mais Cliques; uma segunda em cada rua, no outro trecho, criada só na primeira vez
+  // (sem Guggenmusik e sem luz de ponto: a lanterna grande e as de cabeça brilham sozinhas no escuro)
+  let extras = null, extrasOn = false;
+  function morgestraich(on) {
+    if (on === extrasOn) return; extrasOn = on;
+    if (on && !extras) extras = caminhos.map((_, i) => clique({ cena, altura, semente: i + 5, semLuz: true, semGugge: true }));
+    extras?.forEach((c, i) => (on ? c.marchar(caminhos[i], { inicio: i * 37 + 140, velocidade: 0.92 + (i % 4) * 0.06, idaEVolta: true }) : c.parar()));
+  }
+  function atualizar(agora, camera, noite = 0, apagao = 0) {
     const e = ceu.estado();
     ligar(forcar ?? ehFasnacht(e.data, e.hora));
+    morgestraich(ligada && apagao > 0.5);
     if (!ligada) return;
-    let d = 1e9; for (const c of cs) d = Math.min(d, c.atualizar(agora, camera, noite) ?? 1e9);
+    const brilho = Math.max(noite, apagao); // no apagão as lanternas brilham como de noite
+    rappli.material.color.setScalar(1 - 0.8 * brilho); // o confete do chão não tem luz própria: no escuro, escuro
+    let d = 1e9; for (const c of cs) d = Math.min(d, c.atualizar(agora, camera, brilho) ?? 1e9);
+    if (extrasOn) for (const c of extras) d = Math.min(d, c.atualizar(agora, camera, brilho) ?? 1e9);
     const prox = Math.max(0, 1 - d / 120);
     if (prox > 0.02 && agora - ultCompasso > (60 / 112) * 4 * 1000 - 30) { ultCompasso = agora; tocar(); }
     somVol(prox * prox * 0.35);
   }
-  const derruba = (x, z, r, fx, fz) => (ligada ? cs.reduce((k, c) => k + c.derruba(x, z, r, fx, fz), 0) : 0);
-  return { atualizar, derruba, forcar: (v) => { forcar = v; }, cliques: cs.length, ativa: () => ligada, onde: () => cs.map((c) => c.onde()) };
+  const derruba = (x, z, r, fx, fz) => (ligada ? [...cs, ...(extrasOn ? extras : [])].reduce((k, c) => k + c.derruba(x, z, r, fx, fz), 0) : 0);
+  return { atualizar, derruba, forcar: (v) => { forcar = v; }, cliques: cs.length, ativa: () => ligada, morgestraich: () => extrasOn, onde: () => [...cs, ...(extrasOn ? extras : [])].map((c) => c.onde()) };
 }
