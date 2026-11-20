@@ -80,7 +80,7 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
       }, 'telhado');
     },
     // KTX2 (2026-11-20, script/ortofoto_ktx2.py): tiles em Basis ETC1S transcodificados para o formato comprimido da GPU
-    // (BC1, ETC2 ou ASTC: 4 bits por pixel). A foto inteira de 5120 px fica em ~18 MB de memória de vídeo, contra ~140 MB em
+    // (ETC2 ou BC1, 4 bits por pixel; BC7 ou ASTC, 8). A foto inteira de 5120 px fica em ~18 MB de memória de vídeo, contra ~140 MB em
     // RGBA (e 5120 px também no celular, que antes ia a 4096). Os tiles entram por compressedTexSubImage2D nos níveis 0–8 de
     // uma textura comprimida alocada vazia; a geral de 512 px mostra a cidade até o último tile chegar. Sem suporte, false:
     // fica o caminho webp.
@@ -88,11 +88,12 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
     prepararKTX2() {
       return (this.ktx2 ??= import('three/addons/loaders/KTX2Loader.js').then(({ KTX2Loader }) => new KTX2Loader().setTranscoderPath(new URL('data/basis/', location.href).href).detectSupport(renderer)));
     },
-    // só no celular e no modo leve (?ktx2=1 força, ?ktx2=0 desliga): no Chromium o envio de blocos comprimidos ainda trava
-    // 0,1–0,4 s por tile; no computador sobra memória de vídeo e o webp entra liso
+    // em todo lugar (?ktx2=0 desliga). Era só no celular porque o envio dos blocos travava 0,1–0,4 s por tile no Chromium;
+    // remedido em 2026-11-20 (Chromium 159 e WebKit do Playwright, Metal, M4): nenhum quadro acima de 100 ms durante os 225
+    // envios, enquanto o caminho webp ainda trava ~0,3 s uma vez ao montar a foto. No Mac sai BC7 (8 bits por pixel, ~35 MB
+    // de memória de vídeo contra ~140 MB em RGBA); custa ~1,8 MB a mais de download, depois da abertura
     querKTX2() {
-      const p = new URLSearchParams(location.search);
-      return p.get('ktx2') === '1' || (p.get('ktx2') !== '0' && (p.get('leve') === '1' || (p.get('leve') !== '0' && matchMedia('(pointer:coarse)').matches)));
+      return new URLSearchParams(location.search).get('ktx2') !== '0';
     },
     async carregaKTX2(meta) {
       const N = meta.grade, LADO = meta.lado, tam = N * LADO, NIV = 9; // nível 8: tile de 4 px, textura de 20 px (múltiplos do bloco 4×4)
