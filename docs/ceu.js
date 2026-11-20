@@ -218,12 +218,28 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
     passeCena.clear = false; passeCena.clearDepth = true;
     gtao = new GTAOPass(cena, camera, w, h);
     gtao.updateGtaoMaterial({ radius: 6, distanceExponent: 1.5, thickness: 6, scale: 1.1, samples: 8, distanceFallOff: 1, screenSpaceRadius: false });
-    gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 8 });
+    gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 8 }); // 6 amostras ou 1 anel: < 1 ms a menos girando (ruído), não compensa
     gtao.blendIntensity = 0.9;
     // o G-buffer do GTAO desenhava a cena inteira de novo, gente, detalhes e confete inclusive (milhões de triângulos que
     // quase não fazem sombra de contato): os objetos em ceu.semAO ficam fora desse passe
     { const orig = gtao.renderOverride.bind(gtao), esc = [];
       gtao.renderOverride = (...a) => { esc.length = 0; for (const o of ceu.semAO) if (o.visible) { o.visible = false; esc.push(o); } orig(...a); for (const o of esc) o.visible = true; }; }
+    // AO guardado (2026-11-20): o que fica no G-buffer não se mexe (prédios, chão, árvores e marcos, desenhados com o
+    // material de normais, sem vento nem ondas), então com a câmera parada o AO do quadro anterior serve: só o blend roda.
+    // Refaz quando a câmera ou a projeção mudam, quando o tamanho muda e, por garantia (estações, botões), a cada 30 quadros
+    { const render = gtao.render.bind(gtao), ant = new Float64Array(34); let idade = 0;
+      gtao.render = (r, w, ler, ...x) => {
+        const m = camera.matrixWorld.elements, p = camera.projectionMatrix.elements;
+        let refaz = ++idade >= 30 || gtao.output !== GTAOPass.OUTPUT.Default || gtao.width !== ant[32] || gtao.height !== ant[33];
+        for (let i = 0; i < 16; i++) { if (m[i] !== ant[i]) { refaz = true; ant[i] = m[i]; } if (p[i] !== ant[16 + i]) { refaz = true; ant[16 + i] = p[i]; } }
+        ant[32] = gtao.width; ant[33] = gtao.height;
+        if (refaz) { idade = 0; return render(r, w, ler, ...x); }
+        const saida = gtao.renderToScreen ? null : w;
+        gtao.copyMaterial.uniforms.tDiffuse.value = ler.texture; gtao.copyMaterial.blending = THREE.NoBlending;
+        gtao.renderPass(r, gtao.copyMaterial, saida);
+        gtao.blendMaterial.uniforms.intensity.value = gtao.blendIntensity; gtao.blendMaterial.uniforms.tDiffuse.value = gtao.pdRenderTarget.texture;
+        gtao.renderPass(r, gtao.blendMaterial, saida);
+      }; }
     if (q.get('dbg') === 'ao') gtao.output = GTAOPass.OUTPUT.AO; if (q.get('dbg') === 'normal') gtao.output = GTAOPass.OUTPUT.Normal;
     // o G-buffer do GTAO também precisa da máquina do tempo (prédios que sobem), senão o AO erra com o ano < 2026
     gtao.normalMaterial.flatShading = true; // os prédios não têm atributo normal (o material deles usa flatShading)
