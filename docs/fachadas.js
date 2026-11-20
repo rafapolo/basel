@@ -150,6 +150,8 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
           fotoMax.set(k, f); g.fotoK = k;
         }
         if (p.ven) { const c = new THREE.Color(p.ven); g.ven = 1 + (Math.round(c.r * 15) << 8 | Math.round(c.g * 15) << 4 | Math.round(c.b * 15)); }
+        // tamanho da janela medido na foto (jw: largura / coluna, jh: altura / andar), em passos de 0,05; vai em fb.w = semente + 2·código
+        if (p.jw && p.jh) g.jdim = 1 + Math.round(Math.min(1, p.jw) * 20) + 21 * Math.round(Math.min(1, p.jh) * 20);
       }
     }
   }
@@ -164,7 +166,7 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
         const f = g.jan ? fotoMax.get(g.fotoK) : null;
         fa[v] = f ? posicoes[t * 9 + k * 3] * f.tx + posicoes[t * 9 + k * 3 + 2] * f.tz - f.a : posicoes[t * 9 + k * 3] * g.tx + posicoes[t * 9 + k * 3 + 2] * g.tz - g.umin;
         fa[v + 1] = posicoes[t * 9 + k * 3 + 1] - g.ymin; fa[v + 2] = f ? Math.max(g.len, f.b - f.a) : g.len; fa[v + 3] = g.hW;
-        fb[v] = g.nF; fb[v + 1] = g.mat; fb[v + 2] = g.loja + 10 * (g.jan ?? 0) + 1000 * (g.ven ?? 0); fb[v + 3] = g.seed;
+        fb[v] = g.nF; fb[v + 1] = g.mat; fb[v + 2] = g.loja + 10 * (g.jan ?? 0) + 1000 * (g.ven ?? 0); fb[v + 3] = g.seed + 2 * (g.jdim ?? 0);
       }
       continue;
     }
@@ -331,7 +333,7 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
       diffuseColor.rgb = base;
     } else if (vFa.z > 0.5 && uJanelas > 0.5) {
       // ---- parede ----
-      float u = vFa.x, v = vFa.y, len = vFa.z, hW = vFa.w, nF = vFb.x, wseed = vFb.w;
+      float u = vFa.x, v = vFa.y, len = vFa.z, hW = vFa.w, nF = vFb.x, jdim = floor(vFb.w / 2.0), wseed = vFb.w - 2.0 * jdim;
       float mat = mod(vFb.y, 10.0), antigo = step(9.5, vFb.y), loja = mod(vFb.z, 10.0);
       float janFoto = mod(floor(vFb.z / 10.0), 100.0), venFoto = floor(vFb.z / 1000.0); // lidos de foto (0 = procedural)
       vec3 venCor = vec3(floor((venFoto - 1.0) / 256.0), mod(floor((venFoto - 1.0) / 16.0), 16.0), mod(venFoto - 1.0, 16.0)) / 15.0;
@@ -374,6 +376,10 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
         vec3 cJan = vec3(0.0); float tem = 0.0; float vidro = 0.0;
         float x0 = 0.5 - mix(0.20, 0.30, fh21(vec2(vPidF, 11.0))), y0 = mix(0.2, 0.3, fh21(vec2(vPidF, 12.0))), wH = mix(0.5, 0.6, fh21(vec2(vPidF, 13.0)));
         if (mat > 1.5) { x0 = 0.04; y0 = 0.27; wH = 0.46; }
+        if (jdim > 0.5) { // medido na foto
+          float jw = mod(jdim - 1.0, 21.0) / 20.0, jh = floor((jdim - 1.0) / 21.0) / 20.0;
+          x0 = 0.5 - 0.5 * jw; wH = jh; y0 = clamp(0.45 * (1.0 - jh), 0.1, 0.3);
+        }
         float soco = antigo * (1.0 - step(0.62, v));
         float sorteioC = fh21(vec2(ci, ri) + wseed * 53.0 + vPidF);
         float ehPorta = (ri < 0.5 && loja < 0.5 && ci == floor(fh21(vec2(wseed, vPidF)) * cols) && len > 3.2) ? 1.0 : 0.0;
