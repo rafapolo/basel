@@ -153,7 +153,13 @@ uniform float uVidaT; uniform float uAnima;`)
       viz[v].forEach((u, j) => { w += el[v][j] * (pesoTipo[tp[v][j]] ?? 0); });
       W[v] = w * dens(X[v], Z[v]); acum[v] = (v ? acum[v - 1] : 0) + W[v];
     }
-    return { X, Z, Y, viz, tp, el, W, acum, n, total: acum[n - 1] || 1 };
+    // compacto (2026-11-20): vizinhos em CSR (off/adj) e tipo de via por índice, em vez de 3 arrays JS por vértice a cada 4 m
+    // de rua (~50 MB de objetos pequenos na memória)
+    const off = new Uint32Array(n + 1);
+    for (let v = 0; v < n; v++) off[v + 1] = off[v] + viz[v].length;
+    const adj = new Int32Array(off[n]), tiposV = [...new Set(tp.flat())], tpI = new Uint8Array(off[n]), iT = new Map(tiposV.map((t, i) => [t, i]));
+    for (let v = 0; v < n; v++) for (let j = 0; j < viz[v].length; j++) { adj[off[v] + j] = viz[v][j]; tpI[off[v] + j] = iT.get(tp[v][j]); }
+    return { X: Float32Array.from(X), Z: Float32Array.from(Z), Y: Float32Array.from(Y), off, adj, tipos: tiposV, tpI, W, acum, n, total: acum[n - 1] || 1 };
   }
   const sorteiaVertice = (g, r = rnd) => {
     const x = r() * g.total; let lo = 0, hi = g.n - 1;
@@ -212,24 +218,24 @@ uniform float uVidaT; uniform float uAnima;`)
     const caido = new Float32Array(n), caiX = new Float32Array(n), caiZ = new Float32Array(n); // derrubados pela e-bike ou por quem anda na vista de rua
     const g = grafo;
     const escolhe = (i) => {
-      const v = alvo[i], nb = g.viz[v];
-      if (!nb.length) return -1;
-      if (nb.length === 1) return nb[0];
+      const v = alvo[i], a0 = g.off[v], nn = Math.min(16, g.off[v + 1] - a0);
+      if (!nn) return -1;
+      if (nn === 1) return g.adj[a0];
       let tot = 0; const w = escolhe.w || (escolhe.w = new Float64Array(16));
-      for (let k = 0; k < nb.length && k < 16; k++) {
-        const u = nb[k];
+      for (let k = 0; k < nn; k++) {
+        const u = g.adj[a0 + k];
         let p;
         if (u === ant[i]) p = 0.03;
         else { const dx = g.X[u] - g.X[v], dz = g.Z[u] - g.Z[v], L = Math.hypot(dx, dz) || 1; p = (0.35 + 0.65 * Math.max(0, (dx * hx[i] + dz * hz[i]) / L)) * (g.W[u] + 0.01); }
         w[k] = p; tot += p;
       }
       let r = rnd() * tot, k = 0;
-      while (k < nb.length - 1 && r > w[k]) { r -= w[k]; k++; }
-      return nb[k];
+      while (k < nn - 1 && r > w[k]) { r -= w[k]; k++; }
+      return g.adj[a0 + k];
     };
     const irPara = (i, u) => { // próximo vértice u: posição de partida = vértice atual
       ant[i] = alvo[i]; alvo[i] = u; tx[i] = g.X[u]; tz[i] = g.Z[u];
-      const v = ant[i]; tipoA[i] = g.tp[v][g.viz[v].indexOf(u)];
+      const v = ant[i]; let j = g.off[v]; while (j < g.off[v + 1] - 1 && g.adj[j] !== u) j++; tipoA[i] = g.tipos[g.tpI[j]];
       elen[i] = Math.hypot(tx[i] - g.X[v], tz[i] - g.Z[v]) || 1; prog[i] = 0;
       const dx = tx[i] - g.X[v], dz = tz[i] - g.Z[v], L = Math.hypot(dx, dz) || 1;
       if (hx[i] === 0 && hz[i] === 0) { hx[i] = dx / L; hz[i] = dz / L; }
@@ -285,8 +291,8 @@ uniform float uVidaT; uniform float uAnima;`)
               x[i] = tx[i]; z[i] = tz[i];
               if (modo[i] === 0) {
                 const u = escolhe(i);
-                if (u < 0 || (g.viz[alvo[i]].length === 1 && respawnLonge)) semear(i, true); else irPara(i, u);
-                if (u >= 0 && g.viz[alvo[i]].length === 1 && !respawnLonge) { /* beco: volta */ }
+                if (u < 0 || (g.off[alvo[i] + 1] - g.off[alvo[i]] === 1 && respawnLonge)) semear(i, true); else irPara(i, u);
+                if (u >= 0 && g.off[alvo[i] + 1] - g.off[alvo[i]] === 1 && !respawnLonge) { /* beco: volta */ }
               } else proximoLivre(i); // sem pausas: todo mundo anda
             } else { x[i] += (dx / d) * passo; z[i] += (dz / d) * passo; if (modo[i] === 0) prog[i] = 1 - d / elen[i]; }
           }
