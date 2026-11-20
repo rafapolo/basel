@@ -54,15 +54,16 @@ export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, contro
   // partes por vértice: 0 pele, 1 tronco/manga/carroceria, 2 calça, 3 sapato/escuro, 4 cabelo/touca; lado ±1 balança
   function unir(partes) {
     const P = [], N = [], A = [];
-    for (const { g, parte, lado = 0 } of partes) {
+    for (const { g, parte, lado = 0, opc = 0 } of partes) {
       const ng = g.index ? g.toNonIndexed() : g;
       P.push(...ng.attributes.position.array); N.push(...ng.attributes.normal.array);
-      for (let i = 0; i < ng.attributes.position.count; i++) A.push(parte, lado);
+      for (let i = 0; i < ng.attributes.position.count; i++) A.push(parte, lado, opc);
     }
     const r = new THREE.BufferGeometry();
     r.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
     r.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
-    r.setAttribute('aPL', new THREE.Float32BufferAttribute(A, 2));
+    r.setAttribute('aPL', new THREE.Float32BufferAttribute(A, 3)); // parte, lado (balança), peça opcional (10·grupo + estilo)
+    r.userData.opcoes = partes.some((q) => q.opc);
     return r;
   }
   const mat4 = (g, x, y, z, sx = 1, sy = 1, sz = 1) => g.scale(sx, sy, sz).translate(x, y, z);
@@ -72,12 +73,21 @@ export async function criarVida({ THREE, cena, ceu, altura, ruas, camera, contro
       Object.assign(s.uniforms, UV);
       s.vertexShader = s.vertexShader
         .replace('#include <common>', `#include <common>
-attribute vec2 aPL; attribute vec3 aTorso; attribute vec3 aCalca; attribute vec3 aPele; attribute vec3 aCabelo; attribute vec2 aAnim;
+attribute vec3 aPL; attribute vec3 aTorso; attribute vec3 aCalca; attribute vec3 aPele; attribute vec3 aCabelo; attribute vec3 aAnim;
+attribute vec3 aAcess;
 uniform float uVidaT; uniform float uAnima;`)
         .replace('#include <color_vertex>', `
   { float parte = aPL.x;
-    vColor = parte < 0.5 ? aPele : parte < 1.5 ? aTorso : parte < 2.5 ? aCalca : parte < 3.5 ? vec3(0.025) : aCabelo; }`)
+    vColor = parte < 0.5 ? aPele : parte < 1.5 ? aTorso : parte < 2.5 ? aCalca : parte < 3.5 ? vec3(0.025) : parte < 4.5 ? aCabelo : aAcess; }`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
+  // peças opcionais (cabelo comprido, chapéu, casaco, cachecol, mochila…): aOpc = 10·grupo + estilo; só aparece a peça
+  // do estilo da pessoa (aEstilo: cabelo, chapéu, casaco, extra); as outras colapsam num ponto e não custam pixel
+  // o estilo vem num número só (aAnim.z = cabelo + 4·chapéu + 16·casaco + 64·extra), por causa do limite de atributos
+  if (aPL.z > 0.5) {
+    float grupoO = floor(aPL.z / 10.0), valO = aPL.z - grupoO * 10.0;
+    float est = mod(floor(aAnim.z / pow(4.0, grupoO - 1.0)), 4.0);
+    if (abs(est - valO) > 0.5) transformed = vec3(0.0);
+  }
   if (uAnima > 0.5 && aPL.y != 0.0 && aAnim.y > 0.05) {
     float braco = aPL.x < 1.5 ? 1.0 : 0.0;
     float a = sin(uVidaT * aAnim.y * 4.6 + aAnim.x) * min(0.62, aAnim.y * 0.44) * aPL.y * (braco > 0.5 ? -0.8 : 1.0);
@@ -94,7 +104,8 @@ uniform float uVidaT; uniform float uAnima;`)
   const atr = (n, tam) => new THREE.InstancedBufferAttribute(new Float32Array(n * tam), tam);
   function malhaInst(geo, mat, n, sombra) {
     geo.setAttribute('aTorso', atr(n, 3)); geo.setAttribute('aCalca', atr(n, 3)); geo.setAttribute('aPele', atr(n, 3));
-    geo.setAttribute('aCabelo', atr(n, 3)); geo.setAttribute('aAnim', atr(n, 2));
+    geo.setAttribute('aCabelo', atr(n, 3)); geo.setAttribute('aAnim', atr(n, 3));
+    if (geo.userData.opcoes) geo.setAttribute('aAcess', atr(n, 3));
     const im = new THREE.InstancedMesh(geo, mat, n);
     im.frustumCulled = false; im.castShadow = sombra && !leve; im.receiveShadow = true;
     im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -117,6 +128,27 @@ uniform float uVidaT; uniform float uAnima;`)
   const INFANTIL = ['#e8452c', '#f2b51d', '#2f8fd8', '#3fae5a', '#d6458f', '#ff7a1a', '#7a4fc9', '#18a5a5', '#e9e2cf'].map(cor);
   const hash01 = (i) => { let x = Math.imul(i ^ 0x9e3779b9, 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
   const poe3 = (at, i, c) => at.setXYZ(i, c.r, c.g, c.b);
+  // figurino pela estação (como o atlas de ../tocador, que veste cada um conforme o cenário): cabelo comprido ou coque,
+  // gorro / boné / chapéu, casaco comprido ou vestido, cachecol / mochila / bolsa, e a cor desses acessórios; poucos
+  // com jaqueta neon. Crianças: mochila de escola, gorro no inverno, chapéu de sol no verão
+  const ACESS = {
+    inverno: ['#b23a3a', '#2f4a6b', '#d8c07a', '#3a3a3a', '#e0e0e0', '#5a7a3a', '#7a2a4a'].map(cor),
+    meia: ['#6b4a2a', '#2f4a6b', '#c8202a', '#3a3a3a', '#d8c07a', '#3c8f4a'].map(cor),
+    verao: ['#e2cf9a', '#f4f1ea', '#2a5fb0', '#c8202a', '#151515', '#e8a020', '#6b4a2a'].map(cor),
+  };
+  const NEON = ['#ff3ad8', '#3af0ff', '#b4ff3a', '#ffb43a'].map(cor);
+  const chance = (tab) => { const r = rnd(); let a = 0; for (let k = 0; k < tab.length; k++) { a += tab[k]; if (r < a) return k + 1; } return 0; };
+  function vestir(A, i, kid, est) {
+    if (!A.aAcess) return;
+    const inv = est === 'inverno', ver = est === 'verao';
+    const cab = kid ? chance([0.3]) : chance([0.33, 0.12]);
+    const chap = kid ? (inv ? chance([0.6]) : ver ? (rnd() < 0.3 ? 3 : 0) : chance([0.15])) : chance(inv ? [0.45, 0, 0.05] : ver ? [0, 0.18, 0.14] : [0.12, 0.1, 0.04]);
+    const cas = kid ? 0 : chance(inv ? [0.55, 0] : ver ? [0, 0.22] : [0.25, 0.08]);
+    const ext = kid ? (rnd() < 0.5 ? 2 : inv && rnd() < 0.4 ? 1 : 0) : chance(inv ? [0.5, 0.1, 0.12] : ver ? [0, 0.18, 0.2] : [0.15, 0.2, 0.15]);
+    A.aAnim.setZ(i, cab + 4 * chap + 16 * cas + 64 * ext);
+    poe3(A.aAcess, i, sorteia(ACESS[est] ?? ACESS.meia));
+    if (!kid && rnd() < 0.03) poe3(A.aTorso, i, sorteia(NEON)); // um ou outro de jaqueta neon
+  }
 
   // ---------- grafos de ruas (do que ruas.json já carrega) ----------
   const FORA = (x, z) => x < recorte.x0 - 10 || x > recorte.x1 + 10 || z < recorte.z0 - 10 || z > recorte.z1 + 10;
@@ -287,7 +319,7 @@ uniform float uVidaT; uniform float uAnima;`)
     const pos = { perto: 0 };
     return {
       im, n, x, z, esc, tipoC,
-      cores(fn) { for (let i = 0; i < n; i++) fn(i, im.geometry.attributes); for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo']) im.geometry.attributes[k].needsUpdate = true; },
+      cores(fn) { for (let i = 0; i < n; i++) fn(i, im.geometry.attributes); for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo', 'aAnim', 'aAcess']) if (im.geometry.attributes[k]) im.geometry.attributes[k].needsUpdate = true; },
       atualizar(dt, ativos, alvoCam) {
         const A = im.geometry.attributes.aAnim, a = im.instanceMatrix.array;
         let animar = false, perto = 0, ult = -1;
@@ -367,6 +399,22 @@ uniform float uVidaT; uniform float uAnima;`)
     partes.push({ g: mat4(cil(0.045, 0.05, 0.08, 5), 0, 1.54, 0), parte: 0 });
     partes.push({ g: mat4(new THREE.SphereGeometry(0.115, 7, 5), 0, 1.65, 0), parte: 0 });
     partes.push({ g: mat4(new THREE.SphereGeometry(0.124, 7, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.66, -0.005), parte: 4 });
+    const DY = 0, DZ = 0;
+    // peças opcionais (aOpc = 10·grupo + estilo; ver o shader): 1x cabelo, 2x chapéu, 3x casaco, 4x extra; parte 5 = aAcess
+    const O = (g, parte, opc) => partes.push({ g, parte, opc });
+    O(mat4(new THREE.BoxGeometry(0.22, 0.3, 0.06), 0, 1.55 + DY, -0.095 + DZ), 4, 11);                       // cabelo comprido
+    O(mat4(new THREE.SphereGeometry(0.06, 6, 4), 0, 1.75 + DY, -0.1 + DZ), 4, 12);                           // coque
+    O(mat4(new THREE.SphereGeometry(0.134, 8, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.665 + DY, DZ), 5, 21);    // gorro
+    O(mat4(new THREE.SphereGeometry(0.04, 5, 4), 0, 1.81 + DY, DZ), 5, 21);                                   // pompom
+    O(mat4(cil(0.128, 0.128, 0.07, 9), 0, 1.73 + DY, DZ), 5, 22);                                             // boné
+    O(mat4(new THREE.BoxGeometry(0.17, 0.02, 0.13), 0, 1.705 + DY, 0.15 + DZ), 5, 22);                        // aba do boné
+    O(mat4(cil(0.23, 0.23, 0.02, 12), 0, 1.71 + DY, DZ), 5, 23);                                              // chapéu: aba larga
+    O(mat4(cil(0.12, 0.13, 0.13, 9), 0, 1.78 + DY, DZ), 5, 23);                                               // copa
+    O(mat4(new THREE.TorusGeometry(0.1, 0.045, 5, 10).rotateX(Math.PI / 2), 0, 1.5 + DY, DZ), 5, 41);       // cachecol
+    O(mat4(cil(0.205, 0.27, 0.52, 9), 0, 0.68, 0, 1.15, 1, 0.82), 1, 31);                                  // casaco comprido
+    O(mat4(cil(0.19, 0.31, 0.46, 10), 0, 0.68, 0, 1.1, 1, 0.9), 1, 32);                                      // vestido
+    O(mat4(new THREE.BoxGeometry(0.3, 0.36, 0.14), 0, 1.22, -0.2), 5, 42);                                    // mochila
+    O(mat4(new THREE.BoxGeometry(0.07, 0.22, 0.22), 0.27, 0.98, 0.02), 5, 43);                                // bolsa de lado
     return unir(partes);
   };
   const geoBici = () => {
@@ -408,7 +456,7 @@ uniform float uVidaT; uniform float uAnima;`)
   const carro = populacao({ n: NCARRO, grafo: gCarro, geo: geoCarro(), mat: matC, vel: [4.5, 9], respawnLonge: true, desloc: (i, r) => 1.7 + r() * 0.3 });
   function pintar() {
     const tor = TORSO[S.estacao];
-    ped.cores((i, A) => { poe3(A.aTorso, i, sorteia(ped.tipoC[i] ? INFANTIL : tor)); poe3(A.aCalca, i, sorteia(ped.tipoC[i] && hash01(i + 3) < 0.5 ? INFANTIL : CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); });
+    ped.cores((i, A) => { poe3(A.aTorso, i, sorteia(ped.tipoC[i] ? INFANTIL : tor)); poe3(A.aCalca, i, sorteia(ped.tipoC[i] && hash01(i + 3) < 0.5 ? INFANTIL : CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); vestir(A, i, !!ped.tipoC[i], S.estacao); });
     bici.cores((i, A) => { poe3(A.aTorso, i, sorteia(TORSO.verao)); poe3(A.aCalca, i, sorteia(CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); });
     carro.cores((i, A) => { poe3(A.aTorso, i, sorteia(CARRO)); poe3(A.aCalca, i, CARRO[0]); poe3(A.aPele, i, CARRO[0]); poe3(A.aCabelo, i, CARRO[0]); });
   }
@@ -429,6 +477,18 @@ uniform float uVidaT; uniform float uAnima;`)
     partes.push({ g: mat4(cil(0.045, 0.05, 0.08, 5), 0, 1.54 + dy, 0), parte: 0 });
     partes.push({ g: mat4(new THREE.SphereGeometry(0.115, 7, 5), 0, 1.65 + dy, 0.02), parte: 0 });
     partes.push({ g: mat4(new THREE.SphereGeometry(0.124, 7, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.66 + dy, 0.015), parte: 4 });
+    const DY = dy, DZ = 0.02;
+    // peças opcionais (aOpc = 10·grupo + estilo; ver o shader): 1x cabelo, 2x chapéu, 3x casaco, 4x extra; parte 5 = aAcess
+    const O = (g, parte, opc) => partes.push({ g, parte, opc });
+    O(mat4(new THREE.BoxGeometry(0.22, 0.3, 0.06), 0, 1.55 + DY, -0.095 + DZ), 4, 11);                       // cabelo comprido
+    O(mat4(new THREE.SphereGeometry(0.06, 6, 4), 0, 1.75 + DY, -0.1 + DZ), 4, 12);                           // coque
+    O(mat4(new THREE.SphereGeometry(0.134, 8, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.665 + DY, DZ), 5, 21);    // gorro
+    O(mat4(new THREE.SphereGeometry(0.04, 5, 4), 0, 1.81 + DY, DZ), 5, 21);                                   // pompom
+    O(mat4(cil(0.128, 0.128, 0.07, 9), 0, 1.73 + DY, DZ), 5, 22);                                             // boné
+    O(mat4(new THREE.BoxGeometry(0.17, 0.02, 0.13), 0, 1.705 + DY, 0.15 + DZ), 5, 22);                        // aba do boné
+    O(mat4(cil(0.23, 0.23, 0.02, 12), 0, 1.71 + DY, DZ), 5, 23);                                              // chapéu: aba larga
+    O(mat4(cil(0.12, 0.13, 0.13, 9), 0, 1.78 + DY, DZ), 5, 23);                                               // copa
+    O(mat4(new THREE.TorusGeometry(0.1, 0.045, 5, 10).rotateX(Math.PI / 2), 0, 1.5 + DY, DZ), 5, 41);       // cachecol
     return unir(partes);
   };
   const LUG = { x: [], z: [], y: [], hx: [], hz: [], tipo: [], lim: [], alt: [], larg: [], kid: [] };
@@ -517,8 +577,8 @@ uniform float uVidaT; uniform float uAnima;`)
     for (const im of [imPar, imSent]) {
       if (!im) continue;
       const A = im.geometry.attributes;
-      for (let i = 0; i < A.aTorso.count; i++) { const kid = im === imPar && LUG.kid[i]; poe3(A.aTorso, i, sorteia(kid ? INFANTIL : tor)); poe3(A.aCalca, i, sorteia(kid && rnd() < 0.5 ? INFANTIL : CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); A.aAnim.setXY(i, rnd() * TAU, 0.3 + rnd() * 0.25); } // ninguém fica estátua: braços e pernas mexem de leve
-      for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo', 'aAnim']) A[k].needsUpdate = true;
+      for (let i = 0; i < A.aTorso.count; i++) { const kid = im === imPar && LUG.kid[i]; poe3(A.aTorso, i, sorteia(kid ? INFANTIL : tor)); poe3(A.aCalca, i, sorteia(kid && rnd() < 0.5 ? INFANTIL : CALCA)); poe3(A.aPele, i, sorteia(PELE)); poe3(A.aCabelo, i, sorteia(CABELO)); vestir(A, i, !!kid, S.estacao); A.aAnim.setXY(i, rnd() * TAU, 0.3 + rnd() * 0.25); } // ninguém fica estátua: braços e pernas mexem de leve
+      for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo', 'aAnim', 'aAcess']) if (A[k]) A[k].needsUpdate = true;
     }
   }
   pintarParados();
