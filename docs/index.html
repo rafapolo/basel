@@ -82,6 +82,16 @@
   #painel { position: fixed; right: 16px; bottom: 16px; width: 300px; z-index: 10; background: rgba(239,230,210,.92); border: 1px solid var(--linha); border-radius: 8px; padding: 14px 16px; backdrop-filter: blur(4px); }
   #agora { font: 400 54px/1 'IM Fell English', Georgia, serif; display: flex; align-items: baseline; gap: 10px; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
   #agora small { font: 500 12px Inter, sans-serif; color: var(--suave); }
+  /* estação: etiqueta com ícone (as cores da estação, discretas) */
+  #estacao.tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px; border: 1px solid var(--linha); font-weight: 600; color: var(--tinta); align-self: center; }
+  #estacao svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  #estacao.inverno { background: #e3e9f0; color: #2f4a6b; } #estacao.primavera { background: #e4efd9; color: #3d6b2a; }
+  #estacao.verao { background: #f6e6b8; color: #7a5a10; } #estacao.outono { background: #f3dcc8; color: #8a4219; }
+  #estacao.primavera circle { fill: #f2a7c0; stroke: #c25a82; }
+  .data-dir { display: inline-flex; align-items: center; gap: 8px; }
+  #c-agora { border: 1px solid var(--linha); background: transparent; color: inherit; border-radius: 999px; padding: 1px 9px; font: 600 11px Inter, sans-serif; cursor: pointer; }
+  #c-agora:hover { background: var(--tinta); color: var(--papel); }
+  #c-agora[hidden] { display: none; }
   .chaves { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   /* chaves: o rótulo inteiro é o botão (sem interruptor desenhado): contorno quando desligado, preenchido quando ligado; a
      caixa de seleção fica invisível, mas segue lá para o teclado e o leitor de tela */
@@ -127,7 +137,7 @@
   body.noite .chave { border-color: rgba(232,225,208,.18); }
   body.noite .chave:hover { background: rgba(232,225,208,.06); }
   body.noite .chave:has(input:checked) { background: var(--ouro); border-color: var(--ouro); color: #1d1812; }
-  body.noite #marca p, body.noite #agora small, body.noite .nota, body.noite #creditos { color: #a99f8c; }
+  body.noite #estacao.tag { background: rgba(232,225,208,.12); color: #e8e1d0; border-color: rgba(232,225,208,.2); } body.noite #marca p, body.noite #agora small, body.noite .nota, body.noite #creditos { color: #a99f8c; }
   body.noite .chip { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
   body.noite .chip:has(input:checked) { background: var(--ouro); color: #1d1812; border-color: var(--ouro); }
   body.noite .btn:not(#tour-abrir):not(#jogo-abrir) { background: rgba(24,22,30,.86); color: #e8e1d0; border-color: rgba(232,225,208,.18); }
@@ -226,7 +236,7 @@
 <div id="sol-ctl">
     <label for="c-hora"><span data-i18n="hora">hora</span> <output id="hora-txt"></output></label>
     <input id="c-hora" type="range" min="0" max="24" step="0.05" value="15" aria-label="Hora do dia" data-i18n-aria="aria-hora">
-    <label for="c-data"><span data-i18n="data">dia</span> <output id="data-txt"></output></label>
+    <label for="c-data"><span data-i18n="data">dia</span> <span class="data-dir"><button type="button" id="c-agora" hidden data-i18n="agora">agora</button><output id="data-txt"></output></span></label>
     <input id="c-data" type="range" min="0" max="364" step="1" value="171" aria-label="Data" data-i18n-aria="aria-data">
     <div class="sol-linha"><span id="sol-info" title="altura do sol · nascer → poente"></span></div>
   </div>

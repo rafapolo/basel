@@ -166,7 +166,16 @@ function criarFarol() {
 // ---------- interface ----------
 const css = document.createElement('style');
 css.textContent = `
-body.jogando #painel, body.jogando #topo, body.jogando #ficha, body.jogando #creditos { opacity: 0; pointer-events: none; transition: opacity .4s; }
+body.jogando #topo, body.jogando #ficha, body.jogando #creditos { opacity: 0; pointer-events: none; transition: opacity .4s; }
+/* o painel fica: dá para mudar a hora e a data pedalando (no toque ele ficaria sobre os botões) */
+@media (pointer: coarse) { body.jogando #painel { opacity: 0; pointer-events: none; } }
+body.jogando #painel { z-index: 41; }
+#jogo .ajuda { bottom: 16px; }
+#jogo .pergunta { top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 20px; pointer-events: auto; }
+#jogo .pergunta small { display: block; font-size: 13px; font-weight: 500; opacity: .8; margin: 4px 0 12px; }
+#jogo .pergunta button { border: 0; border-radius: 999px; padding: 9px 16px; margin: 0 4px; font: 700 14px system-ui; cursor: pointer; }
+#jogo .pergunta .sim { background: #ff8a1a; color: #1d1812; } #jogo .pergunta .nao { background: rgba(246,239,224,.16); color: #f6efe0; }
+#jogo .pergunta[hidden] { display: none; }
 #jogo { position: fixed; inset: 0; z-index: 40; pointer-events: none; font: 600 14px/1.3 system-ui, sans-serif; color: #f6efe0; }
 #jogo[hidden] { display: none; }
 #jogo .caixa { position: absolute; background: rgba(20,18,24,.72); border-radius: 12px; padding: 10px 14px; backdrop-filter: blur(6px); }
@@ -174,6 +183,7 @@ body.jogando #painel, body.jogando #topo, body.jogando #ficha, body.jogando #cre
 #jogo .topo b { color: #f2c14e; font-size: 16px; }
 #jogo-seta { display: inline-block; width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 18px solid #f2c14e; transition: transform .1s linear; }
 #jogo .vel { right: 16px; bottom: 16px; text-align: right; }
+@media (pointer: fine) { #jogo .vel { right: 332px; } }
 #jogo .vel b { font-size: 30px; display: block; line-height: 1; }
 #jogo .ajuda { left: 16px; bottom: 16px; font-weight: 500; font-size: 12px; opacity: .85; max-width: 46ch; }
 #jogo .msg { top: 38%; left: 50%; transform: translate(-50%, -50%); font-size: 22px; text-align: center; opacity: 0; transition: opacity .3s; }
@@ -194,13 +204,16 @@ hud.innerHTML = `
 <div class="caixa vel"><b id="jogo-kmh">0</b>km/h</div>
 <div class="caixa ajuda" id="jogo-ajuda"></div>
 <div class="caixa msg" id="jogo-msg"></div>
+<div class="caixa pergunta" id="jogo-rio" hidden><span data-t="rio"></span><small data-t="rio-sub"></small><button type="button" class="sim" id="jogo-boia"></button><button type="button" class="nao" id="jogo-volta"></button></div>
 <div class="toque esq"><button data-k="esq" aria-label="left">◀</button><button data-k="dir" aria-label="right">▶</button></div>
 <div class="toque dir"><button data-k="tras" aria-label="brake">▼</button><button data-k="frente" aria-label="pedal">▲</button></div>`;
 document.body.appendChild(hud);
 
 // ---------- estado ----------
 let ativo = false, bici = null, farol = null, raf = 0, tAnt = 0;
-const S = { x: 0, z: 0, y: 0, rumo: 0, v: 0, incl: 0, fase: 0, alvo: 0, t0: 0, fim: 0, tremor: 0, caiu: 0, morto: 0 };
+const S = { x: 0, z: 0, y: 0, rumo: 0, v: 0, incl: 0, fase: 0, alvo: 0, t0: 0, fim: 0, tremor: 0, caiu: 0, morto: 0, h: 0, vh: 0, nado: 0, pergunta: 0, secoX: 0, secoZ: 0, secoRumo: 0 };
+// olhar em volta: arrastar com o botão esquerdo gira a câmera em torno da bici; pedalando ela volta ao centro
+const OLHO = { yaw: 0, pitch: 0, arrasta: null };
 const tecla = { frente: false, tras: false, esq: false, dir: false };
 const MAPA = { KeyW: 'frente', ArrowUp: 'frente', KeyS: 'tras', ArrowDown: 'tras', KeyA: 'esq', ArrowLeft: 'esq', KeyD: 'dir', ArrowRight: 'dir' };
 let salvo = null;
@@ -264,9 +277,9 @@ function iniciar() {
   pausa = null;
   if (aqui && !bloqueado(aqui.x, aqui.z)) { Object.assign(S, aqui, { v: 0 }); S.y = piso(S.x, S.z).y; }
   const melhor = lerMelhor();
-  $('jogo-ajuda').innerHTML = t('W/S ou ↑/↓ pedala e freia · A/D ou ←/→ vira · B campainha · V câmera · Esc sai (o botão retoma) · cuidado com bondes, carros e o Reno',
-    'W/S or ↑/↓ pedal and brake · A/D or ←/→ steer · B bell · V camera · Esc exits (the button resumes) · mind trams, cars and the Rhine',
-    'W/S oder ↑/↓ treten und bremsen · A/D oder ←/→ lenken · B Klingel · V Kamera · Esc beendet (der Knopf macht weiter) · Achtung vor Trams, Autos und dem Rhein') +
+  $('jogo-ajuda').innerHTML = t('W/S ou ↑/↓ pedala e freia · A/D ou ←/→ vira · espaço pula · arrastar olha em volta · B campainha · V câmera · Esc sai (o botão retoma) · cuidado com bondes e carros',
+    'W/S or ↑/↓ pedal and brake · A/D or ←/→ steer · space jumps · drag to look around · B bell · V camera · Esc exits (the button resumes) · mind trams and cars',
+    'W/S oder ↑/↓ treten und bremsen · A/D oder ←/→ lenken · Leertaste springt · ziehen zum Umschauen · B Klingel · V Kamera · Esc beendet (der Knopf macht weiter) · Achtung vor Trams und Autos') +
     (melhor ? `<br>${t('melhor tempo', 'best time', 'Bestzeit')}: ${mmss(melhor)}` : '');
   if (aqui) mensagem(t('E-bike aqui', 'E-bike right here', 'E-Bike genau hier'), t(`siga a seta até ${ALVOS[S.alvo]?.n ?? 'a chegada'}`, `follow the arrow to ${ALVOS[S.alvo]?.n ?? 'the finish'}`, `folgen Sie dem Pfeil zu ${ALVOS[S.alvo]?.n ?? 'dem Ziel'}`), 2200);
   else if (retoma) mensagem(t('De volta à e-bike', 'Back on the e-bike', 'Zurück auf dem E-Bike'), `${S.alvo}/${ALVOS.length} · ${mmss(performance.now() - S.t0)}`, 1800);
@@ -280,7 +293,8 @@ function iniciar() {
 function largada() {
   // na calçada de montante (7 m do eixo, fora dos trilhos do bonde que corre pelo meio da ponte)
   const { A, B } = C.ponte, f = 0.62, L = Math.hypot(B[0] - A[0], B[1] - A[1]), nx = -(B[1] - A[1]) / L, nz = (B[0] - A[0]) / L;
-  Object.assign(S, { x: A[0] + (B[0] - A[0]) * f + nx * 7, z: A[1] + (B[1] - A[1]) * f + nz * 7, rumo: Math.atan2(A[0] - B[0], A[1] - B[1]), v: 0, incl: 0, alvo: 0, fim: 0, caiu: 0, morto: 0, derrubados: 0 });
+  Object.assign(S, { x: A[0] + (B[0] - A[0]) * f + nx * 7, z: A[1] + (B[1] - A[1]) * f + nz * 7, rumo: Math.atan2(A[0] - B[0], A[1] - B[1]), v: 0, incl: 0, alvo: 0, fim: 0, caiu: 0, morto: 0, derrubados: 0, h: 0, vh: 0, nado: 0, pergunta: 0 });
+  $('jogo-rio').hidden = true; if (boia) boia.visible = false;
   S.y = piso(S.x, S.z).y;
   S.t0 = performance.now();
   bici.rotation.set(0, 0, 0);
@@ -308,6 +322,8 @@ function parar() {
   hud.hidden = true;
   document.body.classList.remove('jogando');
   bici.visible = farol.visible = false;
+  if (boia) boia.visible = false;
+  $('jogo-rio').hidden = true; S.pergunta = 0; OLHO.yaw = OLHO.pitch = 0; OLHO.arrasta = null;
   // a câmera fica por perto da bicicleta, em órbita
   C.porCamera({ alvo: [S.x, S.y + 1, S.z], dist: 60, az: S.rumo + Math.PI, polar: THREE.MathUtils.degToRad(62) });
   controls.enabled = true;
@@ -315,18 +331,70 @@ function parar() {
   for (const k of Object.keys(tecla)) tecla[k] = false;
 }
 
+// ---------- Reno: pegar a boia (Wickelfisch) e descer com a corrente, ou voltar para a margem ----------
+let boia = null;
+function criarBoia() {
+  const g = new THREE.Group(), m = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 });
+  const peixe = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.6, 4, 10).rotateX(Math.PI / 2), m(0xff7a1a)); peixe.position.set(0.32, 0.05, 0.1);
+  const rabo = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.3, 10).rotateX(-Math.PI / 2), m(0xff7a1a)); rabo.position.set(0.32, 0.05, -0.42);
+  const cabeca = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), m(0xe0b894)); cabeca.position.set(0, 0.1, 0.12);
+  const touca = new THREE.Mesh(new THREE.SphereGeometry(0.128, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), m(0xb3161c)); touca.position.set(0, 0.11, 0.115);
+  const ombro = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.12, 0.4), m(0x1c2a46)); ombro.position.set(0, -0.04, -0.12);
+  for (const o of [peixe, rabo, cabeca, touca, ombro]) { o.castShadow = true; g.add(o); }
+  g.visible = false; return g;
+}
+function perguntarRio() {
+  if (S.pergunta) return;
+  S.pergunta = 1; S.v = 0;
+  const q = $('jogo-rio');
+  q.querySelector('[data-t="rio"]').textContent = t('Chegou ao Reno!', 'You reached the Rhine!', 'Am Rhein angekommen!');
+  q.querySelector('[data-t="rio-sub"]').textContent = t('Pegar o Wickelfisch e descer com a corrente, ou voltar?', 'Grab a Wickelfisch and float downstream, or go back?', 'Wickelfisch nehmen und mit der Strömung schwimmen, oder zurück?');
+  $('jogo-boia').textContent = t('🐟 descer de boia (F)', '🐟 float down (F)', '🐟 schwimmen (F)');
+  $('jogo-volta').textContent = t('voltar (R)', 'go back (R)', 'zurück (R)');
+  q.hidden = false;
+}
+function pegarBoia() {
+  if (!S.pergunta) return;
+  if (!boia) { boia = criarBoia(); C.cena.add(boia); }
+  S.pergunta = 0; S.nado = 1; S.v = 0.6; $('jogo-rio').hidden = true; campainha();
+  mensagem(t('Tchibum! De boia no Reno', 'Splash! Floating down the Rhine', 'Platsch! Im Rhein'), t('A/D nada para os lados · W nada mais rápido · na margem, volta para a bici', 'A/D swim sideways · W swim faster · at the bank you get back on the bike', 'A/D seitwärts · W schneller · am Ufer zurück aufs Velo'), 3200);
+}
+function voltarDoRio() {
+  if (!S.pergunta) return;
+  S.pergunta = 0; $('jogo-rio').hidden = true;
+  Object.assign(S, { x: S.secoX, z: S.secoZ, rumo: S.secoRumo + Math.PI, v: 0 }); S.y = piso(S.x, S.z).y;
+}
+function sairDaAgua(x, z) {
+  S.nado = 0; S.v = 0;
+  // a bici espera na margem: o primeiro chão firme à frente
+  Object.assign(S, { x, z }); S.y = piso(x, z).y;
+  mensagem(t('De volta à margem', 'Back on the bank', 'Zurück am Ufer'), t('a e-bike estava esperando', 'the e-bike was waiting', 'das E-Bike hat gewartet'), 1800);
+}
+$('jogo-boia').addEventListener('click', pegarBoia);
+$('jogo-volta').addEventListener('click', voltarDoRio);
+// arrastar com o botão esquerdo: olhar em volta (a câmera gira em torno da bici; pedalando, volta ao centro)
+const tela = document.getElementById('cena');
+tela.addEventListener('pointerdown', (e) => { if (!ativo || e.button !== 0) return; OLHO.arrasta = [e.clientX, e.clientY]; tela.setPointerCapture?.(e.pointerId); });
+tela.addEventListener('pointermove', (e) => {
+  if (!ativo || !OLHO.arrasta) return;
+  const dx = e.clientX - OLHO.arrasta[0], dy = e.clientY - OLHO.arrasta[1]; OLHO.arrasta = [e.clientX, e.clientY];
+  OLHO.yaw -= dx * 0.006; OLHO.pitch = Math.max(-0.6, Math.min(0.5, OLHO.pitch - dy * 0.004));
+});
+for (const ev of ['pointerup', 'pointercancel']) tela.addEventListener(ev, () => { OLHO.arrasta = null; });
+
 let vista = 0; // 0 = atrás, 1 = primeira pessoa
 const camAlvo = new THREE.Vector3(), olhar = new THREE.Vector3(), olharS = new THREE.Vector3();
 function passo(agora) {
   if (!ativo) return;
   raf = requestAnimationFrame(passo);
-  const dt = Math.min(0.05, (agora - tAnt) / 1000); tAnt = agora;
+  let dt = Math.min(0.05, (agora - tAnt) / 1000); tAnt = agora;
+  if (S.pergunta) dt = 0; // esperando a escolha no Reno: tudo parado
   // ---- física ----
   if (S.morto) { // tombada: só a queda e a espera até recomeçar
     S.v *= 1 - 4 * dt; S.incl += (1.45 - S.incl) * Math.min(1, dt * 5);
     if (agora - S.morto > 1800) largada();
   }
-  const vmax = 12.5; // e-bike rápida (S-Pedelec): 45 km/h
+  const vmax = S.nado ? 2.2 : 12.5; // e-bike rápida (S-Pedelec): 45 km/h; de boia, a braçada ajuda um pouco a corrente
   if (S.morto) { /* sem pedal */ }
   else if (tecla.frente) S.v += (S.v < 0 ? 6 : 5.2 * (1 - (S.v / vmax) ** 2)) * dt; // o motor ajuda até perto do teto
   else if (tecla.tras) S.v = S.v > 0 ? Math.max(0, S.v - 9 * dt) : Math.max(-2.2, S.v - 2 * dt);
@@ -338,7 +406,15 @@ function passo(agora) {
   if (!S.morto) S.incl += (-giro * Math.min(1, S.v / 7) * 0.32 - S.incl) * Math.min(1, dt * 6);
   const fx = Math.sin(S.rumo), fz = Math.cos(S.rumo);
   const xAnt = S.x, zAnt = S.z; // para varrer o trajeto do quadro (a 45 km/h, ~0,8 m a 15 fps)
-  const nx = S.x + fx * S.v * dt, nz = S.z + fz * S.v * dt;
+  let nx = S.x + fx * S.v * dt, nz = S.z + fz * S.v * dt;
+  if (S.nado) { // a corrente do Reno leva (~1,5–2,5 m/s); a pessoa só nada um pouco para os lados
+    const fl = window.vida?.fluxo?.(S.x, S.z) ?? { x: 0, z: 0 };
+    nx += fl.x * 1.6 * dt; nz += fl.z * 1.6 * dt;
+    const rio = (x, z) => window.vida?.ehAgua?.(x, z) ?? naAgua(x, z); // a máscara do rio: por baixo das pontes também é água
+    if (!rio(nx + fx * 1.2, nz + fz * 1.2) && !rio(nx, nz)) { sairDaAgua(nx, nz); nx = S.x; nz = S.z; }
+  } else if (!naAgua(S.x, S.z)) { S.secoX = S.x; S.secoZ = S.z; S.secoRumo = S.rumo; } // último chão firme (para voltar do Reno)
+  // pulo (espaço): 0,5 m; no ar a bici segue reta
+  if (S.h > 0 || S.vh > 0) { S.vh -= 9.81 * dt; S.h = Math.max(0, S.h + S.vh * dt); if (S.h === 0) { S.vh = 0; S.tremor = Math.max(S.tremor, 0.12); } }
   const frente = 0.7 * Math.sign(S.v || 1);
   const livre = (x, z) => !bloqueado(x + fx * frente, z + fz * frente) && !bloqueado(x, z);
   if (livre(nx, nz)) { S.x = nx; S.z = nz; }
@@ -347,12 +423,12 @@ function passo(agora) {
   else if (Math.abs(S.v) > 0.5) { if (Math.abs(S.v) > 3) { S.tremor = 0.35; campainha(); } S.v = -S.v * 0.2; }
   else S.v = 0;
   // Reno, bonde ou carro: fim da corrida (morrer() mostra o aviso; largada() vem 1,8 s depois)
-  if (!S.morto && agora - S.t0 > 2000) { // 2 s de folga na largada
-    if (naAgua(S.x, S.z)) { S.caiu = agora; morrer(agora, 'reno'); }
+  if (!S.morto && !S.nado && !S.pergunta && agora - S.t0 > 2000) { // 2 s de folga na largada
+    if (naAgua(S.x, S.z) && !S.nado) perguntarRio();
     else { const v = window.vida?.bate(S.x + fx * 0.4, S.z + fz * 0.4, 0.45); if (v) morrer(agora, v); }
   }
   // pedestres: quem a bici pega cai no chão (e levanta 6 s depois); a bici perde metade da velocidade
-  if (!S.morto && Math.abs(S.v) > 1.5) {
+  if (!S.morto && !S.nado && Math.abs(S.v) > 1.5) {
     let k = 0;
     const passos = Math.max(1, Math.ceil(Math.hypot(S.x - xAnt, S.z - zAnt) / 0.4));
     for (let p = 1; p <= passos; p++) {
@@ -364,13 +440,14 @@ function passo(agora) {
       mensagem(t('Opa! Derrubou alguém', 'Oops! Knocked someone over', 'Hoppla! Jemanden umgefahren'), t(`${S.derrubados} no chão nesta corrida`, `${S.derrubados} knocked down this race`, `${S.derrubados} umgefahren in diesem Rennen`), 1400);
     }
   }
-  const p0 = piso(S.x, S.z), naRio = S.morto && S.caiu, yAlvo = naRio ? C.nivelReno - 1.2 : p0.y;
+  const p0 = piso(S.x, S.z), naRio = S.morto && S.caiu, yAlvo = S.nado ? C.nivelReno - 0.55 + Math.sin(agora / 600) * 0.04 : naRio ? C.nivelReno - 1.2 : p0.y;
   S.y += (yAlvo - S.y) * Math.min(1, dt * (naRio ? 2 : 14));
   const pf = piso(S.x + fx * 0.6, S.z + fz * 0.6).y, pt = piso(S.x - fx * 0.6, S.z - fz * 0.6).y;
   const arfagem = Math.atan2(pf - pt, 1.2);
   // ---- desenho da bici ----
   S.fase += (S.v / bici.userData.R0) * dt;
-  bici.position.set(S.x, S.y, S.z);
+  bici.position.set(S.x, S.y + S.h, S.z);
+  bici.visible = !S.nado; if (boia) { boia.visible = !!S.nado; boia.position.set(S.x, C.nivelReno + 0.02, S.z); boia.rotation.y = S.rumo; }
   bici.rotation.set(0, 0, 0);
   bici.rotateY(S.rumo); bici.rotateX(-arfagem); bici.rotateZ(S.incl);
   for (const r of bici.userData.rodas) r.rotation.x = S.fase;
@@ -408,24 +485,27 @@ function passo(agora) {
   $('jogo-tempo').textContent = mmss(S.fim || agora - S.t0);
   $('jogo-kmh').textContent = Math.round(Math.abs(S.v) * 3.6);
   // ---- câmera ----
+  // olhar em volta: quem pedala (ou nada) volta a olhar para a frente
+  if (!OLHO.arrasta && (tecla.frente || tecla.tras || tecla.esq || tecla.dir || Math.abs(S.v) > 1)) { const k = Math.exp(-dt * 3); OLHO.yaw *= k; OLHO.pitch *= k; }
+  const yH = S.y + S.h + (S.nado ? -1.1 : 0), ry = S.rumo + OLHO.yaw, gx = Math.sin(ry), gz = Math.cos(ry);
   if (vista === 1) {
-    camera.position.set(S.x + fx * 0.15, S.y + 1.62, S.z + fz * 0.15);
-    olhar.set(S.x + fx * 10, S.y + 1.3 + Math.tan(arfagem) * 10, S.z + fz * 10);
+    camera.position.set(S.x + fx * 0.15, yH + 1.62, S.z + fz * 0.15);
+    olhar.set(S.x + gx * 10, yH + 1.3 + Math.tan(arfagem) * 10 + Math.tan(OLHO.pitch) * 10, S.z + gz * 10);
     camera.up.set(Math.cos(S.rumo) * S.incl * 0.4, 1, -Math.sin(S.rumo) * S.incl * 0.4).normalize();
     camera.lookAt(olhar);
     camera.up.set(0, 1, 0);
   } else {
     // atrás e acima; se um prédio ficar entre a bici e a câmera, ela chega mais perto
     let dist = 6.5;
-    for (let k = 1; k <= 8; k++) { const s = (k / 8) * 6.5; if (bloqueado(S.x - fx * s, S.z - fz * s)) { dist = Math.max(1.8, s - 1); break; } }
-    camAlvo.set(S.x - fx * dist, S.y + 2.4 + (6.5 - dist) * 0.25, S.z - fz * dist);
-    camera.position.lerp(camAlvo, 1 - Math.exp(-dt * 5));
-    olhar.set(S.x + fx * 3, S.y + 1.2, S.z + fz * 3);
-    olharS.lerp(olhar, 1 - Math.exp(-dt * 8));
+    for (let k = 1; k <= 8; k++) { const s = (k / 8) * 6.5; if (bloqueado(S.x - gx * s, S.z - gz * s)) { dist = Math.max(1.8, s - 1); break; } }
+    camAlvo.set(S.x - gx * dist, yH + 2.4 + (6.5 - dist) * 0.25 + OLHO.pitch * 5, S.z - gz * dist);
+    camera.position.lerp(camAlvo, 1 - Math.exp(-dt * (OLHO.arrasta ? 14 : 5)));
+    olhar.set(S.x + gx * 3, yH + 1.2, S.z + gz * 3);
+    olharS.lerp(olhar, 1 - Math.exp(-dt * (OLHO.arrasta ? 16 : 8)));
     camera.lookAt(olharS);
   }
   if (S.tremor > 0) { S.tremor -= dt; camera.position.x += (Math.random() - 0.5) * S.tremor * 0.4; camera.position.y += (Math.random() - 0.5) * S.tremor * 0.4; }
-  controls.target.set(S.x, S.y + 1, S.z); // para a cidade (LOD, gente perto da câmera) saber onde se está
+  controls.target.set(S.x, yH + 1, S.z); // para a cidade (LOD, gente perto da câmera) saber onde se está
 }
 
 addEventListener('keydown', (e) => {
@@ -434,6 +514,9 @@ addEventListener('keydown', (e) => {
   const k = MAPA[e.code];
   if (k) { tecla[k] = true; e.preventDefault(); }
   if (e.code === 'KeyB' && !e.repeat) campainha();
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat && !S.nado && !S.pergunta && !S.morto && S.h === 0) { S.vh = Math.sqrt(2 * 9.81 * 0.5); } }
+  if (S.pergunta && (e.code === 'KeyF' || e.code === 'Enter')) { e.preventDefault(); pegarBoia(); }
+  if (S.pergunta && e.code === 'KeyR') { e.preventDefault(); voltarDoRio(); }
   if (e.code === 'KeyV' && !e.repeat) { vista = 1 - vista; if (vista === 0) olharS.copy(olhar); }
 });
 addEventListener('keyup', (e) => { const k = MAPA[e.code]; if (k) tecla[k] = false; });

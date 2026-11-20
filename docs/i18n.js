@@ -20,6 +20,7 @@
     carregando: ['Desenhando a cidade…', 'Drawing the city…', 'Die Stadt wird gezeichnet…'],
     sub: ['A cidade inteira, prédio por prédio, agora', 'The whole city, building by building, right now', 'Die ganze Stadt, Haus für Haus, jetzt'],
     som: ['som', 'sound', 'Ton'],
+    agora: ['agora', 'now', 'jetzt'],
     tour: ['Tour de 2 min', '2-min tour', '2-Min-Tour'],
     jogo: ['Pedalar', 'Ride an e-bike', 'E-Bike fahren'],
     'jogo-titulo': ['Uma e-bike vermelha (45 km/h) na Mittlere Brücke: passe por sete lugares da cidade contra o relógio', 'A red e-bike (45 km/h) on the Mittlere Brücke: ride to seven places in town against the clock', 'Ein rotes E-Bike (45 km/h) auf der Mittleren Brücke: fahren Sie sieben Orte der Stadt auf Zeit an'],

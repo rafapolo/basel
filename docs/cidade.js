@@ -400,10 +400,20 @@ if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, a
 // relógio e estação no painel: a hora de Basel (ceu.js segue o relógio real até alguém mexer)
 const ESTACAO = { inverno: ['inverno', 'winter', 'Winter'], primavera: ['primavera', 'spring', 'Frühling'], verao: ['verão', 'summer', 'Sommer'], outono: ['outono', 'autumn', 'Herbst'] };
 const estacaoDe = (data) => { const [, m, d] = data.split('-').map(Number), x = m * 100 + d; return x < 320 || x >= 1221 ? 'inverno' : x < 621 ? 'primavera' : x < 923 ? 'verao' : x < 1221 ? 'outono' : 'inverno'; };
+// ícone de cada estação, desenhado à mão (traço na cor do texto): floco de neve, broto com flor, sol, folha
+const ICONE_EST = {
+  inverno: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v13M2.4 4.75l11.2 6.5M2.4 11.25l11.2-6.5M6.4 2.6 8 4.1l1.6-1.5M6.4 13.4 8 11.9l1.6 1.5"/></svg>',
+  primavera: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 15V8.5M8 11.5c-2.6 0-4-1.4-4.2-3.4 2.4-.1 3.9 1 4.2 3.4ZM8 10c1.9-.1 3.2-1.1 3.5-2.9-2-.1-3.3.9-3.5 2.9Z"/><circle cx="8" cy="4.4" r="1.4"/><path d="M8 1.6v1.4M10.8 4.4H9.4M5.2 4.4h1.4M8 7.2V5.8"/></svg>',
+  verao: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6 13 13M3 13l1.4-1.4M11.6 4.4 13 3"/></svg>',
+  outono: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13C2.6 7 6.5 3 13.5 2.5 13.4 9.4 9.5 13.3 3 13Z"/><path d="M3 13 10 6M6.4 9.6 6 7M8.4 7.6l2.4.3"/></svg>',
+};
 function relogio(e) {
   $('relogio').textContent = `${String(Math.floor(e.hora)).padStart(2, '0')}:${String(Math.floor((e.hora % 1) * 60)).padStart(2, '0')}`;
   const tempo = ceu.aoVivo && TEMPO.ok ? ` · ${Math.round(TEMPO.temp)} °C` : '';
-  $('estacao').textContent = `${t(...ESTACAO[estacaoDe(e.data)])}${ceu.aoVivo ? t(' · agora', ' · live', ' · live') : ''}${tempo}`;
+  const est = estacaoDe(e.data);
+  $('estacao').className = `tag ${est}`;
+  $('estacao').innerHTML = `${ICONE_EST[est]}<span>${t(...ESTACAO[est])}${ceu.aoVivo ? t(' · agora', ' · live', ' · live') : ''}${tempo}</span>`;
+  $('c-agora').hidden = ceu.aoVivo;
 }
 addEventListener('tempo:agora', () => relogio(ceu.estado()));
 // ---------- chaves ----------

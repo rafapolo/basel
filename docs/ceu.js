@@ -340,6 +340,8 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
     if (info) info.textContent = `${Math.round(e.altitudeGraus)}° · ${e.nascer ? hhmm(e.nascer) : '—'} → ${e.poente ? hhmm(e.poente) : '—'}`;
   }
   hr?.addEventListener('input', () => ceu.definirHora(+hr.value));
+  // "agora": volta à data e à hora reais de Basel e ao relógio ao vivo (só aparece quando alguém mexeu)
+  document.getElementById('c-agora')?.addEventListener('click', () => { const a = agoraEmBasel(); ceu.definirData(a.data, { vivo: true }); ceu.definirHora(a.hora, { vivo: true, animar: true }); ceu.aoVivo = true; emitir(); });
   const fmtDia = (m, d) => new Intl.DateTimeFormat(document.documentElement.lang || 'pt', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(Date.UTC(2025, m - 1, d)).replace('.', '');
   let pedido = 0; // arrastar o slider recalcula sol, árvores e roupas: no máximo uma vez por quadro
   dt?.addEventListener('input', () => {
