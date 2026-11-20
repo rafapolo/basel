@@ -30,39 +30,53 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
   const velho = (p) => (p.ano ?? 2000) < 1950 ? 1 : 0;
 
   // ---- 1. agrupa triângulos por plano: paredes (u,v) e telhados (cumeeira) ----
-  const paredes = new Map(), telhados = new Map();
+  // tabela de hash própria (endereçamento aberto) para as chaves numéricas: o Map com chaves acima de 2^31 (doubles) era
+  // metade do tempo da etapa
+  const tabela = (bits) => {
+    const n = 1 << bits, mask = n - 1, k = new Float64Array(n), v = new Int32Array(n).fill(-1);
+    return {
+      get(c) { let i = (Math.imul((c / 65536) | 0, 0x9e3779b1) ^ (c & 0xffff) * 0x85eb) & mask; while (v[i] >= 0) { if (k[i] === c) return v[i]; i = (i + 1) & mask; } return undefined; },
+      set(c, x) { let i = (Math.imul((c / 65536) | 0, 0x9e3779b1) ^ (c & 0xffff) * 0x85eb) & mask; while (v[i] >= 0) i = (i + 1) & mask; k[i] = c; v[i] = x; },
+    };
+  };
+  const bitsTab = Math.max(10, Math.ceil(Math.log2(nTris))); // ~2 triângulos por grupo: carga < 30%
+  const paredes = tabela(bitsTab), telhados = tabela(bitsTab);
   const triParede = new Int32Array(nTris).fill(-1);
   const grupos = [], gTelhado = [];
   const triTelhado = new Int32Array(nTris).fill(-1);
   const bTopo = new Float32Array(P.length).fill(-1e9);
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  // chave numérica (era uma string por triângulo: ~60% do tempo da etapa); mesma conta do Vector3 (cross, normalize),
+  // então os mesmos grupos na mesma ordem. id < 2^14, cada componente arredondado cabe em 7 bits, d em 16: < 2^53
   for (let t = 0; t < nTris; t++) {
     const o = t * 9;
-    a.fromArray(posicoes, o); b.fromArray(posicoes, o + 3); c.fromArray(posicoes, o + 6);
-    n.copy(b).sub(a).cross(c.clone().sub(a));
-    const area = n.length() / 2;
+    const ax = posicoes[o], ay = posicoes[o + 1], az = posicoes[o + 2];
+    const ux = posicoes[o + 3] - ax, uy = posicoes[o + 4] - ay, uz = posicoes[o + 5] - az;
+    const vx = posicoes[o + 6] - ax, vy = posicoes[o + 7] - ay, vz = posicoes[o + 8] - az;
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.sqrt(nx * nx + ny * ny + nz * nz), area = len / 2;
     if (area < 1e-4) continue;
-    n.normalize();
+    const inv = 1 / len; nx *= inv; ny *= inv; nz *= inv;
     const id = ids16[t * 3];
-    if (Math.abs(n.y) <= 0.35) {
-      const h = Math.hypot(n.x, n.z), tx = -n.z / h, tz = n.x / h;
-      const d = n.x * a.x + n.z * a.z;
-      const chave = `${id}|${Math.round(n.x * 40)}|${Math.round(n.z * 40)}|${Math.round(d * 5)}`;
+    if (Math.abs(ny) <= 0.35) {
+      const h = Math.hypot(nx, nz), tx = -nz / h, tz = nx / h;
+      const d = nx * ax + nz * az;
+      const chave = ((id * 81 + Math.round(nx * 40) + 40) * 81 + Math.round(nz * 40) + 40) * 65536 + Math.round(d * 5) + 32768;
       let gi = paredes.get(chave);
       if (gi === undefined) {
         gi = grupos.length; paredes.set(chave, gi);
-        grupos.push({ id, tx, tz, umin: 1e9, umax: -1e9, ymin: 1e9, ymax: -1e9, tris: [], chave });
+        grupos.push({ id, tx, tz, umin: 1e9, umax: -1e9, ymin: 1e9, ymax: -1e9, tris: [] });
       }
       const g = grupos[gi];
       g.tris.push(t); triParede[t] = gi;
       for (let k = 0; k < 3; k++) {
         const u = posicoes[o + k * 3] * tx + posicoes[o + k * 3 + 2] * tz, y = posicoes[o + k * 3 + 1];
-        g.umin = Math.min(g.umin, u); g.umax = Math.max(g.umax, u); g.ymin = Math.min(g.ymin, y); g.ymax = Math.max(g.ymax, y);
+        if (u < g.umin) g.umin = u; if (u > g.umax) g.umax = u; if (y < g.ymin) g.ymin = y; if (y > g.ymax) g.ymax = y;
       }
     } else {
-      const ny = n.y < 0 ? -n.y : n.y, nx = n.y < 0 ? -n.x : n.x, nz = n.y < 0 ? -n.z : n.z;
-      const d = nx * a.x + ny * a.y + nz * a.z;
-      const chave = `${id}|${Math.round(nx * 30)}|${Math.round(ny * 30)}|${Math.round(nz * 30)}|${Math.round(d * 3)}`;
+      if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      const d = nx * ax + ny * ay + nz * az;
+      const chave = (((id * 61 + Math.round(nx * 30) + 30) * 31 + Math.round(ny * 30)) * 61 + Math.round(nz * 30) + 30) * 65536 + Math.round(d * 3) + 32768;
       let gi = telhados.get(chave);
       if (gi === undefined) {
         gi = gTelhado.length; telhados.set(chave, gi);
@@ -70,23 +84,32 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
       }
       const g = gTelhado[gi];
       g.tris.push(t); g.area += area; triTelhado[t] = gi;
-      for (let k = 0; k < 3; k++) g.ymax = Math.max(g.ymax, posicoes[o + k * 3 + 1]);
-      for (let k = 0; k < 3; k++) bTopo[id] = Math.max(bTopo[id], posicoes[o + k * 3 + 1]);
+      const ym = Math.max(ay, posicoes[o + 4], posicoes[o + 7]);
+      if (ym > g.ymax) g.ymax = ym;
+      if (ym > bTopo[id]) bTopo[id] = ym;
     }
   }
 
   // ---- 2. por parede: comprimento, beiral (aresta horizontal mais alta que cruza a parede) e andares ----
+  // beiral: a cota (em dm) mais alta cuja faixa de vértices cobre metade da parede; cotas distintas são poucas por parede,
+  // então busca linear em arrays reaproveitados (era um Map, um spread e um sort por parede)
+  let yk = new Int32Array(64), umn = new Float64Array(64), umx = new Float64Array(64);
   for (const g of grupos) {
     const len = g.umax - g.umin;
-    const grupo = new Map();
+    let m = 0;
     for (const t of g.tris) for (let k = 0; k < 3; k++) {
       const u = posicoes[t * 9 + k * 3] * g.tx + posicoes[t * 9 + k * 3 + 2] * g.tz, y = Math.round(posicoes[t * 9 + k * 3 + 1] * 10);
-      const e = grupo.get(y) ?? [1e9, -1e9];
-      e[0] = Math.min(e[0], u); e[1] = Math.max(e[1], u); grupo.set(y, e);
+      let j = 0;
+      while (j < m && yk[j] !== y) j++;
+      if (j === m) {
+        if (m === yk.length) { const n2 = m * 2; const y2 = new Int32Array(n2), a2 = new Float64Array(n2), b2 = new Float64Array(n2); y2.set(yk); a2.set(umn); b2.set(umx); yk = y2; umn = a2; umx = b2; }
+        yk[m] = y; umn[m] = 1e9; umx[m] = -1e9; m++;
+      }
+      if (u < umn[j]) umn[j] = u; if (u > umx[j]) umx[j] = u;
     }
-    let eave = g.ymax;
-    const ys = [...grupo.keys()].sort((p, q) => q - p);
-    for (const y of ys) if (grupo.get(y)[1] - grupo.get(y)[0] >= 0.5 * len) { eave = y / 10; break; }
+    let eave = g.ymax, melhor = -Infinity;
+    for (let j = 0; j < m; j++) if (yk[j] > melhor && umx[j] - umn[j] >= 0.5 * len) melhor = yk[j];
+    if (melhor > -Infinity) eave = melhor / 10;
     const hW = Math.max(1, eave - g.ymin);
     const p = P[g.id];
     let nF = p.and > 0 ? p.and : Math.round(hW / 3.1);

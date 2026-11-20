@@ -282,7 +282,9 @@ colorir(); cores = null; // só uma vez; o atributo solta o array depois de subi
 
 // destaque do prédio da ficha e noite, no shader (a cidade é a de hoje: sem máquina do tempo)
 const U = { uSel: { value: -1 }, uNoite: { value: 0 } };
+performance.mark('fachadas'); // tempo de montagem: performance.getEntriesByName('fachadas', 'measure')
 const FACH = criarFachadas({ cena, meta, posicoes, ids16, U });
+performance.measure('fachadas', 'fachadas');
 geo.setAttribute('fa', FACH.atributos.fa);
 geo.setAttribute('fb', FACH.atributos.fb);
 const VERT_DECL = `
