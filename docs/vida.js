@@ -793,30 +793,51 @@ uniform float uVidaT; uniform float uAnima;`)
     aves.instanceMatrix.needsUpdate = true;
   }
   // nadadores (Wickelfisch laranja ou amarelo, touca de cor)
-  const NNAD = leve ? 400 : 2000; // no auge do verão, milhares descem o Reno (o "Rheinschwimmen"); de resto, poucos
-  const geoNad = unir([
-    { g: mat4(new THREE.SphereGeometry(0.1, 6, 5), 0, 0.0, 0.18), parte: 0 },
-    { g: mat4(new THREE.SphereGeometry(0.105, 6, 4, 0, TAU, 0, Math.PI * 0.55), 0, 0.01, 0.175), parte: 4 },
-    { g: mat4(new THREE.BoxGeometry(0.4, 0.14, 0.55), 0, -0.05, -0.17), parte: 0 },
-    { g: mat4(cil(0.17, 0.17, 0.62, 8).rotateX(Math.PI / 2), 0.42, 0.0, -0.1), parte: 1 }, // boia
-    { g: mat4(new THREE.BoxGeometry(0.1, 0.05, 0.45), 0.2, 0.03, 0.05), parte: 0 },
+  // no auge do verão, milhares descem o Reno ao mesmo tempo (o "Rheinschwimmen", da Tinguely à Johanniterbrücke); de resto, poucos
+  const NNAD = leve ? 1000 : 5000;
+  // cabeça e ombros fora d'água, um braço por cima do Wickelfisch (o saco-boia em forma de peixe, ~0,8 m, que leva a roupa)
+  const geoNad = unir([ // poucos lados: 5000 deles, e de longe cada um é um ponto colorido
+    { g: mat4(new THREE.SphereGeometry(0.11, 6, 4), 0, 0.1, 0.12), parte: 0 },
+    { g: mat4(new THREE.SphereGeometry(0.116, 6, 3, 0, TAU, 0, Math.PI * 0.55), 0, 0.11, 0.115), parte: 4 },
+    { g: mat4(new THREE.BoxGeometry(0.42, 0.14, 0.5), 0, -0.01, -0.14), parte: 2 },            // ombros (o maiô)
+    { g: mat4(new THREE.ConeGeometry(0.2, 0.26, 6).rotateX(-Math.PI / 2).translate(0, 0, -0.44), 0.38, 0.03, 0), parte: 1 }, // rabo do peixe
+    { g: mat4(new THREE.CapsuleGeometry(0.2, 0.55, 2, 6).rotateX(Math.PI / 2), 0.38, 0.03, 0.04), parte: 1 }, // Wickelfisch
+    { g: mat4(new THREE.BoxGeometry(0.11, 0.06, 0.42), 0.22, 0.2, 0.1), parte: 0 },            // braço por cima da boia
   ]);
-  const nad = malhaInst(geoNad, matGente(0.5), NNAD, false);
-  const BOIA = ['#ff6a1a', '#ff9a1a', '#ffd21a', '#ff4a4a'].map(cor), TOUCA = ['#ffffff', '#ff5a5a', '#2f7fff', '#ffd21a', '#222'].map(cor);
-  for (let i = 0; i < NNAD; i++) { poe3(nad.geometry.attributes.aTorso, i, sorteia(BOIA)); poe3(nad.geometry.attributes.aPele, i, sorteia(PELE)); poe3(nad.geometry.attributes.aCabelo, i, sorteia(TOUCA)); poe3(nad.geometry.attributes.aCalca, i, CALCA[0]); nad.geometry.attributes.aAnim.setXY(i, 0, 0); }
+  // longe (> 150 m da câmera) basta a boia e a cabeça, 24 triângulos: a malha detalhada desenha só os de perto, em
+  // vagas recopiadas quando muda quem está perto (as cores ficam no índice do nadador, na malha de longe)
+  const geoNadLonge = unir([
+    { g: mat4(new THREE.BoxGeometry(0.4, 0.3, 0.9), 0.3, 0.03, 0), parte: 1 },
+    { g: mat4(new THREE.BoxGeometry(0.22, 0.22, 0.22), 0, 0.1, 0.12), parte: 4 },
+  ]);
+  const matNad = matGente(0.5);
+  const nad = malhaInst(geoNadLonge, matNad, NNAD, false), nadPerto = malhaInst(geoNad, matNad, leve ? 300 : 900, false);
+  const PERTO2 = 150 * 150, vaga = new Int32Array(nadPerto.count).fill(-1);
+  // Wickelfisch: laranja, amarelo, verde, azul, rosa, vermelho (os da loja têm o peixe estampado em cores fortes)
+  const BOIA = ['#ff6a1a', '#ff9a1a', '#ffd21a', '#ff4a4a', '#3fbf4a', '#1f9ad6', '#ff5fa2', '#7ad13b', '#00b3b3'].map(cor), TOUCA = ['#ffffff', '#ff5a5a', '#2f7fff', '#ffd21a', '#222', '#3a2a1e', '#8a5a2a'].map(cor);
+  const MAIO = ['#1c2a46', '#d8493f', '#222', '#3d6fb3', '#e2b542', '#4c9a6a', '#c77ab0'].map(cor);
+  for (let i = 0; i < NNAD; i++) { poe3(nad.geometry.attributes.aTorso, i, sorteia(BOIA)); poe3(nad.geometry.attributes.aPele, i, sorteia(PELE)); poe3(nad.geometry.attributes.aCabelo, i, sorteia(TOUCA)); poe3(nad.geometry.attributes.aCalca, i, sorteia(MAIO)); nad.geometry.attributes.aAnim.setXY(i, 0, 0); }
   const zonasNado = V.nado.map((p) => p.map(([x, z]) => [x, z]));
   const noNado = (x, z) => zonasNado.some((p) => dentro(x, z, p));
   let nadoForcado = 0; // o tour, quando fala do Reno no verão, põe todo mundo de boia na água
   const nd = Array.from({ length: NNAD }, () => ({ x: 0, z: 0, vida: 0, ph: rnd() * TAU, v: 1 + rnd() * 0.5, esc: 0 }));
   const fl = { x: 0, z: 0 };
-  function lancar(s) {
+  // perto da margem? (terra a até 22 m em alguma das 8 direções): quase todo mundo desce a uns metros da beira, poucos no meio
+  const pertoMargem = (x, z) => { for (let k = 0; k < 8; k++) { const a = (k * TAU) / 8; if (!ehAgua(x + Math.cos(a) * 22, z + Math.sin(a) * 22)) return true; } return false; };
+  function lancar(s, i) {
+    // em turma: metade entra junto de alguém que já está descendo (amigos de 2 a 6, a poucos metros)
+    if (rnd() < 0.5) {
+      const o = nd[Math.floor(rnd() * Math.max(1, i))];
+      if (o && o.vida > 5 && o.esc > 0.5) { const x = o.x + (rnd() - 0.5) * 4, z = o.z + (rnd() - 0.5) * 4; if (ehAgua(x, z)) { s.x = x; s.z = z; s.vida = o.vida; s.v = o.v; return; } }
+    }
     for (let t = 0; t < 60; t++) {
       const c = celAgua[Math.floor(rnd() * celAgua.length)]; if (!c) return;
       const x = c[0] + (rnd() - 0.5) * RP, z = c[1] + (rnd() - 0.5) * RP;
-      if (noNado(x, z) && ehAgua(x, z)) { s.x = x; s.z = z; s.vida = 40 + rnd() * 160; return; }
+      if (noNado(x, z) && ehAgua(x, z) && (t > 40 || rnd() < 0.15 || pertoMargem(x, z))) { s.x = x; s.z = z; s.vida = 40 + rnd() * 160; s.v = 1 + rnd() * 0.5; return; }
     }
     s.vida = 0;
   }
+  let quadroNad = 0;
   const nadoQuer = () => {
     const dia = S.diaAno, verao = suave(170, 190, dia) * (1 - suave(300, 320, dia)); // meados de maio a fim de setembro (dia = mês·31 + dia)
     // auge: julho e agosto (dia ~ 217–278), à tarde; fora dele uns poucos por cento. Ao vivo, o calor de agora pesa
@@ -825,20 +846,31 @@ uniform float uVidaT; uniform float uAnima;`)
     const base = verao * suave(8, 11, hora()) * (1 - suave(19, 21.5, hora())) * suave(18, 30, S.alt ?? 40) * (S.dia === 'util' ? 0.75 : 1);
     return base * (0.02 + 0.98 * auge * tarde) * temp;
   };
-  function nadadores(dt, quer) {
+  function nadadores(dt, quer, cam) {
     const n = Math.round(NNAD * quer);
+    let ult = -1, k = 0, mudou = false; quadroNad++;
+    const cx = cam ? cam.position.x : 0, cz = cam ? cam.position.z : 0, maxP = vaga.length, aL = nad.geometry.attributes, aP = nadPerto.geometry.attributes;
     for (let i = 0; i < NNAD; i++) {
       const s = nd[i], a = nad.instanceMatrix.array;
       const q = i < n ? 1 : 0;
       s.esc += lim(q - s.esc, -dt / 2, dt / 2);
       if (s.esc <= 0.01) { a.fill(0, i * 16, i * 16 + 16); continue; }
-      if (s.vida <= 0 || !noNado(s.x, s.z) || !ehAgua(s.x, s.z)) { lancar(s); if (s.vida <= 0) continue; }
+      ult = i;
+      // saiu da água ou da zona de nado? confere 1 em 8 quadros por nadador (5000 polígonos por quadro custavam ~1 ms)
+      if (s.vida <= 0 || ((i + quadroNad) % 8 === 0 && (!noNado(s.x, s.z) || !ehAgua(s.x, s.z)))) { lancar(s, i); if (s.vida <= 0) continue; }
       fluxo(s.x, s.z, fl);
       s.x += fl.x * (1.1 + s.v * 0.5) * dt; s.z += fl.z * (1.1 + s.v * 0.5) * dt; s.vida -= dt;
       const y = nivelAgua() + 0.02 + Math.sin(S.relogio * 1.6 + s.ph) * 0.03;
-      matriz(nad, i, s.x, y, s.z, fl.x, fl.z, s.esc, s.esc, s.esc);
+      const dx = s.x - cx, dz = s.z - cz;
+      if (cam && k < maxP && dx * dx + dz * dz < PERTO2) {
+        a.fill(0, i * 16, i * 16 + 16);
+        if (vaga[k] !== i) { vaga[k] = i; mudou = true; for (const c of ['aTorso', 'aPele', 'aCabelo', 'aCalca']) aP[c].setXYZ(k, aL[c].getX(i), aL[c].getY(i), aL[c].getZ(i)); }
+        matriz(nadPerto, k++, s.x, y, s.z, fl.x, fl.z, s.esc, s.esc, s.esc);
+      } else matriz(nad, i, s.x, y, s.z, fl.x, fl.z, s.esc, s.esc, s.esc);
     }
-    nad.instanceMatrix.needsUpdate = true;
+    nad.count = ult + 1; nadPerto.count = k;
+    nad.instanceMatrix.needsUpdate = true; nadPerto.instanceMatrix.needsUpdate = true;
+    if (mudou) for (const c of ['aTorso', 'aPele', 'aCabelo', 'aCalca']) aP[c].needsUpdate = true;
     return n;
   }
 
@@ -868,7 +900,7 @@ uniform float uVidaT; uniform float uAnima;`)
     bondes(sd);
     const nAve = Math.round(NAVE * suave(-4, 8, S.alt ?? 40) * (S.noite > 0.9 ? 0 : 1));
     gaivotas(sd, nAve);
-    const nNad = nadadores(sd, Math.max(nadoQuer(), nadoForcado));
+    const nNad = nadadores(sd, Math.max(nadoQuer(), nadoForcado), camera);
     info.pessoas = Math.round(nPed); info.bicicletas = nBici; info.carros = nCarro; info.bondes = bondeInfo.n; info.gaivotas = nAve; info.nadadores = nNad;
     // contexto para o som ambiente (a cada ~0,4 s)
     if (agora - tCtx > 400) {

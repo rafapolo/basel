@@ -116,7 +116,7 @@
     suavizar(mestre.gain, quer ? 0.9 : 0, quer ? 0.6 : 0.4);
     if (!quer) return;
     const dia = alvo.dia, noite = alvo.noite;
-    suavizar(bus.agua.gain, 0.03 + 0.55 * alvo.agua + 0.04 * alvo.nadadores / 30, 1.2);
+    suavizar(bus.agua.gain, 0.03 + 0.55 * alvo.agua + 0.08 * Math.min(1, alvo.nadadores / 2000) * alvo.agua, 1.2); // respingos: no máximo um pouco mais, e só com o rio à vista
     // zumbido de trânsito: cai de madrugada (3 h) e sobe nas horas de pico
     const h = alvo.hora, transito = 0.25 + 0.75 * Math.max(0, Math.sin(((h - 4) / 20) * Math.PI)) ** 0.6;
     suavizar(bus.cidade.gain, 0.16 * transito, 1.5);
