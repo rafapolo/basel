@@ -42,18 +42,26 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
   const anel = reno.aneis[0];
 
   // ---- máscara e campo de distância assinado (+ dentro da água, − fora) ----
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  // só numa janela em volta do rio (2026-11-20): o recorte inteiro eram 6,6 M células em três passes de chanfro e ~90 MB
+  // de campos guardados; fora da janela é terra a mais de 80 m da água
+  const MJ = 80;
+  let jx0 = Infinity, jz0 = Infinity, jx1 = -Infinity, jz1 = -Infinity;
+  for (const a of reno.aneis) for (let i = 0; i < a.length; i += 2) { jx0 = Math.min(jx0, a[i]); jx1 = Math.max(jx1, a[i]); jz0 = Math.min(jz0, a[i + 1]); jz1 = Math.max(jz1, a[i + 1]); }
+  const JX0 = Math.max(X0, Math.floor(jx0 - MJ)), JZ0 = Math.max(Z0, Math.floor(jz0 - MJ));
+  const JW = Math.min(X0 + W, Math.ceil(jx1 + MJ)) - JX0, JH = Math.min(Z0 + H, Math.ceil(jz1 + MJ)) - JZ0;
+  const cv = document.createElement('canvas'); cv.width = JW; cv.height = JH;
   const cx = cv.getContext('2d', { willReadFrequently: true });
-  cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);
+  cx.fillStyle = '#000'; cx.fillRect(0, 0, JW, JH);
   cx.fillStyle = '#fff';
   for (const a of reno.aneis) {
     cx.beginPath();
-    for (let i = 0; i < a.length; i += 2) cx[i ? 'lineTo' : 'moveTo'](a[i] - X0, a[i + 1] - Z0);
+    for (let i = 0; i < a.length; i += 2) cx[i ? 'lineTo' : 'moveTo'](a[i] - JX0, a[i + 1] - JZ0);
     cx.fill();
   }
-  const px = cx.getImageData(0, 0, W, H).data;
-  const dentro = new Uint8Array(W * H), fora = new Uint8Array(W * H);
-  for (let i = 0; i < W * H; i++) { dentro[i] = px[i * 4] > 127 ? 1 : 0; fora[i] = dentro[i] ? 0 : 1; }
+  const px = cx.getImageData(0, 0, JW, JH).data;
+  cv.width = cv.height = 1; // solta o canvas
+  const dentro = new Uint8Array(JW * JH), fora = new Uint8Array(JW * JH);
+  for (let i = 0; i < JW * JH; i++) { dentro[i] = px[i * 4] > 127 ? 1 : 0; fora[i] = dentro[i] ? 0 : 1; }
   // pilares entram como "terra" para a espuma cercá-los
   const terraPil = Uint8Array.from(fora);
   // pilares: os de reno.json são genéricos (um a cada ~32 m do trecho molhado). Na Mittlere Brücke os arcos de
@@ -68,21 +76,23 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
   for (const p of pil) {
     const r = Math.ceil(Math.max(p.w, p.l) / 2) + 1;
     for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
-      const x = Math.round(p.x - X0) + dx, z = Math.round(p.z - Z0) + dz;
-      if (x < 0 || z < 0 || x >= W || z >= H) continue;
+      const x = Math.round(p.x - JX0) + dx, z = Math.round(p.z - JZ0) + dz;
+      if (x < 0 || z < 0 || x >= JW || z >= JH) continue;
       // elipse alinhada ao fluxo
       const u = dx * FLUXO[0] + dz * FLUXO[1], v = -dx * FLUXO[1] + dz * FLUXO[0];
-      if ((u / (p.l / 2)) ** 2 + (v / (p.w / 2)) ** 2 <= 1) terraPil[z * W + x] = 1;
+      if ((u / (p.l / 2)) ** 2 + (v / (p.w / 2)) ** 2 <= 1) terraPil[z * JW + x] = 1;
     }
   }
-  const dInt = chanfro(fora, W, H), dExt = chanfro(dentro, W, H), dPil = chanfro(terraPil, W, H);
-  const dsig = (x, z) => { // + dentro, − fora (m), por célula
-    const i = clamp(Math.round(z - Z0), 0, H - 1) * W + clamp(Math.round(x - X0), 0, W - 1);
+  const dInt = chanfro(fora, JW, JH), dExt = chanfro(dentro, JW, JH), dPil = chanfro(terraPil, JW, JH);
+  const dsig = (x, z) => { // + dentro, − fora (m), por célula; fora da janela, terra longe
+    const ix = Math.round(x - JX0), iz = Math.round(z - JZ0);
+    if (ix < 0 || iz < 0 || ix >= JW || iz >= JH) return -MJ - 1;
+    const i = iz * JW + ix;
     return dentro[i] ? dInt[i] : -dExt[i];
   };
-  const dados = new Uint8Array(W * H * 2);
-  for (let i = 0; i < W * H; i++) { dados[i * 2] = dentro[i] ? Math.min(255, dPil[i] * 5) : 0; dados[i * 2 + 1] = dentro[i] ? Math.min(255, dInt[i] * 5) : 0; }
-  const texDist = new THREE.DataTexture(dados, W, H, THREE.RGFormat, THREE.UnsignedByteType);
+  const dados = new Uint8Array(JW * JH * 2);
+  for (let i = 0; i < JW * JH; i++) { dados[i * 2] = dentro[i] ? Math.min(255, dPil[i] * 5) : 0; dados[i * 2 + 1] = dentro[i] ? Math.min(255, dInt[i] * 5) : 0; }
+  const texDist = new THREE.DataTexture(dados, JW, JH, THREE.RGFormat, THREE.UnsignedByteType);
   texDist.minFilter = texDist.magFilter = THREE.LinearFilter; texDist.needsUpdate = true;
 
   // ---- cor pela temperatura e turbidez ----
@@ -259,7 +269,7 @@ export async function criaAgua({ THREE, cena, renderer, camera, meta, altura, ru
   // ---- superfície ----
   let mat = null, malha = null, reflexo = false, aoMudarOff = null;
   const U = {
-    uTempo: { value: 0 }, uDist: { value: texDist }, uDim: { value: new THREE.Vector4(X0, Z0, W, H) },
+    uTempo: { value: 0 }, uDist: { value: texDist }, uDim: { value: new THREE.Vector4(JX0, JZ0, JW, JH) },
     uRasa: { value: cRasa }, uFunda: { value: cFunda }, uFluxo: { value: new THREE.Vector2(...FLUXO) },
     uSolDir: { value: new THREE.Vector3(0, 1, 0) }, uSolCor: { value: new THREE.Color(1, 1, 1) }, uSolI: { value: 1 },
     uZenite: { value: new THREE.Color(0.1, 0.2, 0.5) }, uHoriz: { value: new THREE.Color(0.5, 0.6, 0.7) },
