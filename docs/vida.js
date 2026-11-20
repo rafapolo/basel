@@ -906,8 +906,12 @@ uniform float uVidaT; uniform float uAnima;`)
     if (agora - tCtx > 400) {
       tCtx = agora;
       let na = 0, nt = 0;
-      if (alvoCam) for (let dz = -120; dz <= 120; dz += 24) for (let dx = -120; dx <= 120; dx += 24) { nt++; if (ehAgua(alvoCam.x + dx, alvoCam.z + dz)) na++; }
-      window.ambiente?.contexto({ agua: nt ? na / nt : 0, gente: lim(ped.perto() / 45, 0, 1) * lim(nPed / NPED * 2, 0, 1), bonde: bondeInfo.perto, bondeVel: bondeInfo.vel, gaivotas: nAve / NAVE, nadadores: nNad,
+      // o som segue a câmera: a água é medida num raio que cresce com a distância (de perto, só o rio que está ali) e `alto`
+      // (0 rente ao chão, 1 lá de cima) troca a cidade e a gente pelo vento do céu
+      const dCam = alvoCam && camera ? camera.position.distanceTo(alvoCam) : 300, R = lim(dCam * 0.35, 20, 160), pas = R / 5;
+      const alto = lim((Math.max(dCam, camera ? camera.position.y - altura(camera.position.x, camera.position.z) : 0) - 60) / 640, 0, 1);
+      if (alvoCam) for (let dz = -R; dz <= R + 0.1; dz += pas) for (let dx = -R; dx <= R + 0.1; dx += pas) { nt++; if (ehAgua(alvoCam.x + dx, alvoCam.z + dz)) na++; }
+      window.ambiente?.contexto({ agua: nt ? na / nt : 0, alto, gente: lim(ped.perto() / 45, 0, 1) * lim(nPed / NPED * 2, 0, 1), bonde: bondeInfo.perto, bondeVel: bondeInfo.vel, gaivotas: nAve / NAVE, nadadores: nNad,
         noite: S.noite, dia: S.dia01, carros: carro.perto(), hora: h, simT: S.simT });
     }
   }

@@ -7,12 +7,13 @@
 //   bonde      → rumor + chiado de roda pelo bonde em movimento mais perto; "ding-ding" quando um bonde sai da parada
 //   sinos      → batidas das horas em tom de sino de igreja (partes inarmônicas), tantas quantas a hora (relógio do bonde)
 //   gaivotas   → gritos ocasionais de dia, se há aves
+//   vento      → lá de cima (zoom aberto) o vento do céu toma o lugar da rua; de perto voltam cidade, gente e bonde
 // vida.js chama window.ambiente.contexto(...) a cada ~0,4 s e .evento('bonde', força, pan). ?som=debug expõe window.ambienteDebug.
 (() => {
   const CHAVE = 'basel-ambiente';
   const lim = (v, a, b) => Math.max(a, Math.min(b, v));
   let ctx = null, mestre, comp, ligado = true, ativo = false, noTour = false, suspenso = false, ultimaHora = null, tRuf = 0, tGaiv = 0, ultimoSimT = null;
-  const bus = {}, alvo = { agua: 0, gente: 0, bonde: 1e9, bondeVel: 0, gaivotas: 0, noite: 0, dia: 1, hora: 15, carros: 0, nadadores: 0 };
+  const bus = {}, alvo = { alto: 0, agua: 0, gente: 0, bonde: 1e9, bondeVel: 0, gaivotas: 0, noite: 0, dia: 1, hora: 15, carros: 0, nadadores: 0 };
   try { ligado = localStorage.getItem(CHAVE) !== 'off'; } catch {}
 
   function ruido(tipo) {
@@ -66,6 +67,10 @@
     const chiado = fonte('rosa'), fc = filtro('bandpass', 2700, 6), gc = ganho(0.0); chiado.connect(fc).connect(gc).connect(bus.bonde);
     lfo(0.5, 0.05, gc.gain, 0.06); bus.chiado = gc;
     bus.bonde.connect(mestre);
+    // vento do céu: ruído rosa numa banda larga e grave, com rajadas lentas; só lá do alto (zoom aberto)
+    bus.vento = ganho(0);
+    { const fv = filtro('bandpass', 420, 0.45), gv = ganho(0.7); fonte('rosa').connect(fv).connect(gv).connect(bus.vento); lfo(0.07, 0.35, gv.gain, 0.65); lfo(0.05, 160, fv.frequency, 420); }
+    bus.vento.connect(mestre);
   }
 
   function sinoNota(f, t, g, dur = 5, pan = 0) {
@@ -115,15 +120,16 @@
     const quer = ligado && ativo && !noTour;
     suavizar(mestre.gain, quer ? 0.9 : 0, quer ? 0.6 : 0.4);
     if (!quer) return;
-    const dia = alvo.dia, noite = alvo.noite;
-    suavizar(bus.agua.gain, 0.03 + 0.55 * alvo.agua + 0.08 * Math.min(1, alvo.nadadores / 2000) * alvo.agua, 1.2); // respingos: no máximo um pouco mais, e só com o rio à vista
+    const dia = alvo.dia, noite = alvo.noite, perto = 1 - 0.88 * alvo.alto; // zoom: de perto a rua, de cima o vento
+    suavizar(bus.agua.gain, (0.03 + 0.55 * alvo.agua + 0.08 * Math.min(1, alvo.nadadores / 2000) * alvo.agua) * (1 - 0.55 * alvo.alto), 1.2); // respingos: no máximo um pouco mais, e só com o rio à vista
+    suavizar(bus.vento.gain, 0.02 + 0.32 * alvo.alto ** 1.3, 1.5);
     // zumbido de trânsito: cai de madrugada (3 h) e sobe nas horas de pico
     const h = alvo.hora, transito = 0.25 + 0.75 * Math.max(0, Math.sin(((h - 4) / 20) * Math.PI)) ** 0.6;
-    suavizar(bus.cidade.gain, 0.16 * transito, 1.5);
-    suavizar(bus.gente.gain, 0.2 * alvo.gente, 1);
+    suavizar(bus.cidade.gain, 0.16 * transito * (0.35 + 0.65 * perto), 1.5);
+    suavizar(bus.gente.gain, 0.2 * alvo.gente * perto, 1);
     const d = alvo.bonde, vel = lim(alvo.bondeVel / 8, 0, 1);
-    suavizar(bus.bonde.gain, d < 1e8 ? 0.55 * Math.exp(-d / 70) * (0.3 + 0.7 * vel) : 0, 0.4);
-    suavizar(bus.chiado.gain, 0.04 + 0.1 * vel, 0.5);
+    suavizar(bus.bonde.gain, d < 1e8 ? 0.55 * Math.exp(-d / 70) * (0.3 + 0.7 * vel) * perto : 0, 0.4);
+    suavizar(bus.chiado.gain, (0.04 + 0.1 * vel) * perto, 0.5);
   }
 
   function contexto(c) {
