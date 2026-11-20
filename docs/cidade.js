@@ -11,6 +11,7 @@ import { criaAgua } from './agua.js';
 import { criarArvores } from './arvores.js';
 import { criarChao, cotaPonta } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
+import { criarMuralha } from './muralha.js';
 import { decodifica, baixaBin } from './compacta.js';
 import { atualizarNuvens, TEMPO } from './nuvens.js';
 import { injetarNeve, atualizarNeve } from './neve.js';
@@ -396,6 +397,14 @@ AGUA.iniciar({ leve }); // superfície do Reno, depois do céu (usa o sol e a n�
 carga?.etapa(0.92, t('fontes, postes e bancos…', 'fountains, lamps and benches…', 'Brunnen, Laternen und Bänke…'));
 const antesDetalhes = new Set(cena.children);
 if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel, cotaPonte: MARC.cotaPonte });
+// muralha de antes de 1860 (muralha.js): liga e desliga no painel; ?muralha=0 abre sem ela
+const MURALHA = await criarMuralha({ cena, altura }).catch(() => null);
+if (MURALHA) {
+  const cm = $('c-muralha');
+  const ligaMuralha = (on) => { MURALHA.ligar(on); cm.checked = on; renderer.shadowMap.needsUpdate = true; };
+  ligaMuralha(q.get('muralha') !== '0');
+  cm.addEventListener('change', (e) => ligaMuralha(e.target.checked));
+} else $('c-muralha')?.closest('label')?.remove();
 
 // relógio e estação no painel: a hora de Basel (ceu.js segue o relógio real até alguém mexer)
 const ESTACAO = { inverno: ['inverno', 'winter', 'Winter'], primavera: ['primavera', 'spring', 'Frühling'], verao: ['verão', 'summer', 'Sommer'], outono: ['outono', 'autumn', 'Herbst'] };
