@@ -87,7 +87,7 @@ void main() { vec2 d = gl_PointCoord - 0.5; d.x *= mix(1.0, 3.5, vChuva); float 
 // a cada quadro: cobertura (devagar) e densidade dos flocos
 let flocos = null, t0 = null;
 export function atualizarNeve(agora, ceu, cena, camera, leve) {
-  if (!flocos) flocos = criarFlocos({ cena, camera, leve });
+  if (!flocos) { flocos = criarFlocos({ cena, camera, leve }); ceu.semAO?.push(flocos.pts); } // flocos fora do G-buffer do GTAO
   const dt = t0 == null ? 0 : Math.min(0.1, (agora - t0) / 1000); t0 = agora;
   const e = ceu.estado();
   let alvo, cai;

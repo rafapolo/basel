@@ -906,14 +906,15 @@ export function criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, niv
   }
 
   // ---------- integração ----------
-  // esconde os triângulos do LOD2 de `ids` (colapsa em um ponto; some do desenho, da sombra e do raio)
+  // esconde os triângulos do LOD2 de `ids`: pid −2, que o shader dos prédios colapsa num ponto (some do desenho e da sombra).
+  // `posicoes` fica intacta (centro(), fachadas, jogo e tour leem dela); devolve o conjunto, para o raio pular esses sólidos.
+  // (era uma cópia colapsada das posições: 31 MB a mais só para desenhar)
   function esconde(geo) {
     const ocultos = new Set([...Object.values(EG).flatMap(ids), KAPPELI].filter((i) => i >= 0)); // Käppelijoch: refeita acima
-    // `posicoes` fica intacta (centro(), fachadas e tour leem dela); a geometria desenhada ganha uma cópia colapsada
-    const copia = new Float32Array(posicoes);
-    for (let v = 0; v < ids16.length; v++) if (ocultos.has(ids16[v])) { copia[v * 3] = 0; copia[v * 3 + 1] = -50; copia[v * 3 + 2] = 0; }
-    geo.setAttribute('position', new THREE.BufferAttribute(copia, 3));
-    geo.computeBoundingSphere();
+    const pid = geo.attributes.pid;
+    for (let v = 0; v < ids16.length; v++) if (ocultos.has(ids16[v])) pid.array[v] = -2;
+    pid.needsUpdate = true;
+    return ocultos;
   }
   const alvos = new Map(); // pid -> pids irmãos (sólidos do mesmo EGID)
   for (const e of Object.values(EG)) { const l = ids(e); for (const i of l.slice(1)) alvos.set(i, l[0]); }

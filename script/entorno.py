@@ -80,9 +80,10 @@ for p in (agua.geoms if hasattr(agua, "geoms") else [agua]):
     V = np.concatenate(an); fins = np.cumsum([len(a) for a in an]).astype(np.uint32)
     for t in earcut.triangulate_float64(V, fins).reshape(-1, 3):
         tri.extend(np.round(V[t], 1).ravel().tolist())
-(RAIZ / "docs/data/entorno.bin").write_bytes(np.clip(np.round(h * 10), -32000, 32000).astype("<i2").tobytes())
+# entorno.bin: desde 2026-11-20 o site não mostra nem baixa o chão de fora do recorte (só o rio)
+# (RAIZ / "docs/data/entorno.bin").write_bytes(np.clip(np.round(h * 10), -32000, 32000).astype("<i2").tobytes())
 (RAIZ / "docs/data/entorno.json").write_text(json.dumps({
     "fonte": "Copernicus GLO-30 DEM (© DLR e Airbus, uso livre); Reno: OpenStreetMap (ODbL)",
     "nx": nx, "nz": nz, "x0": float(xs[0]), "z0": float(zs[0]), "passo": PASSO, "nivel": nivel,
     "recorte": [RC.X0, RC.Z0, RC.X1, RC.Z1], "agua": tri}, separators=(",", ":")))
-print(f"grade {nx} × {nz}, água {len(tri) // 6} triângulos; entorno.bin {(nx * nz * 2) / 1024:.0f} KB")
+print(f"grade {nx} × {nz}, água {len(tri) // 6} triângulos")

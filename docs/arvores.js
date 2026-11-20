@@ -312,6 +312,7 @@ void main() {
     const m = new THREE.Mesh(g, gramaMat);
     m.receiveShadow = true; m.renderOrder = 1; m.name = 'gramados';
     cena.add(m);
+    ceu.semAO?.push(m); // película sobre o relevo: o chão por baixo já dá a profundidade ao GTAO (0,6 M triângulos a menos)
   }
   estacao(ceu.estado());
 

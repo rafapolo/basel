@@ -5,6 +5,7 @@
 // Também: meio-fio em relevo, trilhos de bonde (bitola de 1 m), fio aéreo e postes.
 // criarChao(THREE, { meta, ruas, orto, nivelReno }) -> { malha, altura, grupo, ruas(on) }
 import { decodifica, baixaBin } from './compacta.js';
+import { ordenarPorBloco, permutar, malhasPorBloco } from './blocos.js';
 
 // cota da ponta de uma ponte do OSM: a ponta costuma cair na beira do cais, onde o relevo já despenca para o rio
 // (a calçada de montante da Mittlere Brücke começava a 2,2 m, rente à água). Vale o maior entre a ponta e o chão
@@ -33,6 +34,9 @@ export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, ba
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(cores, 3));
+  // triângulos por bloco de 300 m (blocos.js): cada bloco é descartado fora da vista e de cada cascata de sombra
+  const { ordem, faixas } = ordenarPorBloco(nt, (t, s) => { const a = idx[t * 3] * 3, b = idx[t * 3 + 1] * 3, d = idx[t * 3 + 2] * 3; s[0] = pos[a] + pos[b] + pos[d]; s[1] = pos[a + 2] + pos[b + 2] + pos[d + 2]; }, 900);
+  permutar(idx, ordem, 3);
   g.setIndex(new THREE.BufferAttribute(idx, 1));
   g.computeVertexNormals();
   { // o three só desenha a face da frente: se a ordem saiu invertida, vira os triângulos
@@ -41,28 +45,27 @@ export async function criarChao(THREE, { meta, ruas, orto, nivelReno, ajuste, ba
     if (s < 0) { for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; } g.computeVertexNormals(); }
   }
 
-  // altura(x, z): o triângulo da malha sob o ponto, rasterizado numa grade de 1 m (consulta em O(1))
-  const P1 = 1, X0 = T.x0, Z0 = T.z0, GN = Math.ceil(((T.nvlado ?? 2048) * T.passo) / P1) + 1;
-  const grade = new Float32Array(GN * GN).fill(NaN);
+  // altura(x, z): o triângulo da malha sob o ponto, rasterizado numa grade de 1 m (consulta em O(1)). Só no recorte e em
+  // centímetros (Int16): o quadrado inteiro do DEM em Float32 eram 97 MB de memória, agora ~13 MB
+  const P1 = 1, X0 = Math.floor(REC.x0), Z0 = Math.floor(REC.z0), GX = Math.ceil(REC.x1 - X0) + 1, GZ = Math.ceil(REC.z1 - Z0) + 1, VAZIO = -32768;
+  const grade = new Int16Array(GX * GZ).fill(VAZIO);
   for (let t = 0; t < idx.length; t += 3) {
     const a = idx[t] * 3, b = idx[t + 1] * 3, d = idx[t + 2] * 3;
     const ax = pos[a], az = pos[a + 2], bx = pos[b], bz = pos[b + 2], dx = pos[d], dz = pos[d + 2];
     const den = (bz - dz) * (ax - dx) + (dx - bx) * (az - dz);
     if (Math.abs(den) < 1e-9) continue;
-    const i0 = Math.max(0, Math.floor((Math.min(ax, bx, dx) - X0) / P1)), i1 = Math.min(GN - 1, Math.ceil((Math.max(ax, bx, dx) - X0) / P1));
-    const j0 = Math.max(0, Math.floor((Math.min(az, bz, dz) - Z0) / P1)), j1 = Math.min(GN - 1, Math.ceil((Math.max(az, bz, dz) - Z0) / P1));
+    const i0 = Math.max(0, Math.floor((Math.min(ax, bx, dx) - X0) / P1)), i1 = Math.min(GX - 1, Math.ceil((Math.max(ax, bx, dx) - X0) / P1));
+    const j0 = Math.max(0, Math.floor((Math.min(az, bz, dz) - Z0) / P1)), j1 = Math.min(GZ - 1, Math.ceil((Math.max(az, bz, dz) - Z0) / P1));
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const px = X0 + i * P1, pz = Z0 + j * P1;
       const l1 = ((bz - dz) * (px - dx) + (dx - bx) * (pz - dz)) / den, l2 = ((dz - az) * (px - dx) + (ax - dx) * (pz - dz)) / den, l3 = 1 - l1 - l2;
       if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue;
-      grade[j * GN + i] = l1 * pos[a + 1] + l2 * pos[b + 1] + l3 * pos[d + 1];
+      grade[j * GX + i] = Math.round((l1 * pos[a + 1] + l2 * pos[b + 1] + l3 * pos[d + 1]) * 100);
     }
   }
+  const h = (a, b) => { if (a < 0 || b < 0 || a >= GX || b >= GZ) return 0; const y = grade[b * GX + a]; return y === VAZIO ? 0 : y / 100; };
   const altura = (x, z) => {
-    const fx = (x - X0) / P1, fz = (z - Z0) / P1;
-    const i = Math.max(0, Math.min(GN - 2, Math.floor(fx))), j = Math.max(0, Math.min(GN - 2, Math.floor(fz)));
-    const u = Math.max(0, Math.min(1, fx - i)), v = Math.max(0, Math.min(1, fz - j));
-    const h = (a, b) => { const y = grade[b * GN + a]; return y === y ? y : 0; };
+    const fx = (x - X0) / P1, fz = (z - Z0) / P1, i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
     return (h(i, j) * (1 - u) + h(i + 1, j) * u) * (1 - v) + (h(i, j + 1) * (1 - u) + h(i + 1, j + 1) * u) * v;
   };
 
@@ -190,8 +193,10 @@ float gRelevo = 0.0; // relevo fino da rua (m), só perto da câmera: vira norma
     }
   }`);
   };
-  const malha = new THREE.Mesh(g, mat);
-  malha.receiveShadow = true;
+  // a primeira Mesh de bloco é a `malha` (material, raio com recursive), as outras são filhas dela
+  const [malha, ...resto] = malhasPorBloco(THREE, g, mat, faixas, pos, 'relevo');
+  for (const m of [malha, ...resto]) m.receiveShadow = true;
+  if (resto.length) malha.add(...resto);
   orto.chao(malha);
 
   // ---------- meio-fio, trilhos, fio e postes ----------
@@ -297,6 +302,6 @@ float gRelevo = 0.0; // relevo fino da rua (m), só perto da câmera: vira norma
     }
   }
   // dentro(x, z): o relevo cobre o ponto? (fora do recorte a grade fica vazia e altura() devolve 0)
-  const dentro = (x, z) => { const i = Math.round((x - X0) / P1), j = Math.round((z - Z0) / P1); return i >= 0 && j >= 0 && i < GN && j < GN && grade[j * GN + i] === grade[j * GN + i]; };
+  const dentro = (x, z) => { const i = Math.round((x - X0) / P1), j = Math.round((z - Z0) / P1); return i >= 0 && j >= 0 && i < GX && j < GZ && grade[j * GX + i] !== VAZIO; };
   return { malha, altura, dentro, grupo, ruas: (on) => { U.uRuasOn.value = on ? 1 : 0; grupo.visible = on; }, estat: { nv, nt } };
 }

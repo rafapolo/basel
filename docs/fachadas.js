@@ -25,7 +25,7 @@ const hash2 = (a, b) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349
 
 export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
   const P = meta.predios, nTris = meta.n_tris, nVert = nTris * 3;
-  const fa = new Float32Array(nVert * 4), fb = new Float32Array(nVert * 4);
+  let fa = new Float32Array(nVert * 4), fb = new Float32Array(nVert * 4); // soltos depois de virar atributo (83 MB)
   const muro = (p) => !p.egid && p.ano == null;
   const velho = (p) => (p.ano ?? 2000) < 1950 ? 1 : 0;
 
@@ -226,6 +226,7 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
 
   // ---- 4. atributos e shader ----
   const atributos = { fa: new THREE.BufferAttribute(fa, 4), fb: new THREE.BufferAttribute(fb, 4) };
+  fa = fb = null; // o atributo segura o array até subir para a GPU (cidade.js, soltarAposSubir)
   Object.assign(U, {
     uFachada: { value: 1 }, uJanelas: { value: 1 }, uTelhaDetalhe: { value: 1 }, uFotoTelhado: { value: 0 },
   });

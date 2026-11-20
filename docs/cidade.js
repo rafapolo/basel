@@ -16,14 +16,15 @@ import { atualizarNuvens, TEMPO } from './nuvens.js';
 import { injetarNeve, atualizarNeve } from './neve.js';
 import { criarRoche } from './roche.js';
 import { criarEntorno } from './entorno.js';
+import { ordenarPorBloco, permutar, malhasPorBloco, soltarAposSubir } from './blocos.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
 
 const carga = window.carga;
 carga?.etapa(0.03, t('baixando os dados…', 'downloading the data…', 'Daten werden geladen…'));
-const binTerreno = baixaBin('data/terreno.v2.bin'); // em paralelo com os prédios: a barra da abertura conta os dois
-const [meta, ruas, bin, rel, RETOQUES] = await Promise.all([
+let binTerreno = baixaBin('data/terreno.v2.bin'); // em paralelo com os prédios: a barra da abertura conta os dois
+let [meta, ruas, bin, rel, RETOQUES] = await Promise.all([
   fetch('data/predios.json').then((r) => r.json()),
   fetch('data/ruas.json').then((r) => r.json()),
   baixaBin('data/predios.v2.bin'),
@@ -40,10 +41,17 @@ const NIVEL_RENO = 2.3; // m acima de BASE_Z (244 m): abaixo disso o relevo é �
 
 // ---------- cena ----------
 const canvas = $('cena');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const leve = q.get('leve') === '1' || (q.get('leve') !== '0' && (matchMedia('(pointer:coarse)').matches || innerWidth < 700 || (navigator.deviceMemory || 8) <= 4));
+// sem MSAA na tela quando há o composer (ele tem o próprio alvo com 4 amostras) e no celular de tela densa (1,5 px por
+// ponto já esconde o serrilhado); o modo leve desenha no máximo 1,5 px por ponto (eram 2: 78% a mais de pixels)
+const PR_MAX = leve ? 1.5 : 2;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: leve && devicePixelRatio < 1.5, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, PR_MAX));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = leve ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+// celular: o sistema derruba o contexto WebGL quando falta memória ou a aba fica no fundo; em vez de uma tela preta, recarrega
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); document.body.classList.add('sem-gl'); });
+canvas.addEventListener('webglcontextrestored', () => location.reload());
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const cena = new THREE.Scene();
 const COR = {
@@ -96,6 +104,7 @@ const AGUA = await criaAgua({ THREE, cena, renderer, camera, meta, altura, ruas,
   const larg = (R.nx - 1) * R.passo, prof = (R.ny - 1) * R.passo;
   // relevo fino e ruas como áreas: docs/chao.js (tarefa 15); o relevo de 5 m (relevo.bin) fica só como reserva
   CH = await criarChao(THREE, { meta, ruas, orto, nivelReno: NIVEL_RENO, ajuste: AGUA.relevo, binTerreno }); // ajuste: leito e margem do Reno (agua.js)
+  binTerreno = null; // o arquivo baixado (8 MB) não fica preso na memória
   cena.add(CH.malha);
 }
 
@@ -202,9 +211,11 @@ const ruasObj = new THREE.Group();
 carga?.etapa(0.76, t('os prédios…', 'the buildings…', 'die Häuser…'));
 const nVert = meta.n_tris * 3;
 // predios.v2.bin (script/compacta.py): vértices únicos + índice; aqui volta à sopa de triângulos de sempre
-const q16 = new Int16Array(nVert * 3), ids16 = new Uint16Array(nVert);
+const ids16 = new Uint16Array(nVert);
+let q16 = new Int16Array(nVert * 3);
 {
   const { cols: [cx, cy, cz, cid], idx } = decodifica(bin, 4, 2);
+  bin = null; // 9 MB
   // giro dos triângulos: o swissBUILDINGS3D chega com quase todo sólido do avesso (1.889 de 1.892: volume assinado
   // negativo, porque z = −norte espelha o LV95). Com FrontSide o three cortava as faces de fora: o telhado (visto de
   // cima) sumia e só se viam as paredes de dentro do lado oposto, "de papel". Aqui cada sólido do avesso é desvirado.
@@ -219,15 +230,23 @@ const q16 = new Int16Array(nVert * 3), ids16 = new Uint16Array(nVert);
     q16[v * 3] = cx[k]; q16[v * 3 + 1] = cy[k]; q16[v * 3 + 2] = cz[k]; ids16[v] = cid[k];
   }
 }
+// triângulos ordenados por bloco de 300 m (blocos.js): cada bloco vira uma Mesh que o three descarta fora da vista e fora
+// de cada cascata de sombra. Tudo o que vem depois (fachadas, marcos, jogo, ficha) lê os arrays já nesta ordem.
+const BLOCOS = (() => {
+  const { ordem, faixas } = ordenarPorBloco(meta.n_tris, (t, s) => { s[0] = q16[t * 9] + q16[t * 9 + 3] + q16[t * 9 + 6]; s[1] = q16[t * 9 + 2] + q16[t * 9 + 5] + q16[t * 9 + 8]; }, 300 * 3 * meta.escala);
+  permutar(q16, ordem, 9); permutar(ids16, ordem, 3);
+  return faixas;
+})();
 const posicoes = new Float32Array(nVert * 3);
 for (let i = 0; i < q16.length; i++) posicoes[i] = q16[i] / meta.escala;
+q16 = null; // 15 MB a menos na memória
 for (let v = 0; v < nVert; v++) { const dz = P[ids16[v]].dz; if (dz) posicoes[v * 3 + 1] -= dz; } // base flutuando sobre o relevo fino (chao.py)
-const aPid = new Float32Array(nVert);
+let aPid = new Float32Array(nVert);
 for (let v = 0; v < nVert; v++) aPid[v] = ids16[v];
 const geo = new THREE.BufferGeometry();
 geo.setAttribute('position', new THREE.BufferAttribute(posicoes, 3));
-geo.setAttribute('pid', new THREE.BufferAttribute(aPid, 1));
-const cores = new Float32Array(nVert * 3);
+geo.setAttribute('pid', new THREE.BufferAttribute(aPid, 1)); aPid = null;
+let cores = new Float32Array(nVert * 3);
 geo.setAttribute('color', new THREE.BufferAttribute(cores, 3));
 geo.computeBoundingSphere();
 
@@ -259,7 +278,7 @@ function colorir() {
   }
   geo.attributes.color.needsUpdate = true;
 }
-colorir();
+colorir(); cores = null; // só uma vez; o atributo solta o array depois de subir (soltarAposSubir)
 
 // destaque do prédio da ficha e noite, no shader (a cidade é a de hoje: sem máquina do tempo)
 const U = { uSel: { value: -1 }, uNoite: { value: 0 } };
@@ -271,7 +290,7 @@ attribute float pid;
 uniform float uSel;
 varying float vEstado; varying float vSel; varying vec3 vMundo; varying float vPid;`;
 const VERT_CORPO = `
-  vec3 transformed = vec3(position);
+  vec3 transformed = pid < -1.5 ? vec3(0.0, -50.0, 0.0) : vec3(position); // pid −2: LOD2 trocado por um marco (marcos.js, esconde)
   vEstado = 0.0; // (era o estado na máquina do tempo; fica 0 para os shaders encadeados que ainda o leem)
   vSel = abs(pid - uSel) < 0.5 ? 1.0 : 0.0;
   vPid = pid;
@@ -295,14 +314,14 @@ const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading
 material.onBeforeCompile = (s) => { injetar(s, true); FACH.injetar(s); };
 // a ortofoto encadeia depois das fachadas: a foto entra logo após <color_fragment> e vira a base da telha
 orto.telhados(material);
-const predios = new THREE.Mesh(geo, material);
-predios.castShadow = predios.receiveShadow = true;
-predios.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-predios.customDepthMaterial.onBeforeCompile = (s) => injetar(s, false);
-predios.frustumCulled = false;
+const predios = new THREE.Group(); predios.name = 'prédios';
+{
+  const prof = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  prof.onBeforeCompile = (s) => injetar(s, false);
+  for (const m of malhasPorBloco(THREE, geo, material, BLOCOS, posicoes, 'prédios')) { m.castShadow = m.receiveShadow = true; m.customDepthMaterial = prof; predios.add(m); }
+}
 cena.add(predios);
 // luz e céu (sol real, CSM, GTAO, bloom): ver ceu.js. Modo leve: ?leve=1, ou automático em celular
-const leve = q.get('leve') === '1' || (q.get('leve') !== '0' && (matchMedia('(pointer:coarse)').matches || innerWidth < 700 || (navigator.deviceMemory || 8) <= 4));
 let arvores; // árvores (arvores.js): o G-buffer do GTAO precisa do recorte de folhas delas
 carga?.etapa(0.82, t('o céu e a luz…', 'sky and light…', 'Himmel und Licht…'));
 const ceu = await iniciarCeu({ cena, renderer, camera, hemi, sol, U, leve, patchNormal: (s) => { const f = s.fragmentShader; injetar(s, false); s.fragmentShader = f; arvores?.patchNormal(s); } });
@@ -310,11 +329,13 @@ arvores = q.get('arvores') === '0' ? null : await criarArvores({ THREE, cena, ca
 // marcos em alta definição (docs/marcos.js): substituem o sólido LOD2 pelo mesmo EGID
 carga?.etapa(0.88, t('o Münster, o Rathaus e as pontes…', 'the Münster, the Rathaus and the bridges…', 'Münster, Rathaus und Brücken…'));
 const MARC = criarMarcos({ renderer, cena, meta, posicoes, ids16, altura, nivelReno: NIVEL_RENO, U });
-MARC.esconde(geo);
+const OCULTOS = MARC.esconde(geo);
+soltarAposSubir(geo.attributes.color, geo.attributes.pid, geo.attributes.fa, geo.attributes.fb); // a GPU guarda; o JS não relê
 
 AGUA.iniciar({ leve }); // superfície do Reno, depois do céu (usa o sol e a névoa dele)
 // detalhes de rua (tarefa 17): fontes, postes, bancos, toldos, bandeiras, balsas e navios; antes do 1º render, para a sombra em cascata pegar
 carga?.etapa(0.92, t('fontes, postes e bancos…', 'fountains, lamps and benches…', 'Brunnen, Laternen und Bänke…'));
+const antesDetalhes = new Set(cena.children);
 if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel, cotaPonte: MARC.cotaPonte });
 
 // relógio e estação no painel: a hora de Basel (ceu.js segue o relógio real até alguém mexer)
@@ -383,8 +404,8 @@ canvas.addEventListener('pointerup', (e) => {
   if (!apertou || Math.hypot(e.clientX - apertou[0], e.clientY - apertou[1]) > 5 || (typeof window.tour?.ativo === "function" && window.tour.ativo()) || window.jogo?.ativo()) return;
   const r = canvas.getBoundingClientRect();
   raio.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
-  const hits = raio.intersectObject(predios, false);
-  const hit = hits[0];
+  const hits = raio.intersectObject(predios, true);
+  const hit = hits.find((h) => !OCULTOS.has(ids16[h.face.a]));
   const hm = MARC.acerta(raio);
   if (hm && (!hit || hm.distance < hit.distance)) abrirFicha(hm.pid);
   else if (hit) abrirFicha(ids16[hit.face.a]); else fecharFicha();
@@ -438,7 +459,7 @@ canvas.addEventListener('dblclick', (e) => {
   if ((typeof window.tour?.ativo === 'function' && window.tour.ativo()) || window.jogo?.ativo()) return;
   const r = canvas.getBoundingClientRect();
   raio.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
-  const chao = raio.intersectObject(CH.malha, false)[0], pr = raio.intersectObject(predios, false)[0];
+  const chao = raio.intersectObject(CH.malha, true)[0], pr = raio.intersectObject(predios, true).find((h) => !OCULTOS.has(ids16[h.face.a]));
   let p = chao?.point;
   // prédio na frente do chão: desce na rua diante da fachada clicada
   if (pr && (!chao || pr.distance < chao.distance)) p = pr.point.clone();
@@ -507,7 +528,9 @@ function porCamera({ alvo, dist, az, polar }) {
 }
 // vista inicial: da Pfalz, atrás do Münster, olhando o Reno e a Mittlere Brücke (eco da vista de Merian)
 // (a Mittlere Brücke fica em x≈25, z≈−204; o Münster em x≈213, z≈211; a câmera fica um pouco além e acima dele)
-const VISTA_PFALZ = { alvo: [25, 4, -190], dist: 540, az: THREE.MathUtils.degToRad(24), polar: THREE.MathUtils.degToRad(70) };
+// celular em pé: o campo horizontal é estreito e a vista de paisagem mostrava só o Reno; mais longe e mais do alto
+const RETRATO = innerHeight > innerWidth * 1.2;
+const VISTA_PFALZ = { alvo: [25, 4, -190], dist: RETRATO ? 900 : 540, az: THREE.MathUtils.degToRad(24), polar: THREE.MathUtils.degToRad(RETRATO ? 58 : 70) };
 porCamera(VISTA_PFALZ);
 // ?cam=<nome>: uma das 6 câmeras fixas de cameras.js (tarefa 21), para comparar com fotos da cidade real
 const CAM = q.get('cam') && (await import('./cameras.js')).CAMERAS[q.get('cam')];
@@ -521,6 +544,22 @@ function redimensionar() {
 }
 addEventListener('resize', redimensionar);
 redimensionar();
+// resolução que se adapta (2026-11-20): se o quadro médio passa de 38 ms por 2,5 s, desenha menos pixels (0,25 por vez, até
+// 0,75 px por ponto no modo leve e 1 no completo); com folga (< 20 ms) volta a subir, nunca antes de 15 s da última descida.
+// ?res=fixa desliga (capturas)
+const RES = { ema: 16, t: 0, pr: renderer.getPixelRatio(), min: leve ? 0.75 : 1, max: Math.min(devicePixelRatio, PR_MAX), baixou: -1e9, on: q.get('res') !== 'fixa' };
+window.resolucao = RES;
+function adaptarResolucao(dt, agora) {
+  if (!RES.on) return;
+  if (dt > 250) { RES.t = 0; return; } // aba voltando do fundo, carga de tiles: não conta
+  RES.ema += (dt - RES.ema) * 0.05; RES.t += dt;
+  if (RES.t < 2500) return;
+  RES.t = 0;
+  let novo = RES.pr;
+  if (RES.ema > 38 && RES.pr > RES.min) { novo = Math.max(RES.min, RES.pr - 0.25); RES.baixou = agora; }
+  else if (RES.ema < 20 && RES.pr < RES.max && agora - RES.baixou > 15000) novo = Math.min(RES.max, RES.pr + 0.25);
+  if (novo !== RES.pr) { RES.pr = novo; renderer.setPixelRatio(novo); redimensionar(); }
+}
 
 // a câmera para o som: distância, inclinação, rumo, velocidade e giro (lidos por som.js)
 const camSom = { dist: 400, polar: 1, az: 0, vel: 0, giro: 0 };
@@ -531,11 +570,13 @@ const cNoite = { hemi: new THREE.Color(0x4a5a86), hemiChao: new THREE.Color(0x1d
 let tQuadro = 0;
 function quadro(agora) {
   requestAnimationFrame(quadro);
-  andarRua(Math.min(0.05, (agora - (tQuadro || agora)) / 1000)); tQuadro = agora;
+  const dtq = agora - (tQuadro || agora);
+  andarRua(Math.min(0.05, dtq / 1000)); tQuadro = agora;
+  adaptarResolucao(dtq, agora);
   if (!(typeof window.tour?.ativo === "function" && window.tour.ativo()) && !window.jogo?.ativo()) controls.update();
   // nunca abaixo do chão nem dentro do Reno: a câmera fica ao menos 1,5 m acima do relevo (ou da água)
-  { const p = camera.position, T = meta.terreno, L = (T.nvlado ?? 2048) * T.passo;
-    const fora = p.x < T.x0 || p.z < T.z0 || p.x > T.x0 + L || p.z > T.z0 + L, h = fora ? (ENTORNO ? ENTORNO.altura(p.x, p.z) : 0) : altura(p.x, p.z); // fora: o relevo do entorno
+  { const p = camera.position;
+    const h = foraREC(p.x, p.z) ? 0 : altura(p.x, p.z); // fora do recorte só há o Reno
     const piso = Math.max(Number.isFinite(h) ? h : 0, AGUA.nivel) + 1.5;
     if (p.y < piso) p.y = piso;
     const t = controls.target, pisoT = altura(t.x, t.z) - 2; if (t.y < pisoT) t.y = pisoT; }
@@ -602,6 +643,9 @@ $('c-vida').addEventListener('change', (e) => VIDA.ligar(e.target.checked));
 // Fasnacht (fasnacht.js): Cliques pelas ruas do centro nos três dias reais, ou quando o tour chega em fevereiro
 const MOD_FAS = await import('./fasnacht.js'), FAS = MOD_FAS.criarFasnacht({ cena, altura, ruas, ceu }), FAS_SEG = MOD_FAS.segundaFasnacht;
 if (q.get('vida') === '0') { $('c-vida').checked = false; VIDA.ligar(false); }
+// fora do G-buffer do GTAO: tudo o que entrou na cena desde os detalhes (postes, bancos, gente, bondes, Cliques, o Reno de
+// fora), menos as torres da Roche, que fazem sombra de contato de verdade
+for (const o of cena.children) if (!antesDetalhes.has(o) && o !== ROCHE?.malha) ceu.semAO.push(o);
 relogio(ceu.estado()); ceu.aoMudar(relogio);
 if (q.get('noite')) definirNoite(true);
 if (CAM) {
@@ -610,6 +654,12 @@ if (CAM) {
   porCamera({ alvo: a, dist: CAM.dist, az: THREE.MathUtils.degToRad(CAM.az), polar: THREE.MathUtils.degToRad(CAM.polar) });
   controls.update();
 }
+// shaders compilados antes de tirar a tela de abertura, em paralelo quando o navegador tem KHR_parallel_shader_compile: sem
+// isso o primeiro quadro compilava tudo de uma vez e a cidade aparecia congelada (1,3 s num M4; vários no celular)
+carga?.etapa(0.98, t('preparando a luz e as cores…', 'preparing light and colour…', 'Licht und Farben…'));
+ceu.ligarSombras?.();
+await renderer.compileAsync(cena, camera).catch(() => {});
+try { ceu.render(); } catch {} // um quadro ainda atrás da abertura: compila o que sobra (sombras, G-buffer do GTAO, composer)
 requestAnimationFrame(quadro);
 orto.carrega(); // tiles chegam depois da abertura
 carga?.etapa(1, '');
@@ -630,7 +680,7 @@ function centro(nome) {
 }
 
 window.cidade = {
-  THREE, FACH, MARC, U, camera, arvores, centro, controls, lerCamera, porCamera, definirNoite, fecharFicha, abrirFicha,
+  THREE, FACH, MARC, U, camera, renderer, arvores, centro, controls, lerCamera, porCamera, definirNoite, fecharFicha, abrirFicha,
   noite: () => ceu.estado().noite > 0.5, estat, VISTA_PFALZ, altura, ceu, cena, sairRua, rua: () => RUA.on, fasnacht: () => FAS, fasnachtSegunda: (a) => FAS_SEG(a),
   // para o modo jogo (jogo.js): plantas dos prédios, pontes e o Reno
   posicoes, nTris: meta.n_tris, ruas, cotaPonta, cotaPonte: MARC.cotaPonte, nivelReno: AGUA.nivel, relevo: R, ponte: MITTLERE,

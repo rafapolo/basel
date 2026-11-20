@@ -133,6 +133,7 @@ const ceu = {
 window.ceu = ceu;
 
 // ---------- cena: céu, luzes, sombras e pós-processamento ----------
+ceu.semAO = [];
 export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNormal, leve = false, pixelMax = 1.5 }) {
   ceu.leve = leve;
   const q = new URLSearchParams(location.search);
@@ -219,6 +220,10 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
     gtao.updateGtaoMaterial({ radius: 6, distanceExponent: 1.5, thickness: 6, scale: 1.1, samples: 8, distanceFallOff: 1, screenSpaceRadius: false });
     gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 8 });
     gtao.blendIntensity = 0.9;
+    // o G-buffer do GTAO desenhava a cena inteira de novo, gente, detalhes e confete inclusive (milhões de triângulos que
+    // quase não fazem sombra de contato): os objetos em ceu.semAO ficam fora desse passe
+    { const orig = gtao.renderOverride.bind(gtao), esc = [];
+      gtao.renderOverride = (...a) => { esc.length = 0; for (const o of ceu.semAO) if (o.visible) { o.visible = false; esc.push(o); } orig(...a); for (const o of esc) o.visible = true; }; }
     if (q.get('dbg') === 'ao') gtao.output = GTAOPass.OUTPUT.AO; if (q.get('dbg') === 'normal') gtao.output = GTAOPass.OUTPUT.Normal;
     // o G-buffer do GTAO também precisa da máquina do tempo (prédios que sobem), senão o AO erra com o ano < 2026
     gtao.normalMaterial.flatShading = true; // os prédios não têm atributo normal (o material deles usa flatShading)
@@ -323,6 +328,7 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
   }
 
   ceu.atualizar = atualizar;
+  ceu.ligarSombras = () => { if (!csmPronto) ligarCSM(); }; // antes do compileAsync da abertura (cidade.js)
   ceu.redimensionar = (w, h) => {
     if (composer) { composer.setPixelRatio(Math.min(renderer.getPixelRatio(), pixelMax)); composer.setSize(w, h); ceu.aoMeia(); csm.updateFrustums(); }
   };
