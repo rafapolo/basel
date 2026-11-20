@@ -71,9 +71,72 @@ export function criaOrtofoto(THREE, renderer, controls, base = 'data/ortofoto/')
   }`);
       }, 'telhado');
     },
+    // KTX2 (2026-11-20, script/ortofoto_ktx2.py): tiles em Basis ETC1S transcodificados para o formato comprimido da GPU
+    // (BC1, ETC2 ou ASTC: 4 bits por pixel). A foto inteira de 5120 px fica em ~18 MB de memória de vídeo, contra ~140 MB em
+    // RGBA (e 5120 px também no celular, que antes ia a 4096). Os tiles entram por compressedTexSubImage2D nos níveis 0–8 de
+    // uma textura comprimida alocada vazia; a geral de 512 px mostra a cidade até o último tile chegar. Sem suporte, false:
+    // fica o caminho webp.
+    // o carregador e a detecção de formatos (getExtension espera a GPU: ~0,5 s) ainda atrás da tela de abertura
+    prepararKTX2() {
+      return (this.ktx2 ??= import('three/addons/loaders/KTX2Loader.js').then(({ KTX2Loader }) => new KTX2Loader().setTranscoderPath(new URL('data/basis/', location.href).href).detectSupport(renderer)));
+    },
+    // só no celular e no modo leve (?ktx2=1 força, ?ktx2=0 desliga): no Chromium o envio de blocos comprimidos ainda trava
+    // 0,1–0,4 s por tile; no computador sobra memória de vídeo e o webp entra liso
+    querKTX2() {
+      const p = new URLSearchParams(location.search);
+      return p.get('ktx2') === '1' || (p.get('ktx2') !== '0' && (p.get('leve') === '1' || (p.get('leve') !== '0' && matchMedia('(pointer:coarse)').matches)));
+    },
+    async carregaKTX2(meta) {
+      const N = meta.grade, LADO = meta.lado, tam = N * LADO, NIV = 9; // nível 8: tile de 4 px, textura de 20 px (múltiplos do bloco 4×4)
+      if (tam > renderer.capabilities.maxTextureSize || LADO >> (NIV - 1) < 4) return false;
+      const ld = await (this.ktx2 ?? this.prepararKTX2());
+      const gl = renderer.getContext();
+      // o mesmo conversor de formatos do three: o enum que ele usou no texStorage2D é o que os envios por pedaço precisam
+      const utils = new THREE.WebGLUtils(gl, renderer.extensions), glFormato = (t) => utils.convert(t.format, t.colorSpace);
+      const fila = [];
+      for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) fila.push({ i, j, d: Math.hypot(meta.x0 + ((i + 0.5) * (meta.x1 - meta.x0)) / N - controls.target.x, meta.z0 + ((j + 0.5) * (meta.z1 - meta.z0)) / N - controls.target.z) });
+      fila.sort((a, b) => a.d - b.d);
+      // o primeiro tile decide o formato (e se a GPU aceita); a geral de 512 px entra enquanto isso
+      const [primeiro, geral] = await Promise.all([ld.loadAsync(base + `t_${fila[0].i}_${fila[0].j}.ktx2`), fetch(base + 'geral.webp').then((r) => r.blob()).then((b) => createImageBitmap(b))]);
+      const fmt = glFormato(primeiro);
+      if (!fmt || primeiro.mipmaps.length < NIV) { primeiro.dispose(); ld.dispose(); return false; }
+      const texG = new THREE.Texture(geral); texG.colorSpace = THREE.SRGBColorSpace; texG.flipY = false; texG.anisotropy = 4; texG.needsUpdate = true;
+      U.uOrto.value = texG;
+      U.uOrtoRet.value.set(meta.x0, meta.z0, 1 / (meta.x1 - meta.x0), 1 / (meta.z1 - meta.z0));
+      U.uOrtoChao.value = 1; U.uOrtoTelhado.value = 1;
+      pronto = true;
+      // a grande: só alocada (dataReady = false: o three faz o texStorage2D e não envia nada)
+      const niveis = []; for (let l = 0; l < NIV; l++) niveis.push({ data: null, width: tam >> l, height: tam >> l });
+      const tex = new THREE.CompressedTexture(niveis, tam, tam, primeiro.format, primeiro.type);
+      tex.colorSpace = primeiro.colorSpace; tex.flipY = false; tex.generateMipmaps = false;
+      tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+      tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      tex.source.dataReady = false; tex.needsUpdate = true;
+      renderer.initTexture(tex);
+      const glt = renderer.properties.get(tex).__webglTexture;
+      if (!glt) { tex.dispose(); primeiro.dispose(); ld.dispose(); return false; }
+      const sobe = (t, i, j) => {
+        renderer.state.bindTexture(gl.TEXTURE_2D, glt);
+        for (let l = 0; l < NIV; l++) { const m = t.mipmaps[l]; gl.compressedTexSubImage2D(gl.TEXTURE_2D, l, (i * LADO) >> l, (j * LADO) >> l, m.width, m.height, fmt, m.data); }
+        t.dispose();
+      };
+      // um tile por quadro, numa fila só (vários envios de uma vez enchiam o buffer de transferência e travavam o quadro)
+      const quadro = () => new Promise((ok) => requestAnimationFrame(ok));
+      let vez = quadro();
+      const envia = (t, i, j) => (vez = vez.then(quadro).then(() => sobe(t, i, j)));
+      envia(primeiro, fila[0].i, fila[0].j); fila.shift();
+      let feitos = 1;
+      const trabalha = async () => { while (fila.length) { const { i, j } = fila.shift(); await envia(await ld.loadAsync(base + `t_${i}_${j}.ktx2`), i, j); feitos++; } };
+      await Promise.all([trabalha(), trabalha(), trabalha()]);
+      await vez;
+      U.uOrto.value = tex; texG.dispose(); geral.close?.(); ld.dispose();
+      window.ortofotoTiles = feitos; window.ortofotoFormato = primeiro.format;
+      return true;
+    },
     async carrega() {
       const meta = await fetch(base + 'ortofoto.json').then((r) => r.json());
       const N = meta.grade, LADO = meta.lado;
+      if (this.querKTX2() && (await this.carregaKTX2(meta).catch((e) => { console.warn('ortofoto KTX2:', e); return false; }))) return;
       // 5120 px fora do modo leve (o recorte de 3,4 km a 4096 px ficava com 0,83 m/px); celular e modo leve seguem em 4096
       const leve = new URLSearchParams(location.search).get('leve') === '1' || matchMedia('(pointer:coarse)').matches;
       const tam = Math.min(N * LADO, renderer.capabilities.maxTextureSize, leve ? 4096 : 5120);

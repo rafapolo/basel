@@ -658,6 +658,7 @@ if (CAM) {
 // isso o primeiro quadro compilava tudo de uma vez e a cidade aparecia congelada (1,3 s num M4; vários no celular)
 carga?.etapa(0.98, t('preparando a luz e as cores…', 'preparing light and colour…', 'Licht und Farben…'));
 ceu.ligarSombras?.();
+if (orto.querKTX2()) await orto.prepararKTX2().catch(() => {}); // foto aérea comprimida (celular): a detecção espera a GPU, melhor aqui
 await renderer.compileAsync(cena, camera).catch(() => {});
 try { ceu.render(); } catch {} // um quadro ainda atrás da abertura: compila o que sobra (sombras, G-buffer do GTAO, composer)
 requestAnimationFrame(quadro);
