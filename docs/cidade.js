@@ -232,8 +232,12 @@ let q16 = new Int16Array(nVert * 3);
 }
 // triângulos ordenados por bloco de 300 m (blocos.js): cada bloco vira uma Mesh que o three descarta fora da vista e fora
 // de cada cascata de sombra. Tudo o que vem depois (fachadas, marcos, jogo, ficha) lê os arrays já nesta ordem.
+// O bloco é o do centro do prédio, não o de cada triângulo: o prédio fica inteiro num bloco e, como a ordenação é estável,
+// com os triângulos na ordem original (as trapeiras e chaminés sorteadas por fachadas.js não mudam com os blocos)
 const BLOCOS = (() => {
-  const { ordem, faixas } = ordenarPorBloco(meta.n_tris, (t, s) => { s[0] = q16[t * 9] + q16[t * 9 + 3] + q16[t * 9 + 6]; s[1] = q16[t * 9 + 2] + q16[t * 9 + 5] + q16[t * 9 + 8]; }, 300 * 3 * meta.escala);
+  const sx = new Float64Array(P.length), sz = new Float64Array(P.length), sn = new Uint32Array(P.length);
+  for (let t = 0; t < meta.n_tris; t++) { const id = ids16[t * 3]; sx[id] += q16[t * 9] + q16[t * 9 + 3] + q16[t * 9 + 6]; sz[id] += q16[t * 9 + 2] + q16[t * 9 + 5] + q16[t * 9 + 8]; sn[id]++; }
+  const { ordem, faixas } = ordenarPorBloco(meta.n_tris, (t, s) => { const id = ids16[t * 3]; s[0] = sx[id] / sn[id]; s[1] = sz[id] / sn[id]; }, 300 * 3 * meta.escala);
   permutar(q16, ordem, 9); permutar(ids16, ordem, 3);
   return faixas;
 })();
