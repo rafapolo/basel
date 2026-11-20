@@ -62,7 +62,9 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
       const h = Math.hypot(nx, nz), tx = -nz / h, tz = nx / h;
       const d = nx * ax + nz * az;
       const chave = ((id * 81 + Math.round(nx * 40) + 40) * 81 + Math.round(nz * 40) + 40) * 65536 + Math.round(d * 5) + 32768;
-      let gi = paredes.get(chave);
+      // parede quase plana partida entre faixas vizinhas de d (0,2 m): junta com a vizinha que já existe, senão cada pedaço
+      // tinha comprimento e beiral próprios e triângulos inteiros ficavam sem janela
+      let gi = paredes.get(chave) ?? paredes.get(chave - 1) ?? paredes.get(chave + 1);
       if (gi === undefined) {
         gi = grupos.length; paredes.set(chave, gi);
         grupos.push({ id, tx, tz, umin: 1e9, umax: -1e9, ymin: 1e9, ymax: -1e9, tris: [] });
@@ -93,6 +95,7 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
   // ---- 2. por parede: comprimento, beiral (aresta horizontal mais alta que cruza a parede) e andares ----
   // beiral: a cota (em dm) mais alta cuja faixa de vértices cobre metade da parede; cotas distintas são poucas por parede,
   // então busca linear em arrays reaproveitados (era um Map, um spread e um sort por parede)
+  const fotoMax = new Map(); // prédio → comprimento do maior pedaço da fachada lida de foto
   let yk = new Int32Array(64), umn = new Float64Array(64), umx = new Float64Array(64);
   for (const g of grupos) {
     const len = g.umax - g.umin;
@@ -108,7 +111,13 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
       if (u < umn[j]) umn[j] = u; if (u > umx[j]) umx[j] = u;
     }
     let eave = g.ymax, melhor = -Infinity;
-    for (let j = 0; j < m; j++) if (yk[j] > melhor && umx[j] - umn[j] >= 0.5 * len) melhor = yk[j];
+    // a faixa de cada cota junta os vértices até 0,5 m abaixo dela: os cantos de uma empena a 15,8 e 16,2 m são o mesmo beiral
+    for (let j = 0; j < m; j++) {
+      if (yk[j] <= melhor) continue;
+      let a = umn[j], b = umx[j];
+      for (let k = 0; k < m; k++) if (yk[k] < yk[j] && yk[k] >= yk[j] - 5) { if (umn[k] < a) a = umn[k]; if (umx[k] > b) b = umx[k]; }
+      if (b - a >= 0.5 * len) melhor = yk[j];
+    }
     if (melhor > -Infinity) eave = melhor / 10;
     const hW = Math.max(1, eave - g.ymin);
     const p = P[g.id];
@@ -122,7 +131,21 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
     // Münster é o caso clássico), não prédio: pedra de cantaria e nenhuma janela, porta ou vitrine (material 3)
     g.mat = (muro(p) ? 3 : (p.mat ?? 0)) + 10 * velho(p);
     g.loja = muro(p) ? 0 : (p.lj ?? 0);
+    // lido de foto (retoques.json, script/fachadas_reno.py): janelas por andar e cor das venezianas na fachada virada para
+    // `frente` (graus, 0 = norte, 90 = leste); empacotado em fb.z junto com a loja: loja + 10·janelas + 1000·(cor RGB 4+4+4 bits + 1)
+    if (p.frente != null && (p.jan || p.ven)) {
+      const az = Math.atan2(g.tz, g.tx) * 180 / Math.PI; // normal para fora = (tz, −tx): az = atan2(nx, −nz), 0 = −z (norte), 90 = +x (leste)
+      const dif = Math.abs(((az - p.frente) % 360 + 540) % 360 - 180);
+      if (dif < 35) {
+        g.jan = p.jan ?? 0; // por enquanto o total; abaixo vira proporcional ao comprimento de cada pedaço
+        if (g.jan) fotoMax.set(g.id, Math.max(fotoMax.get(g.id) ?? 0, len));
+        if (p.ven) { const c = new THREE.Color(p.ven); g.ven = 1 + (Math.round(c.r * 15) << 8 | Math.round(c.g * 15) << 4 | Math.round(c.b * 15)); }
+      }
+    }
   }
+  // a fachada lida de foto pode vir partida em pedaços (parede não plana no LOD2): as janelas da foto valem para o maior,
+  // e cada pedaço ganha colunas no mesmo espaçamento
+  for (const g of grupos) if (g.jan) g.jan = Math.min(60, Math.max(1, Math.round((g.len * g.jan) / fotoMax.get(g.id))));
   for (let t = 0; t < nTris; t++) {
     const gi = triParede[t];
     if (gi >= 0) {
@@ -131,7 +154,7 @@ export function criarFachadas({ cena, meta, posicoes, ids16, U }) {
         const v = (t * 3 + k) * 4;
         fa[v] = posicoes[t * 9 + k * 3] * g.tx + posicoes[t * 9 + k * 3 + 2] * g.tz - g.umin;
         fa[v + 1] = posicoes[t * 9 + k * 3 + 1] - g.ymin; fa[v + 2] = g.len; fa[v + 3] = g.hW;
-        fb[v] = g.nF; fb[v + 1] = g.mat; fb[v + 2] = g.loja; fb[v + 3] = g.seed;
+        fb[v] = g.nF; fb[v + 1] = g.mat; fb[v + 2] = g.loja + 10 * (g.jan ?? 0) + 1000 * (g.ven ?? 0); fb[v + 3] = g.seed;
       }
       continue;
     }
@@ -299,7 +322,9 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
     } else if (vFa.z > 0.5 && uJanelas > 0.5) {
       // ---- parede ----
       float u = vFa.x, v = vFa.y, len = vFa.z, hW = vFa.w, nF = vFb.x, wseed = vFb.w;
-      float mat = mod(vFb.y, 10.0), antigo = step(9.5, vFb.y), loja = vFb.z;
+      float mat = mod(vFb.y, 10.0), antigo = step(9.5, vFb.y), loja = mod(vFb.z, 10.0);
+      float janFoto = mod(floor(vFb.z / 10.0), 100.0), venFoto = floor(vFb.z / 1000.0); // lidos de foto (0 = procedural)
+      vec3 venCor = vec3(floor((venFoto - 1.0) / 256.0), mod(floor((venFoto - 1.0) / 16.0), 16.0), mod(venFoto - 1.0, 16.0)) / 15.0;
       float lw = max(fwidth(u), fwidth(v));            // metros por pixel
       vec3 parede = diffuseColor.rgb;
       // material
@@ -331,7 +356,7 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
         parede *= mix(0.80, 1.0, smoothstep(0.0, 1.6, v)) * mix(0.9, 1.0, smoothstep(0.0, 0.5, hW - v));
       }
       if (len > 1.3 && v < hW + 0.01 && mat < 2.5) {
-        float cols = max(1.0, floor(len / (2.5 + 1.3 * vPred) + 0.5));
+        float cols = janFoto > 0.5 ? janFoto : max(1.0, floor(len / (2.5 + 1.3 * vPred) + 0.5));
         float cw = len / cols, cu = u / cw, ci = clamp(floor(cu), 0.0, cols - 1.0), fu = cu - ci;
         float fh = hW / max(nF, 1.0), cv = v / fh, ri = floor(cv), fv = cv - ri;
         float dist = 1.0 - smoothstep(0.15, 0.6, lw);     // 1 perto, 0 longe (começava a 0,30 m/px: janelas de 3 px cintilavam)
@@ -377,18 +402,18 @@ vec3 telhadoCor(vec3 base, vec3 mundo) { ${ganchos.telhadoCor} }`;
           float peit = step(yy - 0.05, fv) * step(fv, yy) * step(x0 - 0.04, fu) * step(fu, 1.0 - x0 + 0.04) * step(0.5, fino);
           if (peit > 0.5 && tem < 0.5) { cJan = vec3(0.80, 0.77, 0.71); tem = 1.0; }
           // persianas: só em reboco antigo, sorteadas por prédio
-          if (mat < 0.5 && antigo > 0.5 && fh21(vec2(vPidF, 31.0)) > 0.42 && tem < 0.5) {
+          if (mat < 0.5 && (venFoto > 0.5 || (antigo > 0.5 && fh21(vec2(vPidF, 31.0)) > 0.42)) && tem < 0.5) {
             float inS = (step(x0 - 0.17, fu) * step(fu, x0 - 0.01) + step(1.0 - x0 + 0.01, fu) * step(fu, 1.0 - x0 + 0.17)) * step(yy, fv) * step(fv, yy + wH);
             if (inS > 0.5) {
               float k = fh21(vec2(vPidF, 32.0));
-              vec3 cs = k < 0.3 ? vec3(0.22, 0.38, 0.26) : k < 0.55 ? vec3(0.50, 0.55, 0.52) : k < 0.8 ? vec3(0.44, 0.47, 0.50) : vec3(0.42, 0.20, 0.16);
+              vec3 cs = venFoto > 0.5 ? venCor : k < 0.3 ? vec3(0.22, 0.38, 0.26) : k < 0.55 ? vec3(0.50, 0.55, 0.52) : k < 0.8 ? vec3(0.44, 0.47, 0.50) : vec3(0.42, 0.20, 0.16);
               cs *= 1.0 - 0.18 * smoothstep(0.35, 0.65, abs(fract(fv * fh / 0.07) - 0.5)) * fino;
               cJan = cs; tem = 1.0;
             }
             // algumas fechadas: as duas folhas sobre o vidro
             if (fh21(vec2(ci, ri) + vPidF * 3.1) > 0.82 && inW > 0.5) {
               float k = fh21(vec2(vPidF, 32.0));
-              vec3 cs = k < 0.3 ? vec3(0.22, 0.38, 0.26) : k < 0.55 ? vec3(0.50, 0.55, 0.52) : k < 0.8 ? vec3(0.44, 0.47, 0.50) : vec3(0.42, 0.20, 0.16);
+              vec3 cs = venFoto > 0.5 ? venCor : k < 0.3 ? vec3(0.22, 0.38, 0.26) : k < 0.55 ? vec3(0.50, 0.55, 0.52) : k < 0.8 ? vec3(0.44, 0.47, 0.50) : vec3(0.42, 0.20, 0.16);
               cs *= 1.0 - 0.18 * smoothstep(0.35, 0.65, abs(fract(fv * fh / 0.07) - 0.5)) * fino;
               cJan = mix(cs, cs * 0.7, step(abs(fu - 0.5), 0.008)); vidro = 0.0;
             }

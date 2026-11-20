@@ -11,5 +11,7 @@
  "454111": {"parede": "#ecebe5", "telhado": "#4e4a48", "fonte": "Café Spitz / Hotel Merian"},
  "243057824": {"parede": "#d4cdbd", "telhado": "#6f9a86", "fonte": "Bahnhof SBB (pedra clara, cúpulas de cobre verde)"},
  "243000741": {"parede": "#e2d8c0", "fonte": "Naturhistorisches Museum / Museum der Kulturen"},
- "243000173": {"parede": "#ece6d6", "telhado": "#5b4a40", "fonte": "Antikenmuseum"}
+ "243000173": {"parede": "#ece6d6", "telhado": "#5b4a40", "fonte": "Antikenmuseum"},
+ "454113": {"parede": "#ebe5d6", "jan": 9, "ven": "#a8a49a", "frente": 225, "fonte": "foto: https://commons.wikimedia.org/wiki/File:Basel,_de_Oberer_Rheinweg_vanaf_de_Mittleren_Br%C3%BCcke_IMG_1437_2022-05-14_20.01.jpg (Michielverbeek, CC BY-SA 4.0)"},
+ "454199": {"parede": "#ece8e0", "mat": 0, "jan": 6, "ven": "#7a2c2a", "frente": 240, "fonte": "foto: https://commons.wikimedia.org/wiki/File:Unterer_Rheinweg_14_in_Basel_(2023).jpg (JoachimKohler-HB, CC BY-SA 4.0)"}
 }
