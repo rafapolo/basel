@@ -12,6 +12,7 @@ import { criarArvores } from './arvores.js';
 import { criarChao, cotaPonta } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
 import { criarMuralha } from './muralha.js';
+import { criarFlores } from './flores.js';
 import { criarFronteira } from './fronteira.js';
 import { decodifica, baixaBin } from './compacta.js';
 import { atualizarNuvens, TEMPO } from './nuvens.js';
@@ -400,6 +401,8 @@ AGUA.iniciar({ leve }); // superfície do Reno, depois do céu (usa o sol e a n�
 carga?.etapa(0.92, t('fontes, postes e bancos…', 'fountains, lamps and benches…', 'Brunnen, Laternen und Bänke…'));
 const antesDetalhes = new Set(cena.children);
 if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel, cotaPonte: MARC.cotaPonte });
+// flores pela estação (flores.js): vasos nos fontanários, canteiros e gramados; ?flores=0 abre sem elas
+if (q.get('flores') !== '0' && q.get('detalhes') !== '0') await criarFlores({ cena, altura, ceu, leve }).catch(() => null);
 // muralha de antes de 1860 (muralha.js): liga e desliga no painel; ?muralha=0 abre sem ela
 const MURALHA = await criarMuralha({ cena, altura }).catch(() => null);
 if (MURALHA) {
