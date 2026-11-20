@@ -90,9 +90,13 @@ T = meta["terreno"]; L = T.get("nvlado", 2048) * T["passo"]
 terreno = box(T["x0"], T["z0"], T["x0"] + L, T["z0"] + L)
 fora = terreno.difference(CH).simplify(1.0)
 fora_l = [list(np.round(np.array(p.exterior.coords)[:-1], 1).ravel()) for p in (fora.geoms if hasattr(fora, "geoms") else [fora]) if p.geom_type == "Polygon" and p.area > 50]
+# o país numa janela de 40 km (simplificado a 15 m): o chão escuro de fora do recorte (fundo.js) fica mais escuro fora da Suíça
+JAN = 20000
+pais = CH.intersection(box(-JAN, -JAN, JAN, JAN)).simplify(15.0)
+pais_l = [list(np.round(np.array(p.exterior.coords)[:-1], 0).ravel()) for p in (pais.geoms if hasattr(pais, "geoms") else [pais]) if p.geom_type == "Polygon" and p.area > 1e4]
 out = {
     "fonte": "swissBOUNDARIES3D (© swisstopo), via api3.geo.admin.ch; relevo: swissALTI3D e Copernicus GLO-30",
-    "nacional": linhas(nac), "cantao": linhas(cant), "fora": [[float(v) for v in a] for a in fora_l],
+    "nacional": linhas(nac), "cantao": linhas(cant), "fora": [[float(v) for v in a] for a in fora_l], "janela": JAN, "pais": [[float(v) for v in a] for a in pais_l],
 }
 (RAIZ / "docs/data/fronteira.json").write_text(json.dumps(out, separators=(",", ":")))
 print(f"nacional {nac.length / 1000:.1f} km · cantão {cant.length / 1000:.1f} km · fora do país no terreno {fora.area / 1e6:.2f} km² em {len(fora_l)} polígonos")

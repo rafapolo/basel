@@ -13,6 +13,7 @@ import { criarChao, cotaPonta } from './chao.js';
 import { criarDetalhes } from './detalhes.js';
 import { criarMuralha } from './muralha.js';
 import { criarFlores } from './flores.js';
+import { criarFundo } from './fundo.js';
 import { criarFronteira } from './fronteira.js';
 import { decodifica, baixaBin } from './compacta.js';
 import { atualizarNuvens, TEMPO } from './nuvens.js';
@@ -92,7 +93,8 @@ function porCamera({ alvo, dist, az, polar }) {
 // (a Mittlere Brücke fica em x≈25, z≈−204; o Münster em x≈213, z≈211; a câmera fica um pouco além e acima dele)
 // celular em pé: o campo horizontal é estreito e a vista de paisagem mostrava só o Reno; mais longe e mais do alto
 const RETRATO = innerHeight > innerWidth * 1.2;
-const VISTA_PFALZ = { alvo: [25, 4, -190], dist: RETRATO ? 900 : 540, az: THREE.MathUtils.degToRad(24), polar: THREE.MathUtils.degToRad(RETRATO ? 58 : 70) };
+// desde 2026-11-21 (pedido): de sudoeste e mais do alto, a ~1 km, com a cidade velha, o Reno e Kleinbasel no quadro
+const VISTA_PFALZ = { alvo: [51.4, 24.3, 170], dist: RETRATO ? 1500 : 1009, az: THREE.MathUtils.degToRad(-56.4), polar: THREE.MathUtils.degToRad(RETRATO ? 58 : 66.6) };
 porCamera(VISTA_PFALZ);
 // vista do link (#x/y/z/distância/rumo/inclinação, ver VISTA abaixo): já aqui, para a abertura mostrar a cidade dela
 { const p = location.hash.slice(1).split('/').map(Number);
@@ -564,8 +566,24 @@ canvas.addEventListener('dblclick', (e) => {
     p = p.clone(); p.x += v.x * d1; p.z += v.y * d1;
   }
   e.preventDefault();
+  marcarPouso(p.x, p.z);
   entrarRua(p.x, p.z);
 });
+// pouso da vista de rua: um anel dourado no chão, no ponto escolhido, que fecha enquanto a câmera desce até ele
+const anelRua = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.15, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf2c14e, transparent: true, depthTest: false, fog: false }));
+anelRua.renderOrder = 10; anelRua.visible = false; anelRua.material.userData.semNeve = true; cena.add(anelRua);
+let anelT = 0;
+function marcarPouso(x, z) {
+  anelRua.position.set(x, altura(x, z) + 0.06, z); anelRua.visible = true; anelT = performance.now();
+  const passo = (agora) => {
+    const t = (agora - anelT) / 1000; // ~1,1 s de voo, mais 0,5 s sumindo
+    if (t > 1.6) { anelRua.visible = false; return; }
+    const k = Math.min(1, t / 1.1), s = 7 - 6 * (1 - (1 - k) ** 3); // de 7 m a 1 m, freando no fim
+    anelRua.scale.setScalar(s); anelRua.material.opacity = t < 1.1 ? 0.9 : 0.9 * (1 - (t - 1.1) / 0.5);
+    requestAnimationFrame(passo);
+  };
+  requestAnimationFrame(passo);
+}
 canvas.addEventListener('wheel', (e) => { if (RUA.on && e.deltaY > 0) sairRua(); }, { passive: true });
 // andar na vista de rua, como na e-bike (jogo.js): W/S ou ↑/↓ para frente e para trás, A/D ou ←/→ viram, Shift corre.
 // Os prédios e o Reno barram o passo (grade de jogo.js); o olho segue o relevo e as pontes a 1,7 m
@@ -655,6 +673,7 @@ function quadro(agora) {
   U.uNoite.value = n;
   cena.background.copy(COR.papel).lerp(COR.ceuNoite, n);
   cena.fog.color.copy(cena.background);
+  FUNDO?.atualizar(n, diaCeu);
   hemi.color.copy(cDia.hemi).lerp(cNoite.hemi, n); hemi.groundColor.copy(cDia.hemiChao).lerp(cNoite.hemiChao, n);
   hemi.intensity = 1.7 - n * 1.25;
   sol.color.copy(cDia.sol).lerp(cNoite.sol, n); sol.intensity = 2.4 - n * 2.05;
@@ -697,6 +716,8 @@ const camAnt = new Float32Array(16); let nQuadro = 0;
 renderer.shadowMap.autoUpdate = false;
 // entorno (entorno.js): o chão em volta e o Reno da fronteira alemã à francesa; a cidade não termina mais numa borda
 const ENTORNO = q.get('entorno') === '0' ? null : await criarEntorno({ cena }).catch(() => null);
+const FUNDO = criarFundo({ cena, dados: FRONTEIRA }); // chão escuro fora do quadrado, mais escuro fora da Suíça
+let diaCeu = ceu.estado().dia; ceu.aoMudar((e) => { diaCeu = e.dia; });
 // torres da Roche (roche.js)
 const ROCHE = q.get('roche') === '0' ? null : await criarRoche({ cena, U, recorte: (() => { const T = meta.terreno, L = (T.nvlado ?? 2048) * T.passo; return { x0: T.x0 + 0.3, x1: T.x0 + L - 0.3, z0: T.z0 + 0.3, z1: T.z0 + L - 0.3, y: 8 }; })() }); // buraco do tamanho do relevo fino (chao.py), não do relevo de 5 m
 // neve (neve.js): em tudo o que já está na cena (prédios, marcos, árvores, detalhes), antes da gente e dos bondes; o chão à
