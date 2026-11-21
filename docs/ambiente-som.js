@@ -145,6 +145,16 @@
     const agora = ctx.currentTime;
     if (alvo.gaivotas > 0.2 && alvo.dia > 0.2 && agora > tGaiv) { tGaiv = agora + 7 + Math.random() * 14; if (alvo.agua > 0.04 || Math.random() < 0.4) gaivota(); }
   }
+  // trovão: ronco grave (ruído marrom em passa-baixa) que estala no começo e rola por 3–5 s; `longe` 0..1 abafa e atrasa
+  function trovao(longe = 0.5) {
+    if (!ctx || !ligado || noTour) return;
+    const t = ctx.currentTime + 0.6 + longe * 3.5, n = ctx.createBufferSource(); n.buffer = ruido('marrom');
+    const f = filtro('lowpass', 900 - longe * 700, 0.5), gg = ganho(0);
+    n.connect(f).connect(gg).connect(mestre); n.start(t, Math.random() * 3);
+    const pico = 0.9 * (1 - 0.6 * longe);
+    gg.gain.setValueAtTime(0, t); gg.gain.linearRampToValueAtTime(pico, t + 0.05 + longe * 0.3);
+    gg.gain.setTargetAtTime(pico * 0.45, t + 0.4, 0.4); gg.gain.setTargetAtTime(0, t + 1.6, 1.1); n.stop(t + 6);
+  }
   function evento(tipo, forca, pan = 0) { if (tipo === 'bonde' && ligado && !noTour) dingDing(forca, pan); }
 
   function iniciar() {
@@ -173,6 +183,6 @@
     const cb = document.getElementById('c-ambiente');
     if (cb) { cb.checked = ligado; cb.addEventListener('change', () => ligar(cb.checked)); }
   });
-  window.ambiente = { contexto, evento, ligar, ligado: () => ligado, sinos, ctx: () => ctx };
+  window.ambiente = { trovao, contexto, evento, ligar, ligado: () => ligado, sinos, ctx: () => ctx };
   if (new URLSearchParams(location.search).get('som') === 'debug') window.ambienteDebug = { alvo, gaivota, dingDing, sinos, iniciar };
 })();

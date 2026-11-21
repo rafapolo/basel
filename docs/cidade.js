@@ -348,6 +348,7 @@ colorir(); cores = null; // só uma vez; o atributo solta o array depois de subi
 // destaque do prédio da ficha e noite, no shader (a cidade é a de hoje: sem máquina do tempo)
 const U = { uSel: { value: -1 }, uNoite: { value: 0 }, uApagao: { value: 0 } }; // uApagao: Morgestraich, a cidade às escuras
 let apagaAlvo = 0; // 1 durante o Morgestraich (fasnacht.js), ver laço
+let raioT = -1e9, proxRaio = 0; const BRANCO_RAIO = new THREE.Color('#dfe6ff'); // relâmpagos em trovoada (nuvens.js → TEMPO)
 performance.mark('fachadas'); // tempo de montagem: performance.getEntriesByName('fachadas', 'measure')
 const FACH = criarFachadas({ cena, meta, posicoes, ids16, U });
 performance.measure('fachadas', 'fachadas');
@@ -678,6 +679,11 @@ function quadro(agora) {
   FUNDO?.atualizar(n, diaCeu);
   hemi.color.copy(cDia.hemi).lerp(cNoite.hemi, n); hemi.groundColor.copy(cDia.hemiChao).lerp(cNoite.hemiChao, n);
   hemi.intensity = 1.7 - n * 1.25;
+  // trovoada (Open-Meteo, código 95–99, ao vivo; ou ?tempo=trovoada): um relâmpago a cada 5–23 s, a cidade pisca branca
+  // duas vezes e o trovão vem depois, mais tarde e mais abafado quanto mais longe
+  if (TEMPO.trovoada && (ceu.aoVivo || TEMPO.forcado) && agora > proxRaio) { raioT = agora; proxRaio = agora + 5000 + Math.random() * 18000; window.ambiente?.trovao?.(Math.random()); }
+  { const fr = agora - raioT, flash = fr < 0 || fr > 650 ? 0 : fr < 80 ? 1 : fr < 170 ? 0.15 : fr < 240 ? 0.85 : 0.5 * (1 - (fr - 240) / 410);
+    if (flash > 0) { hemi.intensity += 4 * flash; cena.background.lerp(BRANCO_RAIO, 0.5 * flash); } }
   sol.color.copy(cDia.sol).lerp(cNoite.sol, n); sol.intensity = 2.4 - n * 2.05;
   // som: velocidade da câmera (m/s relativos à distância + giro)
   const c = lerCamera();

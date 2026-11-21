@@ -184,6 +184,7 @@ export async function iniciarCeu({ cena, renderer, camera, hemi, sol, U, patchNo
       retColor = mix(retColor, (vec3(lumC * 1.75 + 0.14) * mix(vec3(1.0), vec3(0.8, 0.82, 0.86), m) + brilho) * noiteK, m * 0.85);
       float d = camadaBaixa(cameraPosition.xz + dH * 1200.0) * smoothstep(0.02, 0.16, direction.y);
       vec3 corN = vec3(lumC * 1.9 + 0.12) * mix(vec3(1.0), vec3(0.62, 0.65, 0.7), smoothstep(0.3, 1.0, d) * (0.5 + 0.5 * uNuvBaixa)) + brilho;
+      corN *= 1.0 - 0.5 * mapaNuv(cameraPosition.xz + dH * 1200.0).a; // onde o radar vê chuva: nuvem de chuva, cinza-chumbo
       retColor = mix(retColor, corN * noiteK, d * 0.94);
     }
     retColor += uNoite * mix(vec3(${NOITE_H.join(',')}), vec3(${NOITE_Z.join(',')}), clamp(direction.y * 1.5, 0.0, 1.0));
