@@ -445,7 +445,7 @@ uniform float uVidaT; uniform float uAnima;`)
   const VIA_CARRO = new Set(['secondary', 'secondary_link', 'tertiary', 'unclassified', 'residential', 'service']);
   const matG = matGente();
   const matC = matGente(0.45);
-  const NPED = leve ? 360 : 1500, NBIKE = leve ? 70 : 280, NCARRO = leve ? 45 : 160; // carros: eram 36 na cidade inteira
+  const NPED = leve ? 360 : 1500, NBIKE = leve ? 160 : 650, NCARRO = leve ? 45 : 160; // carros: eram 36 na cidade inteira; bicicletas: Basel pedala muito (eram 280)
   const ped = populacao({ n: NPED, grafo: gPed, geo: geoGente(), mat: matG, sombra: false, vel: [0.95, 1.65], livres: Math.round(NPED * 0.34),
     desloc: (i, r) => (r() < 0.5 ? -1 : 1) * (0.2 + r() * 0.9),
     offTipo: (t, o) => (VIA_CARRO.has(t) ? Math.sign(o) * (LARG[t] / 2 + 1.1) : o),
@@ -461,6 +461,41 @@ uniform float uVidaT; uniform float uAnima;`)
     carro.cores((i, A) => { poe3(A.aTorso, i, sorteia(CARRO)); poe3(A.aCalca, i, CARRO[0]); poe3(A.aPele, i, CARRO[0]); poe3(A.aCabelo, i, CARRO[0]); });
   }
   pintar();
+  // cachorros: ~9% dos adultos que andam levam um, na guia, um pouco à frente e à direita; porte e pelagem variados
+  // (de salsicha a pastor), rabo e cabeça; a guia é uma linha da mão até a coleira
+  const caes = (() => {
+    const donos = []; for (let i = 0; i < ped.n; i++) if (!ped.tipoC[i] && !(ped.tipoC[i + 1] === 1) && hash01(i * 31 + 7) < 0.09) donos.push(i);
+    if (!donos.length) return null;
+    const P = [];
+    P.push({ g: mat4(new THREE.CapsuleGeometry(0.11, 0.38, 3, 7).rotateX(Math.PI / 2), 0, 0.34, 0), parte: 1 });       // corpo
+    for (const [x, z] of [[-0.08, 0.17], [0.08, 0.17], [-0.08, -0.17], [0.08, -0.17]]) P.push({ g: mat4(cil(0.032, 0.028, 0.26, 5), x, 0.13, z), parte: 1 }); // patas
+    P.push({ g: mat4(new THREE.SphereGeometry(0.1, 7, 5), 0, 0.46, 0.3), parte: 1 });                                     // cabeça
+    P.push({ g: mat4(new THREE.BoxGeometry(0.08, 0.07, 0.12), 0, 0.43, 0.41), parte: 1 });                                 // focinho
+    P.push({ g: mat4(new THREE.SphereGeometry(0.022, 4, 3), 0, 0.44, 0.475), parte: 3 });                                  // nariz
+    for (const x of [-0.065, 0.065]) P.push({ g: mat4(new THREE.BoxGeometry(0.04, 0.09, 0.06).rotateZ(x > 0 ? -0.3 : 0.3), x, 0.53, 0.27), parte: 4 }); // orelhas
+    P.push({ g: mat4(cil(0.018, 0.012, 0.24, 4).rotateX(-0.9), 0, 0.42, -0.3), parte: 4 });                               // rabo
+    const im = malhaInst(unir(P), matG, donos.length, false);
+    const PEL = ['#3a2a1c', '#c8a06a', '#151515', '#e8e0d0', '#8a5a2a', '#d8b070', '#6b6b6b', '#a06030'].map(cor);
+    const A = im.geometry.attributes, porte = donos.map((_, k) => 0.55 + hash01(k * 13 + 5) * 0.95);
+    donos.forEach((_, k) => { const c = PEL[Math.floor(hash01(k * 17 + 3) * PEL.length)]; poe3(A.aTorso, k, c); poe3(A.aCalca, k, c); poe3(A.aPele, k, c); poe3(A.aCabelo, k, hash01(k + 9) < 0.5 ? c : PEL[2]); });
+    for (const k of ['aTorso', 'aCalca', 'aPele', 'aCabelo']) A[k].needsUpdate = true;
+    const guia = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(donos.length * 6), 3)), new THREE.LineBasicMaterial({ color: 0x2a2a2a }));
+    guia.frustumCulled = false; guia.name = "guias"; grupo.add(guia);
+    const pd = ped.im.instanceMatrix.array, pc = im.instanceMatrix.array, pg = guia.geometry.attributes.position.array, sx = new THREE.Vector3();
+    return function atualizarCaes(t) {
+      donos.forEach((o, k) => {
+        const e = o * 16;
+        if (o >= ped.im.count || pd[e + 15] === 0 || pd[e] * pd[e] + pd[e + 2] * pd[e + 2] < 1e-6) { pc.fill(0, k * 16, k * 16 + 16); pg.fill(0, k * 6, k * 6 + 6); return; }
+        sx.set(pd[e], pd[e + 1], pd[e + 2]); const esc = sx.length(); // escala do dono (some e aparece com ele)
+        const fx = pd[e + 8] / esc, fz = pd[e + 10] / esc, rx = pd[e] / esc, rz = pd[e + 2] / esc; // frente e direita do dono
+        const ox = pd[e + 12], oy = pd[e + 13], oz = pd[e + 14], s = porte[k] * Math.min(1, esc);
+        const x = ox + fx * 0.9 + rx * 0.45, z = oz + fz * 0.9 + rz * 0.45, y = oy + Math.sin(t * 9 + k) * 0.012 * s;
+        matriz(im, k, x, y, z, fx, fz, s, s, s);
+        pg.set([ox + rx * 0.24, oy + 0.9 * Math.min(1, esc), oz + rz * 0.24, x + fx * 0.3 * s, y + 0.4 * s, z + fz * 0.3 * s], k * 6);
+      });
+      im.instanceMatrix.needsUpdate = true; guia.geometry.attributes.position.needsUpdate = true;
+    };
+  })();
   for (const p of [bici, carro]) { const A = p.im.geometry.attributes.aAnim; for (let i = 0; i < p.n; i++) A.setY(i, 0); A.needsUpdate = true; }
 
   // ---------- gente parada: rodinhas nas praças, sentados no Rheinbord, debruçados na Mittlere, à espera do bonde ----------
@@ -1027,6 +1062,7 @@ uniform float uVidaT; uniform float uAnima;`)
     const fc = lim(0.05 + 0.6 * fv + 0.25 * suave(6, 9, h) * (1 - suave(19, 23, h)), 0, 1) * (S.dia === 'dom' ? 0.55 : 1);
     const nCarro = Math.round(NCARRO * fc);
     ped.atualizar(sd, nPed, alvoCam); bici.atualizar(sd, nBici, alvoCam); carro.atualizar(sd, nCarro, alvoCam);
+    caes?.(S.relogio);
     parados(agora, fp, h);
     caidosParados(sd);
     bondes(sd);
