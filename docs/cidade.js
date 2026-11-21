@@ -14,6 +14,7 @@ import { criarDetalhes } from './detalhes.js';
 import { criarMuralha } from './muralha.js';
 import { criarFlores } from './flores.js';
 import { criarFundo } from './fundo.js';
+import { criarRelogioCeu } from './relogio-ceu.js';
 import { criarFronteira } from './fronteira.js';
 import { decodifica, baixaBin } from './compacta.js';
 import { atualizarNuvens, TEMPO } from './nuvens.js';
@@ -438,7 +439,8 @@ function relogio(e) {
 }
 addEventListener('tempo:agora', () => relogio(ceu.estado()));
 // ---------- chaves ----------
-$('c-ruas').addEventListener('change', (e) => { ruasObj.visible = e.target.checked; CH.ruas(e.target.checked); });
+// ruas e trilhos: sempre visíveis (sem chave desde 2026-11-21); ?ruas=0 ainda tira, para comparar
+if (q.get('ruas') === '0') { ruasObj.visible = false; CH.ruas(false); }
 let noiteAlvo = 0;
 function definirNoite(on) { noiteAlvo = on ? 1 : 0; ceu.noite(on); $('c-noite').checked = on; document.body.classList.toggle('noite', on); }
 $('c-noite').addEventListener('change', (e) => definirNoite(e.target.checked));
@@ -756,6 +758,8 @@ if (q.get('vida') === '0') VIDA.ligar(false);
 // fora), menos as torres da Roche, que fazem sombra de contato de verdade
 for (const o of cena.children) if (!antesDetalhes.has(o) && o !== ROCHE?.malha) ceu.semAO.push(o);
 relogio(ceu.estado()); ceu.aoMudar(relogio);
+// relógio do céu (relogio-ceu.js, como sky-clock.klet.app): a cor do céu em cada hora do dia escolhido e o anel dos dias
+criarRelogioCeu({ ceu, lang: LANG });
 if (q.get('noite')) definirNoite(true);
 if (CAM && !(location.hash.length > 1)) {
   const a = typeof CAM.alvo === 'string' ? centro(CAM.alvo) : [...CAM.alvo];
