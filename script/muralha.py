@@ -105,11 +105,26 @@ gb = ([P["Thomasturm"]] + trecho(P["St. Johanns-Tor"], P["Spalentor"], ["Schanze
       + [P["St. Alban-Tor"]] + [list(q) for q in (SOBRA if math.dist(SOBRA[0], P["St. Alban-Tor"]) < math.dist(SOBRA[-1], P["St. Alban-Tor"]) else SOBRA[::-1])])
 kb = (trecho(KL, P["Bläsitor"], ["Klingentalgraben"], 50) + trecho(P["Bläsitor"], P["Riehentor"], ["Claragraben"], 60)
       + trecho(P["Riehentor"], TH, ["Theodorsgraben"], 60) + [TH])
+# altura do chão em cada ponto (para o trecho fora do recorte, onde a cidade não tem relevo fino: St. Johann)
+import numpy as np
+R_ = meta["relevo"]; rel = np.fromfile(RAIZ / "docs/data/relevo.bin", dtype=np.uint16).reshape(R_["ny"], R_["nx"]) / 100.0
+def alt(x, z):
+    i, j = (x - R_["x0"]) / R_["passo"], (z - R_["z0"]) / R_["passo"]
+    i, j = min(max(i, 0), R_["nx"] - 1), min(max(j, 0), R_["ny"] - 1)  # fora: a borda mais perto do relevo (St. Johann fica a ~300 m)
+    return round(float(rel[int(round(j)), int(round(i))]), 1)
+gb = [[x, z, alt(x, z)] for x, z in gb]; kb = [[x, z, alt(x, z)] for x, z in kb]
+# forma de cada portão (Wikipédia e gravuras de Merian): altura, lado, telhado e o que tinha de especial
+FORMA = {"St. Johanns-Tor": (24, 8, "agudo", ""), "Steinentor": (28, 9, "agudo", ""), "Aeschentor": (32, 10, "agudo", "relogio"),
+         "Riehentor": (22, 9, "quatro", ""), "Blasitor": (19, 7.5, "piramide", ""), "Spalentor": (0, 0, "", ""), "St. Alban-Tor": (0, 0, "", "")}
 out = {
     "fonte": "Wikipédia (de) «Basler Stadtmauer» e os artigos de cada portão; traçado pelos antigos fossos no OSM",
     "linhas": [gb, kb],
-    "portoes": [{"n": k, "x": P[k][0], "z": P[k][1], "existe": v[2]} for k, v in PORTOES.items() if k != "Thomasturm"],
-    "torres": [{"n": "Thomasturm", "x": P["Thomasturm"][0], "z": P["Thomasturm"][1], "existe": True}],
+    # «existe» = já está no modelo (o St. Johanns-Tor existe, mas fica fora do recorte: é desenhado)
+    "portoes": [{"n": k, "x": P[k][0], "z": P[k][1], "y": alt(*P[k]), "existe": v[2] and k != "St. Johanns-Tor",
+                 "h": FORMA.get(k.replace("ä", "a"), (24, 9, "agudo", ""))[0], "lado": FORMA.get(k.replace("ä", "a"), (24, 9, "agudo", ""))[1],
+                 "telhado": FORMA.get(k.replace("ä", "a"), (24, 9, "agudo", ""))[2], "extra": FORMA.get(k.replace("ä", "a"), (24, 9, "agudo", ""))[3]}
+                for k, v in PORTOES.items() if k != "Thomasturm"],
+    "torres": [{"n": "Thomasturm", "x": P["Thomasturm"][0], "z": P["Thomasturm"][1], "y": alt(*P["Thomasturm"]), "existe": False, "h": 16, "redonda": True}],
 }
 (RAIZ / "docs/data/muralha.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")))
 comp = lambda l: sum(math.dist(a, b) for a, b in zip(l, l[1:]))

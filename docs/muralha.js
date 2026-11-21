@@ -8,9 +8,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const ALT = 8, ESP = 1.7, AMEIA = 1.1, PASSO_AMEIA = 2.4, TORRE_CADA = 75;
 
-export async function criarMuralha({ cena, altura, base = 'data/' }) {
+export async function criarMuralha({ cena, altura, dentro = () => true, ponte = null, base = 'data/' }) {
   const M = await fetch(base + 'muralha.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
   if (!M) return null;
+  // chão: o relevo fino no recorte; fora dele (St. Johann) o campo do fundo (fundo.js, a −6 m), onde a muralha pousa
+  const chao = (x, z) => (dentro(x, z) ? altura(x, z) : -6);
   const pedra = [], telha = [], escuro = [];
   const cor = (g, c) => { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) c.toArray(a, i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
   const tom = (k) => new THREE.Color().setRGB(0.66 + 0.06 * k, 0.6 + 0.05 * k, 0.5 + 0.04 * k); // calcário cinza-bege, pedra a pedra
@@ -23,22 +25,22 @@ export async function criarMuralha({ cena, altura, base = 'data/' }) {
     telha.push(cor(g, new THREE.Color('#8a3d2c'))); };
 
   // portões: os perdidos viram torre; todos abrem um vão na muralha
-  const portoes = M.portoes.map((p) => ({ ...p, y: altura(p.x, p.z) }));
+  const portoes = M.portoes.map((p) => ({ ...p, y: chao(p.x, p.z, p.y) }));
   const vao = (x, z) => portoes.some((p) => Math.hypot(p.x - x, p.z - z) < (p.existe ? 9 : 5.5));
 
   let iTorre = 0;
   for (const linha of M.linhas) {
     // alisa os cotovelos do traçado (uma passada de Chaikin) e corta em pedaços de até 4 m, cada um no chão do seu meio
     let pts = linha;
-    { const s = [pts[0]]; for (let i = 0; i < pts.length - 1; i++) { const [a, b] = [pts[i], pts[i + 1]]; s.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]); } s.push(pts.at(-1)); pts = s; }
+    { const s = [pts[0]]; for (let i = 0; i < pts.length - 1; i++) { const [a, b] = [pts[i], pts[i + 1]]; s.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25, a[2] * 0.75 + b[2] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75, a[2] * 0.25 + b[2] * 0.75]); } s.push(pts.at(-1)); pts = s; }
     let percorrido = 0, proxTorre = 30;
     for (let i = 0; i < pts.length - 1; i++) {
-      const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 0.3) continue;
+      const [ax, az, ay] = pts[i], [bx, bz, by] = pts[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 0.3) continue;
       const a = Math.atan2(bz - az, bx - ax), n = Math.ceil(L / 4);
       for (let k = 0; k < n; k++) {
         const t0 = k / n, t1 = (k + 1) / n, tm = (t0 + t1) / 2, x = ax + (bx - ax) * tm, z = az + (bz - az) * tm, l = L / n;
         if (vao(x, z)) continue;
-        const y = Math.min(altura(ax + (bx - ax) * t0, az + (bz - az) * t0), altura(ax + (bx - ax) * t1, az + (bz - az) * t1));
+        const y = Math.min(chao(ax + (bx - ax) * t0, az + (bz - az) * t0, ay + (by - ay) * t0), chao(ax + (bx - ax) * t1, az + (bz - az) * t1, ay + (by - ay) * t1));
         caixa(l + 0.05, ESP, x, z, a, y - 1.5, y + ALT, pedra, tom(hs(i * 31 + k)));
         // ameias: dentes no lado de fora do caminho de ronda
         for (let m = 0; m < l / PASSO_AMEIA; m++) {
@@ -52,33 +54,57 @@ export async function criarMuralha({ cena, altura, base = 'data/' }) {
         const t = 1 - (percorrido - proxTorre) / L, x = ax + (bx - ax) * t, z = az + (bz - az) * t;
         proxTorre += TORRE_CADA * (0.85 + 0.3 * hs(iTorre++));
         if (vao(x, z)) continue;
-        const y = altura(x, z), h = ALT + 5 + 3 * hs(iTorre * 7);
+        const y = chao(x, z, ay + (by - ay) * t), h = ALT + 5 + 3 * hs(iTorre * 7);
         caixa(6, 6, x, z, a, y - 1.5, y + h, pedra, tom(0.2 + 0.5 * hs(iTorre)));
         telhado(6.4, 6.4, x, z, a, y + h, 4.5);
       }
     }
   }
-  // portões perdidos: torre de ~9 × 9 m e 26–30 m, arco de passagem nas duas faces, telhado alto
-  for (const p of portoes) {
-    if (p.existe) continue;
-    // rumo da muralha no portão: o pedaço de linha mais perto
-    let best = 1e9, a = 0;
+  // portões desenhados (os que sumiram e o St. Johanns-Tor, que fica fora do recorte): torre quadrada com a altura, o lado
+  // e o telhado de cada um (muralha.json), arco de passagem nas duas faces, cornija; o Aeschentor com relógio
+  const rumoNo = (x, z) => { let best = 1e9, a = 0;
     for (const l of M.linhas) for (let i = 0; i < l.length - 1; i++) {
       const [ax, az] = l[i], [bx, bz] = l[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
-      const t = Math.max(0, Math.min(1, ((p.x - ax) * dx + (p.z - az) * dz) / L2)), d = Math.hypot(ax + dx * t - p.x, az + dz * t - p.z);
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), d = Math.hypot(ax + dx * t - x, az + dz * t - z);
       if (d < best) { best = d; a = Math.atan2(dz, dx); }
-    }
-    const h = 24 + 4 * hs(p.x), y = p.y;
-    caixa(9, 9, p.x, p.z, a, y - 1.5, y + h, pedra, tom(0.55));
-    caixa(9.6, 9.6, p.x, p.z, a, y + h - 0.6, y + h, pedra, tom(0.9)); // cornija
-    // arco: escuro de 4 m × 6 m nas duas faces (o vão de passagem), com a ponta redonda
-    for (const s of [-1, 1]) {
-      const g = new THREE.PlaneGeometry(4, 6); const c = new THREE.CircleGeometry(2, 12, 0, Math.PI).translate(0, 3, 0);
-      const arco = mergeGeometries([g.translate(0, 0, 0), c]); arco.translate(0, 3 + 0.02, 0);
-      arco.rotateY(s > 0 ? 0 : Math.PI); arco.translate(0, 0, s * 4.53); arco.rotateY(-a + Math.PI / 2); arco.translate(p.x, y, p.z);
+    } return a; };
+  const relogio = (x, y, z, a, s, lado) => { // mostrador branco com ponteiros, nas duas faces de fora/dentro
+    for (const k of [-1, 1]) {
+      const d = new THREE.CircleGeometry(1.5, 20); d.rotateY(k > 0 ? 0 : Math.PI); d.translate(0, 0, k * (lado / 2 + 0.05)); d.rotateY(-a + Math.PI / 2); d.translate(x, y, z); escuro.push(cor(d, new THREE.Color('#f1ece0')));
+      for (const [w, h, r] of [[0.12, 1.1, 0.4], [0.1, 0.8, 2.2]]) { const p = new THREE.PlaneGeometry(w, h).translate(0, h / 2, 0); p.rotateZ(r); p.rotateY(k > 0 ? 0 : Math.PI); p.translate(0, 0, k * (lado / 2 + 0.08)); p.rotateY(-a + Math.PI / 2); p.translate(x, y, z); escuro.push(cor(p, new THREE.Color('#151515'))); }
+    } };
+  const lalle = (x, y, z, a, lado) => { // o Lällekönig: cabeça de rei, coroa dourada e a língua de fora, virado para Kleinbasel
+    const c = new THREE.SphereGeometry(0.9, 12, 10); c.translate(0, 0, lado / 2 + 0.6); c.rotateY(-a); c.translate(x, y, z); pedra.push(cor(c, new THREE.Color('#d0745a')));
+    const co = new THREE.CylinderGeometry(0.75, 0.85, 0.6, 10); co.translate(0, 0.95, lado / 2 + 0.6); co.rotateY(-a); co.translate(x, y, z); telha.push(cor(co, new THREE.Color('#d9b24a')));
+    const li = new THREE.BoxGeometry(0.35, 0.12, 0.7); li.translate(0, -0.45, lado / 2 + 1.45); li.rotateY(-a); li.translate(x, y, z); telha.push(cor(li, new THREE.Color('#c8202a')));
+  };
+  const torreDePortao = ({ x, z, y, h, lado, telhado: tt, extra }, a) => {
+    caixa(lado, lado, x, z, a, y - 1.5, y + h, pedra, tom(0.55));
+    caixa(lado + 0.6, lado + 0.6, x, z, a, y + h - 0.6, y + h, pedra, tom(0.9)); // cornija
+    for (const s of [-1, 1]) { // arco: o vão de passagem, nas duas faces
+      const g = new THREE.PlaneGeometry(4, 6), c = new THREE.CircleGeometry(2, 12, 0, Math.PI).translate(0, 3, 0);
+      const arco = mergeGeometries([g, c]); arco.translate(0, 3.02, 0);
+      arco.rotateY(s > 0 ? 0 : Math.PI); arco.translate(0, 0, s * (lado / 2 + 0.03)); arco.rotateY(-a + Math.PI / 2); arco.translate(x, y, z);
       escuro.push(cor(arco, new THREE.Color('#1c1712')));
     }
-    telhado(9.4, 9.4, p.x, p.z, a, y + h, 9);
+    const hr = tt === 'agudo' ? lado * 1.35 : tt === 'quatro' ? lado * 0.6 : lado * 0.9;
+    telhado(lado + 0.4, lado + 0.4, x, z, a, y + h, hr);
+    if (extra.includes('relogio')) relogio(x, y + h - 5, z, a, 1, lado);
+  };
+  for (const p of portoes) if (!p.existe) torreDePortao(p, rumoNo(p.x, p.z));
+  // torres redondas das pontas (Thomasturm, na beira do Reno em St. Johann): cilindro com telhado cônico
+  for (const t of M.torres ?? []) {
+    if (t.existe) continue;
+    const y = chao(t.x, t.z, t.y), g = new THREE.CylinderGeometry(3.6, 3.9, t.h + 1.5, 16); g.translate(t.x, y - 1.5 + (t.h + 1.5) / 2, t.z); pedra.push(cor(g, tom(0.5)));
+    const r = new THREE.ConeGeometry(4.2, 6, 16); r.translate(t.x, y + t.h + 3, t.z); telha.push(cor(r, new THREE.Color('#8a3d2c')));
+  }
+  // Rheintor: a torre da cabeceira de Grossbasel da Mittlere Brücke (demolida em 1839), com relógio e o Lällekönig
+  if (ponte) {
+    const { A, B } = ponte, dA = Math.hypot(A[0] + 102, A[1] - 20), dB = Math.hypot(B[0] + 102, B[1] - 20);
+    const [g0, g1] = dA < dB ? [A, B] : [B, A], L = Math.hypot(g0[0] - g1[0], g0[1] - g1[1]), ux = (g0[0] - g1[0]) / L, uz = (g0[1] - g1[1]) / L;
+    const x = g0[0] + ux * 4, z = g0[1] + uz * 4, a = Math.atan2(uz, ux) + Math.PI / 2, y = chao(x, z, 8);
+    torreDePortao({ x, z, y, h: 26, lado: 8, telhado: 'agudo', extra: 'relogio' }, a);
+    lalle(x, y + 15, z, -Math.atan2(-ux, -uz), 8); // de frente para a ponte, mostrando a língua a Kleinbasel
   }
   const grupo = new THREE.Group(); grupo.name = 'muralha';
   const mk = (lista, mat) => { if (!lista.length) return; const g = mergeGeometries(lista.map((x) => x.index ? x.toNonIndexed() : x)); g.computeVertexNormals(); const m = new THREE.Mesh(g, mat); m.castShadow = m.receiveShadow = true; grupo.add(m); };
