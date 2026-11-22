@@ -408,7 +408,7 @@ carga?.etapa(0.92, t('fontes, postes e bancos…', 'fountains, lamps and benches
 const antesDetalhes = new Set(cena.children);
 if (q.get('detalhes') !== '0') await criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, leve, nivelAgua: () => AGUA.nivel, cotaPonte: MARC.cotaPonte });
 // Markthalle (letreiro) e as bicicletas estacionadas dela e da SBB (locais.js)
-if (q.get('detalhes') !== '0') criarLocais({ cena, altura, leve });
+if (q.get('detalhes') !== '0') criarLocais({ cena, altura, ceu, leve });
 // flores pela estação (flores.js): vasos nos fontanários, canteiros e gramados; ?flores=0 abre sem elas
 if (q.get('flores') !== '0' && q.get('detalhes') !== '0') await criarFlores({ cena, altura, ceu, leve }).catch(() => null);
 // muralha de antes de 1860 (muralha.js): liga e desliga no painel; ?muralha=0 abre sem ela
