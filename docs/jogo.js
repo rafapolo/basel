@@ -403,7 +403,7 @@ function passo(agora) {
   const giro = (tecla.esq ? 1 : 0) - (tecla.dir ? 1 : 0);
   const pega = Math.min(1, Math.abs(S.v) / 2.5);
   S.rumo += giro * dt * (1.9 - 0.8 * Math.min(1, Math.abs(S.v) / 12)) * pega * Math.sign(S.v || 1);
-  if (!S.morto) S.incl += (-giro * Math.min(1, S.v / 7) * 0.32 - S.incl) * Math.min(1, dt * 6);
+  if (!S.morto) S.incl += ((S.nado ? 0 : -giro * Math.min(1, S.v / 7) * 0.32) - S.incl) * Math.min(1, dt * 6);
   const fx = Math.sin(S.rumo), fz = Math.cos(S.rumo);
   const xAnt = S.x, zAnt = S.z; // para varrer o trajeto do quadro (a 45 km/h, ~0,8 m a 15 fps)
   let nx = S.x + fx * S.v * dt, nz = S.z + fz * S.v * dt;
@@ -440,10 +440,10 @@ function passo(agora) {
       mensagem(t('Opa! Derrubou alguém', 'Oops! Knocked someone over', 'Hoppla! Jemanden umgefahren'), t(`${S.derrubados} no chão nesta corrida`, `${S.derrubados} knocked down this race`, `${S.derrubados} umgefahren in diesem Rennen`), 1400);
     }
   }
-  const p0 = piso(S.x, S.z), naRio = S.morto && S.caiu, yAlvo = S.nado ? C.nivelReno - 0.55 + Math.sin(agora / 600) * 0.04 : naRio ? C.nivelReno - 1.2 : p0.y;
+  const p0 = piso(S.x, S.z), naRio = S.morto && S.caiu, yAlvo = S.nado ? C.nivelReno - 0.55 + Math.sin(agora / 900) * 0.025 : naRio ? C.nivelReno - 1.2 : p0.y;
   S.y += (yAlvo - S.y) * Math.min(1, dt * (naRio ? 2 : 14));
   const pf = piso(S.x + fx * 0.6, S.z + fz * 0.6).y, pt = piso(S.x - fx * 0.6, S.z - fz * 0.6).y;
-  const arfagem = Math.atan2(pf - pt, 1.2);
+  const arfagem = S.nado ? 0 : Math.atan2(pf - pt, 1.2); // na água o leito do rio embaixo não inclina nada
   // ---- desenho da bici ----
   S.fase += (S.v / bici.userData.R0) * dt;
   bici.position.set(S.x, S.y + S.h, S.z);
@@ -499,9 +499,9 @@ function passo(agora) {
     let dist = 6.5;
     for (let k = 1; k <= 8; k++) { const s = (k / 8) * 6.5; if (bloqueado(S.x - gx * s, S.z - gz * s)) { dist = Math.max(1.8, s - 1); break; } }
     camAlvo.set(S.x - gx * dist, yH + 2.4 + (6.5 - dist) * 0.25 + OLHO.pitch * 5, S.z - gz * dist);
-    camera.position.lerp(camAlvo, 1 - Math.exp(-dt * (OLHO.arrasta ? 14 : 5)));
+    camera.position.lerp(camAlvo, 1 - Math.exp(-dt * (OLHO.arrasta ? 14 : S.nado ? 1.8 : 5))); // de boia, a câmera vem macia (a correnteza sacudia)
     olhar.set(S.x + gx * 3, yH + 1.2, S.z + gz * 3);
-    olharS.lerp(olhar, 1 - Math.exp(-dt * (OLHO.arrasta ? 16 : 8)));
+    olharS.lerp(olhar, 1 - Math.exp(-dt * (OLHO.arrasta ? 16 : S.nado ? 2.5 : 8)));
     camera.lookAt(olharS);
   }
   if (S.tremor > 0) { S.tremor -= dt; camera.position.x += (Math.random() - 0.5) * S.tremor * 0.4; camera.position.y += (Math.random() - 0.5) * S.tremor * 0.4; }
