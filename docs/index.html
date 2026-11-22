@@ -113,12 +113,8 @@
   #legenda-linhas { display: flex; flex-wrap: nowrap; gap: 2px; margin: 8px 0 0; }
   #legenda-linhas span { flex: 1 1 0; min-width: 0; padding: 1px 0; border-radius: 4px; background: var(--c); color: #fff; font: 700 11px Inter, sans-serif; text-align: center; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
   #legenda-linhas[hidden] { display: none; }
-  /* relógio do céu: no alto ao centro; no celular, menor, à direita, embaixo dos botões */
-  #relogio-ceu { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: 152px; height: 152px; z-index: 10; border-radius: 50%; box-shadow: 0 6px 22px rgba(0,0,0,.28); touch-action: none; }
-  #relogio-ceu canvas { width: 100%; height: 100%; display: block; cursor: grab; }
-  body.touring #relogio-ceu { opacity: 0; pointer-events: none; transition: opacity .5s; }
-  @media (max-width: 900px) { #relogio-ceu { width: 120px; height: 120px; top: 64px; } }
-  @media (max-width: 640px) { #relogio-ceu { width: 96px; height: 96px; left: auto; right: 12px; transform: none; top: 104px; } }
+  /* barras de cor do painel (barras.js): céu do dia acima do slider da hora, copas do ano abaixo do slider do dia */
+  .barra-cor { display: block; width: 100%; height: 20px; border-radius: 4px; margin: 4px 0 2px; }
   .nota a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
   #ficha { position: fixed; left: 16px; bottom: 44px; width: min(330px, calc(100vw - 32px)); z-index: 11; background: var(--papel); border: 1px solid var(--tinta); border-radius: 6px; padding: 12px 14px; box-shadow: 4px 4px 0 var(--tinta); }

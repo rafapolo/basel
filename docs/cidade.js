@@ -14,7 +14,7 @@ import { criarDetalhes } from './detalhes.js';
 import { criarMuralha } from './muralha.js';
 import { criarFlores } from './flores.js';
 import { criarFundo } from './fundo.js';
-import { criarRelogioCeu } from './relogio-ceu.js';
+import { criarBarras } from './barras.js';
 import { criarFronteira } from './fronteira.js';
 import { decodifica, baixaBin } from './compacta.js';
 import { atualizarNuvens, TEMPO } from './nuvens.js';
@@ -768,8 +768,8 @@ if (q.get('vida') === '0') VIDA.ligar(false);
 // fora), menos as torres da Roche, que fazem sombra de contato de verdade
 for (const o of cena.children) if (!antesDetalhes.has(o) && o !== ROCHE?.malha) ceu.semAO.push(o);
 relogio(ceu.estado()); ceu.aoMudar(relogio);
-// relógio do céu (relogio-ceu.js, como sky-clock.klet.app): a cor do céu em cada hora do dia escolhido e o anel dos dias
-criarRelogioCeu({ ceu, lang: LANG });
+// barras do painel (barras.js): a cor do céu em cada hora do dia escolhido e a das copas ao longo do ano
+criarBarras({ ceu });
 if (q.get('noite')) definirNoite(true);
 if (CAM && !(location.hash.length > 1)) {
   const a = typeof CAM.alvo === 'string' ? centro(CAM.alvo) : [...CAM.alvo];
