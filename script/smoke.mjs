@@ -12,8 +12,11 @@ try {
   // uma página por consulta: navegar com tiles ainda chegando faz o WebKit rejeitar os downloads abortados ("Load failed")
   for (const q of ['?hora=15&data=2026-06-21', '?lang=de&leve=1']) {
     const pg = await b.newPage({ viewport: { width: 1280, height: 800 } });
+    // serviços de fora (tempo, radar, fontes, mapas) ficam bloqueados: o teste é do site, e um 429 deles não pode barrar o
+    // deploy (2026-11-22: o Open-Meteo respondeu 429 na CI). A página segue sem eles, como sem rede
+    await pg.route((u) => u.origin !== new URL(url).origin, (r) => r.abort());
     pg.on('pageerror', (e) => erros.push(`pageerror: ${e.message}`));
-    pg.on('console', (m) => { if (m.type() === 'error') erros.push(`console: ${m.text()}`); });
+    pg.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR_FAILED/.test(m.text())) erros.push(`console: ${m.text()}`); }); // recursos de fora bloqueados acima
     pg.on('response', (r) => { if (r.status() >= 400 && r.url().startsWith(new URL(url).origin)) erros.push(`${r.status()} ${r.url()}`); });
     await pg.goto(url + q, { waitUntil: 'load', timeout: 60000 });
     await pg.waitForSelector('#carregando.fora', { state: 'attached', timeout: 90000 });

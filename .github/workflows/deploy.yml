@@ -68,7 +68,8 @@ jobs:
 
       - name: Smoke test
         run: |
-          bunx playwright install --with-deps chromium
+          # sem --with-deps: o apt das dependências levava ~40 s por deploy, e o runner do Ubuntu já traz as bibliotecas do Chrome
+          bunx playwright install chromium
           python3 -m http.server -d dist 8000 >/dev/null 2>&1 &
           sleep 1
           bun script/smoke.mjs http://localhost:8000/
