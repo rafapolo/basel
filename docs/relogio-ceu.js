@@ -51,6 +51,7 @@ export function criarRelogioCeu({ ceu, lang = 'pt' }) {
   }
   const doyDe = (data) => { const [a, m, d] = data.split('-').map(Number); return Math.round((Date.UTC(a, m - 1, d) - Date.UTC(a, 0, 1)) / 86400000); };
   function desenhar(e) {
+    if (document.body.classList.contains('touring')) return; // escondido no tour: não repinta (era o grosso do lixo do tour)
     medir(); if (!tam) return;
     if (e.data !== dataFace) pintarFace(e.data);
     const c = tam / 2, rA = tam * R_ANEL, rF = tam * R_FACE, k = tam / 300;
@@ -97,6 +98,7 @@ export function criarRelogioCeu({ ceu, lang = 'pt' }) {
   for (const t of ['pointerup', 'pointercancel']) cv.addEventListener(t, () => { modo = null; });
   addEventListener('resize', () => { tam = 0; desenhar(ceu.estado()); });
   ceu.aoMudar(desenhar);
+  new MutationObserver(() => desenhar(ceu.estado())).observe(document.body, { attributes: true, attributeFilter: ['class'] }); // ao sair do tour, em dia
   desenhar(ceu.estado());
   return { caixa };
 }

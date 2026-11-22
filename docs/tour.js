@@ -99,7 +99,7 @@ function estacoes(ms, ano) {
     const passo = (agora) => {
       if (!ativo) return ok();
       const t = Math.min(1, (agora - t0) / ms);
-      if (agora - ult > 120 || t >= 1) { // ~8 vezes por segundo basta: cada troca de data recalcula sol e árvores
+      if (agora - ult > 250 || t >= 1) { // 4 vezes por segundo basta: cada troca de data recalcula sol, árvores e flores (e gera lixo)
         ult = agora;
         const d = new Date(dataEm((t * ms) / TOTAL)); // t: fração do ano corrido; o eixo dos quadros-chave é o tempo do tour
         C.ceu.definirData(d.toISOString().slice(0, 10));

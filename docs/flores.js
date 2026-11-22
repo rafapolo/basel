@@ -17,6 +17,8 @@ const FASES = [
   [318, 367, ['#d98fb8', '#f2e6ee', '#8a5bc4'], [0.5, 0.15, 0]],                                    // fim de outono: urze e os últimos ásteres
 ];
 const CAMPO = ['#ffffff', '#f7f3e8', '#f2d84b', '#7a8ce0', '#ffffff']; // na grama: margaridas, botões-de-ouro, flores do campo
+// as cores já como THREE.Color (antes cada troca de dia reinterpretava ~10 mil textos de cor: lixo no tour)
+const COR_PRONTA = new Map(); const corPronta = (h) => { let c = COR_PRONTA.get(h); if (!c) { c = new THREE.Color(h); COR_PRONTA.set(h, c); } return c; };
 
 export async function criarFlores({ cena, altura, ceu, leve = false, base = 'data/' }) {
   const [det, arv] = await Promise.all([fetch(base + 'detalhes.json').then((r) => r.json()), fetch(base + 'arvores.json').then((r) => r.json())]).catch(() => [null, null]);
@@ -82,7 +84,7 @@ export async function criarFlores({ cena, altura, ceu, leve = false, base = 'dat
       m4.compose(p3.set(it.x, it.y, it.z), q.setFromAxisAngle(Y, it.r * 40), e.set(s, s * (0.8 + 0.4 * k), s));
       mF.setMatrixAt(i, m4); mB.setMatrixAt(i, m4);
       const p = it.tipo === GRAMA && pal !== FASES[1][2] ? CAMPO : pal;
-      mB.setColorAt(i, cor.set(p[Math.floor(((it.r * 7.31) % 1) * p.length)]));
+      mB.setColorAt(i, corPronta(p[Math.floor(((it.r * 7.31) % 1) * p.length)]));
     });
     mF.instanceMatrix.needsUpdate = mB.instanceMatrix.needsUpdate = true; if (mB.instanceColor) mB.instanceColor.needsUpdate = true;
   }
