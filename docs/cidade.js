@@ -706,6 +706,10 @@ function quadro(agora) {
   atualizarNeve(agora, ceu, cena, camera, leve);
   ceu.atualizar(agora);
   if (sol.castShadow) { // a sombra do modo leve acompanha a câmera, em passos de 8 m (sem tremer a cada quadro)
+    // e cresce com a distância (2026-11-22): o quadrado fixo de 1,2 km ficava inteiro na tela vista do alto, um retângulo
+    // escuro andando sobre a cidade. Em degraus de 25%, para não refazer a projeção a cada quadro
+    { const d = camera.position.distanceTo(controls.target), lado = Math.min(4000, Math.max(600, 600 * 1.25 ** Math.ceil(Math.log(Math.max(1, d * 1.1) / 600) / Math.log(1.25))));
+      const sc = sol.shadow.camera; if (sc.right !== lado) { sc.left = sc.bottom = -lado; sc.right = sc.top = lado; sc.far = 2000 + lado; sc.updateProjectionMatrix(); renderer.shadowMap.needsUpdate = true; } }
     const tx = Math.round(controls.target.x / 8) * 8, tz = Math.round(controls.target.z / 8) * 8;
     if (tx !== sol.target.position.x || tz !== sol.target.position.z) {
       const d = sol.position.clone().sub(sol.target.position);
