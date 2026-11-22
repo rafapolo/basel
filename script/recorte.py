@@ -7,8 +7,8 @@ A ORIGEM fica fixa no centro do recorte antigo: as coordenadas locais já espalh
 tour, pontos) continuam valendo. Local: x = E − ORIGEM_E (leste), z = −(N − ORIGEM_N) (sul é +z).
 """
 
-E0, E1 = 2609600.0, 2613000.0  # oeste: 250 m além da Allschwilerplatz, com a Oekolampad (igreja, Gemeindehaus e a Anlage)
-N0, N1 = 1266150.0, 1268100.0
+E0, E1 = 2609400.0, 2613000.0  # oeste: o Kannenfeldpark inteiro (2026-11-22; antes 2609600, 250 m além da Allschwilerplatz)
+N0, N1 = 1266150.0, 1268550.0  # norte: até a Burgfelderstrasse, com o parque (antes 1268100)
 ORIGEM_E, ORIGEM_N = 2611350.0, 1267525.0
 BASE_Z = 244.0
 ESCALA = 16  # Int16 em 1/16 m (6 cm): ±2048 m, cobre o recorte novo (x de −1750 a 550, z de −575 a 1375, +60 m de folga)
