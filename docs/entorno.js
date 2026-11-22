@@ -11,7 +11,9 @@ export async function criarEntorno({ cena, base = 'data/' }) {
   const ga = new THREE.BufferGeometry(), pa = new Float32Array((M.agua.length / 2) * 3);
   for (let i = 0, k = 0; i < M.agua.length; i += 2, k += 3) { pa[k] = M.agua[i]; pa[k + 1] = M.nivel; pa[k + 2] = M.agua[i + 1]; }
   ga.setAttribute('position', new THREE.BufferAttribute(pa, 3)); ga.computeVertexNormals();
-  const matAgua = new THREE.MeshStandardMaterial({ color: 0x4d777d, roughness: 0.12, metalness: 0.25, side: THREE.DoubleSide }); // perto do tom do Reno do recorte
+  // o tom do Reno do recorte visto de cima (cinza-esverdeado) e fosco: liso e metálico, ele virava uma faixa clara e branca de
+  // reflexo do sol, com emenda dura onde começa a água de verdade (2026-11-22)
+  const matAgua = new THREE.MeshStandardMaterial({ color: 0x4a5a5c, roughness: 0.55, metalness: 0, side: THREE.DoubleSide });
   matAgua.userData.semNeve = true;
   const agua = new THREE.Mesh(ga, matAgua); agua.name = 'Reno (entorno)'; agua.receiveShadow = true;
   cena.add(agua);
