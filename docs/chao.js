@@ -176,6 +176,11 @@ float gRelevo = 0.0; // relevo fino da rua (m), só perto da câmera: vira norma
     roughnessFactor = clamp(0.95 - 0.28 * mancha * (asf + cal) - 0.06 * ruido + 0.05 * pav, 0.4, 1.0);
     }
     diffuseColor.rgb *= mix(1.0, 0.62, ao * uRuasOn * 0.35 * (1.0 - cobre));
+    // fora das ruas, de perto (até ~140 m): a foto aérea (10–25 cm por pixel) vista rente vira um borrão liso; ganha manchas
+    // largas e um grão leve, como terra batida, grama rala e cascalho, para não parecer uma foto esticada
+    { float pertoD = (1.0 - smoothstep(25.0, 140.0, length(vViewPosition))) * (1.0 - clamp(cobre, 0.0, 1.0));
+      if (pertoD > 0.01) diffuseColor.rgb *= 1.0 + pertoD * (0.2 * (fbm(vChaoP * 1.7) - 0.5) + 0.1 * (vnoise(vChaoP * 7.0) - 0.5));
+    }
   }`)
       // encosta íngreme (as margens do Reno sob a Pfalz e o Rheinsprung, os taludes): a foto aérea, vista de cima, esticava
       // num borrão verde na parede; ali vira muro de arrimo em blocos de arenito e calcário, com hera aqui e ali
