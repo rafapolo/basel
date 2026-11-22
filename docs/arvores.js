@@ -317,7 +317,7 @@ void main() {
     const pos = [], cor = [];
     const sub = (a, b, c, k, depth) => { // subdivide até as arestas ficarem abaixo de 4 m, para seguir o relevo de 0,5 m (tarefa 15)
       const e = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), Math.hypot(c[0] - b[0], c[1] - b[1]), Math.hypot(a[0] - c[0], a[1] - c[1]));
-      if (e < 4 || depth > 6) {
+      if (e < 8 || depth > 6) { // 8 m (eram 4): ~4 vezes menos triângulos na camada transparente, que pesava ~3 ms
         // fora do relevo (gramados do OSM além do recorte) a altura cai a 0 e a mancha boiava no céu, atrás da cidade
         if (![a, b, c].every((p) => dentro(p[0], p[1]))) return;
         for (const p of [a, b, c]) {

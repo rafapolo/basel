@@ -105,7 +105,7 @@ uniform float uVidaT; uniform float uAnima;`)
   function malhaInst(geo, mat, n, sombra) {
     geo.setAttribute('aTorso', atr(n, 3)); geo.setAttribute('aCalca', atr(n, 3)); geo.setAttribute('aPele', atr(n, 3));
     geo.setAttribute('aCabelo', atr(n, 3)); geo.setAttribute('aAnim', atr(n, 3));
-    if (geo.userData.opcoes) geo.setAttribute('aAcess', atr(n, 3));
+    geo.setAttribute('aAcess', atr(n, 3)); // sempre: o estilo e a cor dos acessórios moram na malha de longe também
     const im = new THREE.InstancedMesh(geo, mat, n);
     im.frustumCulled = false; im.castShadow = sombra && !leve; im.receiveShadow = true;
     im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -385,20 +385,42 @@ uniform float uVidaT; uniform float uAnima;`)
     };
   }
 
+  // ---------- perto e longe ----------
+  // a malha de longe (só o corpo) desenha todo mundo; quem está a menos de R m da câmera passa para a malha de perto (com
+  // roupa e acessórios), numa vaga copiada da de longe: matriz e atributos (estes só quando a vaga muda de dono)
+  const ATR = ['aTorso', 'aCalca', 'aPele', 'aCabelo', 'aAnim', 'aAcess'];
+  function separarPerto(imL, imP, dono, R) {
+    if (!camera) return;
+    const a = imL.instanceMatrix.array, b = imP.instanceMatrix.array, cx = camera.position.x, cz = camera.position.z, R2 = R * R;
+    const AL = imL.geometry.attributes, AP = imP.geometry.attributes, cap = dono.length;
+    let k = 0, mudou = false;
+    for (let i = 0; i < imL.count && k < cap; i++) {
+      const o = i * 16; if (a[o + 15] === 0) continue;
+      const dx = a[o + 12] - cx, dz = a[o + 14] - cz; if (dx * dx + dz * dz > R2) continue;
+      for (let j = 0; j < 16; j++) b[k * 16 + j] = a[o + j];
+      a.fill(0, o, o + 16);
+      if (dono[k] !== i) { dono[k] = i; mudou = true; for (const n of ATR) { const s = AL[n], d = AP[n]; for (let c = 0; c < s.itemSize; c++) d.array[k * s.itemSize + c] = s.array[i * s.itemSize + c]; } }
+      k++;
+    }
+    imP.count = k; imL.instanceMatrix.needsUpdate = imP.instanceMatrix.needsUpdate = true;
+    if (mudou) for (const n of ATR) AP[n].needsUpdate = true;
+  }
+
   // ---------- geometrias ----------
   const cil = (r0, r1, h, s = 6) => new THREE.CylinderGeometry(r0, r1, h, s);
-  const geoGente = () => {
+  const geoGente = (roupa = true) => {
     const partes = [];
     for (const l of [-1, 1]) {
-      partes.push({ g: mat4(cil(0.075, 0.06, 0.82, 5), l * 0.085, 0.46, 0), parte: 2, lado: l });
+      partes.push({ g: mat4(cil(0.075, 0.06, 0.82, roupa ? 5 : 4), l * 0.085, 0.46, 0), parte: 2, lado: l });
       partes.push({ g: mat4(new THREE.BoxGeometry(0.1, 0.07, 0.25), l * 0.085, 0.045, 0.05), parte: 3, lado: l });
-      partes.push({ g: mat4(cil(0.042, 0.036, 0.5, 5), l * 0.235, 1.21, 0), parte: 1, lado: l });
-      partes.push({ g: mat4(new THREE.SphereGeometry(0.045, 4, 3), l * 0.235, 0.9, 0), parte: 0, lado: l });
+      partes.push({ g: mat4(cil(0.042, 0.036, 0.5, roupa ? 5 : 4), l * 0.235, 1.21, 0), parte: 1, lado: l });
+      partes.push({ g: mat4(new THREE.SphereGeometry(0.045, 4, roupa ? 3 : 2), l * 0.235, 0.9, 0), parte: 0, lado: l });
     }
-    partes.push({ g: mat4(cil(0.17, 0.2, 0.62, 7), 0, 1.19, 0, 1.2, 1, 0.72), parte: 1 });
+    partes.push({ g: mat4(cil(0.17, 0.2, 0.62, roupa ? 7 : 6), 0, 1.19, 0, 1.2, 1, 0.72), parte: 1 });
     partes.push({ g: mat4(cil(0.045, 0.05, 0.08, 5), 0, 1.54, 0), parte: 0 });
-    partes.push({ g: mat4(new THREE.SphereGeometry(0.115, 7, 5), 0, 1.65, 0), parte: 0 });
-    partes.push({ g: mat4(new THREE.SphereGeometry(0.124, 7, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.66, -0.005), parte: 4 });
+    partes.push({ g: mat4(new THREE.SphereGeometry(0.115, roupa ? 7 : 5, roupa ? 5 : 4), 0, 1.65, 0), parte: 0 });
+    partes.push({ g: mat4(new THREE.SphereGeometry(0.124, roupa ? 7 : 5, roupa ? 4 : 2, 0, TAU, 0, Math.PI * 0.55), 0, 1.66, -0.005), parte: 4 });
+    if (!roupa) return unir(partes); // de longe: só o corpo (a roupa custava ~1100 vértices por pessoa, mesmo escondida)
     const DY = 0, DZ = 0;
     // peças opcionais (aOpc = 10·grupo + estilo; ver o shader): 1x cabelo, 2x chapéu, 3x casaco, 4x extra; parte 5 = aAcess
     const O = (g, parte, opc) => partes.push({ g, parte, opc });
@@ -446,7 +468,7 @@ uniform float uVidaT; uniform float uAnima;`)
   const matG = matGente();
   const matC = matGente(0.45);
   const NPED = leve ? 360 : 1500, NBIKE = leve ? 160 : 650, NCARRO = leve ? 45 : 160; // carros: eram 36 na cidade inteira; bicicletas: Basel pedala muito (eram 280)
-  const ped = populacao({ n: NPED, grafo: gPed, geo: geoGente(), mat: matG, sombra: false, vel: [0.95, 1.65], livres: Math.round(NPED * 0.34),
+  const ped = populacao({ n: NPED, grafo: gPed, geo: geoGente(false), mat: matG, sombra: false, vel: [0.95, 1.65], livres: Math.round(NPED * 0.34),
     desloc: (i, r) => (r() < 0.5 ? -1 : 1) * (0.2 + r() * 0.9),
     offTipo: (t, o) => (VIA_CARRO.has(t) ? Math.sign(o) * (LARG[t] / 2 + 1.1) : o),
     // Basel tem muita criança na rua: ~18% de mão com um adulto (o índice anterior), ~7% sozinhas (escolares)
@@ -461,6 +483,7 @@ uniform float uVidaT; uniform float uAnima;`)
     carro.cores((i, A) => { poe3(A.aTorso, i, sorteia(CARRO)); poe3(A.aCalca, i, CARRO[0]); poe3(A.aPele, i, CARRO[0]); poe3(A.aCabelo, i, CARRO[0]); });
   }
   pintar();
+  const pedPerto = malhaInst(geoGente(true), matG, leve ? 120 : 360, false), donoPed = new Int32Array(pedPerto.count).fill(-1), R_PERTO = 110;
   // cachorros: ~9% dos adultos que andam levam um, na guia, um pouco à frente e à direita; porte e pelagem variados
   // (de salsicha a pastor), rabo e cabeça; a guia é uma linha da mão até a coleira
   const caes = (() => {
@@ -512,18 +535,7 @@ uniform float uVidaT; uniform float uAnima;`)
     partes.push({ g: mat4(cil(0.045, 0.05, 0.08, 5), 0, 1.54 + dy, 0), parte: 0 });
     partes.push({ g: mat4(new THREE.SphereGeometry(0.115, 7, 5), 0, 1.65 + dy, 0.02), parte: 0 });
     partes.push({ g: mat4(new THREE.SphereGeometry(0.124, 7, 4, 0, TAU, 0, Math.PI * 0.55), 0, 1.66 + dy, 0.015), parte: 4 });
-    const DY = dy, DZ = 0.02;
-    // peças opcionais (aOpc = 10·grupo + estilo; ver o shader): 1x cabelo, 2x chapéu, 3x casaco, 4x extra; parte 5 = aAcess
-    const O = (g, parte, opc) => partes.push({ g, parte, opc });
-    O(mat4(new THREE.BoxGeometry(0.22, 0.3, 0.06), 0, 1.55 + DY, -0.095 + DZ), 4, 11);                       // cabelo comprido
-    O(mat4(new THREE.SphereGeometry(0.06, 4, 3), 0, 1.75 + DY, -0.1 + DZ), 4, 12);                           // coque
-    O(mat4(new THREE.SphereGeometry(0.134, 6, 3, 0, TAU, 0, Math.PI * 0.55), 0, 1.665 + DY, DZ), 5, 21);    // gorro
-    O(mat4(new THREE.SphereGeometry(0.04, 4, 2), 0, 1.81 + DY, DZ), 5, 21);                                   // pompom
-    O(mat4(cil(0.128, 0.128, 0.07, 6), 0, 1.73 + DY, DZ), 5, 22);                                             // boné
-    O(mat4(new THREE.BoxGeometry(0.17, 0.02, 0.13), 0, 1.705 + DY, 0.15 + DZ), 5, 22);                        // aba do boné
-    O(mat4(cil(0.23, 0.23, 0.02, 8), 0, 1.71 + DY, DZ), 5, 23);                                              // chapéu: aba larga
-    O(mat4(cil(0.12, 0.13, 0.13, 6), 0, 1.78 + DY, DZ), 5, 23);                                               // copa
-    O(mat4(new THREE.TorusGeometry(0.1, 0.045, 3, 7).rotateX(Math.PI / 2), 0, 1.5 + DY, DZ), 5, 41);       // cachecol
+    // (sem as peças opcionais: sentados quase sempre se veem de longe, e eram 1467 vértices cada)
     return unir(partes);
   };
   const LUG = { x: [], z: [], y: [], hx: [], hz: [], tipo: [], lim: [], alt: [], larg: [], kid: [] };
@@ -591,7 +603,9 @@ uniform float uVidaT; uniform float uAnima;`)
     const ord = LUG.lim.map((_, i) => i).sort((p, q) => LUG.lim[p] - LUG.lim[q]);
     for (const k in LUG) LUG[k] = ord.map((i) => LUG[k][i]);
   }
-  const imPar = nLug ? malhaInst(geoGente(), matG, nLug, false) : null;
+  const imPar = nLug ? malhaInst(geoGente(false), matG, nLug, false) : null;
+  const parSalvo = new Float32Array(nLug * 16); // as matrizes de verdade dos parados (separarPerto zera as de perto na malha de longe)
+  const imParPerto = nLug ? malhaInst(geoGente(true), matG, leve ? 80 : 250, false) : null, donoPar = new Int32Array(imParPerto?.count ?? 0).fill(-1);
   const imSent = SENT.length ? malhaInst(geoSentado(), matG, SENT.length, false) : null;
   const limSent = SENT.map((e) => e[5] ?? rnd()), altSent = SENT.map(() => 0.94 + rnd() * 0.14);
   // toalhas dos piqueniques: xadrez em cores de toalha (vermelho, azul, verde, amarelo), uma por família sentada
@@ -630,12 +644,13 @@ uniform float uVidaT; uniform float uAnima;`)
       caidoP[i] = Math.max(0, caidoP[i] - dt);
       if (caidoP[i] > 0) { algumCaidoP = true; matrizCaida(m, i, LUG.x[i], LUG.y[i], LUG.z[i], caiPX[i], caiPZ[i], caidoP[i], LUG.larg[i], LUG.alt[i]); }
       else matriz(imPar, i, LUG.x[i], LUG.y[i], LUG.z[i], LUG.hx[i], LUG.hz[i], LUG.larg[i], LUG.alt[i], LUG.larg[i]);
+      parSalvo.set(m.subarray(i * 16, i * 16 + 16), i * 16);
     }
     imPar.instanceMatrix.needsUpdate = true;
   }
   function derrubaParados(x, z, r, fx, fz) {
     if (!imPar) return 0;
-    const m = imPar.instanceMatrix.array; let k = 0;
+    const m = parSalvo; let k = 0;
     for (let i = 0; i < nLug; i++) {
       if (caidoP[i] > 0 || m[i * 16 + 15] !== 1) continue; // só quem está à vista
       if (Math.hypot(LUG.x[i] - x, LUG.z[i] - z) < r) { caidoP[i] = CAIDO; caiPX[i] = fx; caiPZ[i] = fz; k++; algumCaidoP = true; }
@@ -668,7 +683,7 @@ uniform float uVidaT; uniform float uAnima;`)
         if (LUG.lim[i] < dens[LUG.tipo[i]]) { matriz(imPar, i, LUG.x[i], LUG.y[i], LUG.z[i], LUG.hx[i], LUG.hz[i], LUG.larg[i], LUG.alt[i], LUG.larg[i]); n++; ult = i; }
         else m.fill(0, i * 16, i * 16 + 16);
       }
-      imPar.count = ult + 1;
+      imPar.count = ult + 1; parSalvo.set(imPar.instanceMatrix.array);
       imPar.instanceMatrix.needsUpdate = true;
     }
     if (imSent) {
@@ -1053,7 +1068,7 @@ uniform float uVidaT; uniform float uAnima;`)
     const seg = (performance.now() / 1000 - T0) - S.ref;
     S.simT = S.base + (parado ? 0 : seg);
     UV.uVidaT.value = S.relogio; UV.uVidaNoite.value = S.noite; matAve.emissiveIntensity = 0.55 * (1 - S.noite);
-    if (recolorir) { recolorir = false; pintar(); pintarParados(); }
+    if (recolorir) { recolorir = false; pintar(); pintarParados(); donoPed.fill(-1); donoPar.fill(-1); } // cores novas: as vagas de perto recopiam
     const h = hora();
     const fp = perfil(V.contagem.ped.hora[S.dia], h) * (0.55 + 0.45 * V.contagem.ped.mes[S.mes]);
     const fv = perfil(V.contagem.velo.hora[S.dia], h) * (0.45 + 0.55 * V.contagem.velo.mes[S.mes]) * (1 - 0.35 * S.noite);
@@ -1063,8 +1078,10 @@ uniform float uVidaT; uniform float uAnima;`)
     const nCarro = Math.round(NCARRO * fc);
     ped.atualizar(sd, nPed, alvoCam); bici.atualizar(sd, nBici, alvoCam); carro.atualizar(sd, nCarro, alvoCam);
     caes?.(S.relogio);
+    separarPerto(ped.im, pedPerto, donoPed, R_PERTO);
     parados(agora, fp, h);
     caidosParados(sd);
+    if (imPar) { imPar.instanceMatrix.array.set(parSalvo); separarPerto(imPar, imParPerto, donoPar, R_PERTO); }
     bondes(sd);
     const nAve = Math.round(NAVE * suave(-4, 8, S.alt ?? 40) * (S.noite > 0.9 ? 0 : 1));
     gaivotas(sd, nAve);

@@ -84,9 +84,9 @@ export async function criarDetalhes({ THREE, cena, renderer, U, altura, ceu, P, 
   // ---------- postes de luz ----------
   const FERRO = 0x2d3532, VIDRO = 0xf3e6c0;
   const geoPoste = juntar([
-    { g: cil(0.16, 0.12, 0.35, 8), c: FERRO, m: T(0, 0.175, 0) },
-    { g: cil(0.07, 0.05, 3.7, 8), c: FERRO, m: T(0, 2.2, 0) },
-    { g: cil(0.09, 0.09, 0.1, 8), c: FERRO, m: T(0, 4.1, 0) },
+    { g: cil(0.16, 0.12, 0.35, 6), c: FERRO, m: T(0, 0.175, 0) }, // 6 lados (eram 8): 756 postes na cidade
+    { g: cil(0.07, 0.05, 3.7, 5), c: FERRO, m: T(0, 2.2, 0) },
+    { g: cil(0.09, 0.09, 0.1, 6), c: FERRO, m: T(0, 4.1, 0) },
     { g: cil(0.12, 0.18, 0.4, 4), c: VIDRO, luz: 1, m: T(0, 4.35, 0, Math.PI / 4) },
     { g: new THREE.ConeGeometry(0.27, 0.3, 4), c: FERRO, m: T(0, 4.7, 0, Math.PI / 4) },
     { g: new THREE.SphereGeometry(0.05, 6, 4), c: FERRO, m: T(0, 4.9, 0) },

@@ -39,7 +39,7 @@ export async function criarFlores({ cena, altura, ceu, leve = false, base = 'dat
   // 2. canteiros e verdes do OSM: pontos sorteados dentro dos polígonos, densidade pelo tipo
   const dentro = (x, z, p) => { let d = false; for (let i = 1, j = p.length - 2; i < p.length; j = i, i += 2) if ((p[i + 1] > z) !== (p[j + 1] > z) && x < ((p[j] - p[i]) * (z - p[i + 1])) / (p[j + 1] - p[i + 1]) + p[i]) d = !d; return d; };
   const area = (p) => { let s = 0; for (let i = 1, j = p.length - 2; i < p.length; j = i, i += 2) s += (p[j] + p[i]) * (p[j + 1] - p[i + 1]); return Math.abs(s / 2); };
-  const TETO = { [CANTEIRO]: leve ? 1200 : 3500, [GRAMA]: leve ? 900 : 3000 };
+  const TETO = { [CANTEIRO]: leve ? 900 : 2500, [GRAMA]: leve ? 500 : 1500 }; // 2026-11-22: ~2,4 ms com 17 mil tufos; menos na grama
   const POR_M2 = { 3: [CANTEIRO, 1 / 1.2], 1: [GRAMA, 1 / 30], 0: [GRAMA, 1 / 45], 2: [GRAMA, 1 / 60] };
   const cont = { [CANTEIRO]: 0, [GRAMA]: 0 };
   for (const p of arv.verde) {
@@ -58,8 +58,8 @@ export async function criarFlores({ cena, altura, ceu, leve = false, base = 'dat
     }
   }
   // geometrias: tufo de folhas (cone baixo) e três flores (octaedros) no alto dele
-  const folhas = new THREE.ConeGeometry(0.13, 0.26, 5).translate(0, 0.13, 0);
-  const flor = mergeGeometries([[0, 0.27, 0], [0.07, 0.22, 0.04], [-0.06, 0.24, -0.05]].map(([x, y, z]) => new THREE.OctahedronGeometry(0.055).translate(x, y, z)));
+  const folhas = new THREE.ConeGeometry(0.13, 0.26, 4, 1, true).translate(0, 0.13, 0); // sem tampa: só se vê de cima e do lado
+  const flor = mergeGeometries([[0, 0.27, 0], [0.07, 0.22, 0.04], [-0.06, 0.24, -0.05]].map(([x, y, z]) => new THREE.TetrahedronGeometry(0.06).translate(x, y, z)));
   const n = itens.length;
   const mF = new THREE.InstancedMesh(folhas, new THREE.MeshStandardMaterial({ color: 0x3f6b2a, roughness: 0.9 }), n);
   const mB = new THREE.InstancedMesh(flor, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }), n);
