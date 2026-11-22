@@ -15,6 +15,18 @@ export async function criarEntorno({ cena, base = 'data/' }) {
   // reflexo do sol, com emenda dura onde começa a água de verdade (2026-11-22)
   const matAgua = new THREE.MeshStandardMaterial({ color: 0x4a5a5c, roughness: 0.55, metalness: 0, side: THREE.DoubleSide });
   matAgua.userData.semNeve = true;
+  // some com a distância do recorte (80 a 650 m): longe, a faixa escura e fosca subia pela névoa do horizonte como uma
+  // sombra no céu (2026-11-22)
+  if (M.recorte) {
+    const [x0, z0, x1, z1] = M.recorte; matAgua.transparent = true; matAgua.depthWrite = false;
+    matAgua.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vEntP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvEntP = position.xz;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vEntP;')
+        .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+  { vec2 d = max(vec2(${x0.toFixed(1)}, ${z0.toFixed(1)}) - vEntP, vEntP - vec2(${x1.toFixed(1)}, ${z1.toFixed(1)}));
+    float fora = length(max(d, 0.0)); gl_FragColor.a *= 1.0 - smoothstep(80.0, 650.0, fora); }`);
+    };
+  }
   const agua = new THREE.Mesh(ga, matAgua); agua.name = 'Reno (entorno)'; agua.receiveShadow = true;
   cena.add(agua);
   const altura = () => M.nivel; // fora do recorte, só a água

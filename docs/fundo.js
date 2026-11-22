@@ -17,17 +17,17 @@ export function criarFundo({ cena, dados, y = -6 }) {
     const x = rnd() * N, z = rnd() * N, w = 3 + rnd() * 30, h = 3 + rnd() * 22;
     g.save(); g.translate(x, z); g.rotate(rnd() * Math.PI); g.globalAlpha = 0.35 + rnd() * 0.5; g.fillStyle = VERDES[Math.floor(rnd() * VERDES.length)]; g.fillRect(-w / 2, -h / 2, w, h); g.restore();
   }
-  for (let i = 0; i < 700; i++) { // matas: manchas escuras e arredondadas
-    const x = rnd() * N, z = rnd() * N, r = 4 + rnd() * 26;
-    g.globalAlpha = 0.55; g.fillStyle = rnd() < 0.5 ? '#3c5a2c' : '#2f4b26'; g.beginPath(); g.ellipse(x, z, r, r * (0.5 + rnd()), rnd() * 3, 0, Math.PI * 2); g.fill();
+  for (let i = 0; i < 900; i++) { // matas: manchas pequenas e só um pouco mais escuras (grandes e escuras, pareciam sombras de nuvem)
+    const x = rnd() * N, z = rnd() * N, r = 2 + rnd() * 9;
+    g.globalAlpha = 0.28; g.fillStyle = rnd() < 0.5 ? '#4e6c38' : '#456334'; g.beginPath(); g.ellipse(x, z, r, r * (0.5 + rnd()), rnd() * 3, 0, Math.PI * 2); g.fill();
   }
   g.globalAlpha = 1;
   // fora da Suíça: o mesmo campo, mais escuro
   if (dados?.pais) {
     const masc = document.createElement('canvas'); masc.width = masc.height = N; const m = masc.getContext('2d');
-    m.fillStyle = 'rgba(0,0,0,0.5)'; m.fillRect(0, 0, N, N); m.globalCompositeOperation = 'destination-out'; m.fillStyle = '#000';
+    m.fillStyle = 'rgba(0,0,0,0.22)'; m.fillRect(0, 0, N, N); // um pouco mais escuro só (a 50% e com borda dura, na névoa parecia a sombra de uma nuvem enorme) m.globalCompositeOperation = 'destination-out'; m.fillStyle = '#000';
     for (const a of dados.pais) { m.beginPath(); for (let i = 0; i < a.length; i += 2) { const u = ((a[i] + J) / (2 * J)) * N, v = ((a[i + 1] + J) / (2 * J)) * N; i ? m.lineTo(u, v) : m.moveTo(u, v); } m.closePath(); m.fill(); }
-    g.drawImage(masc, 0, 0);
+    g.filter = 'blur(6px)'; g.drawImage(masc, 0, 0); g.filter = 'none'; // borda macia (~120 m)
   }
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   // plano no xz: u segue +x e v segue +z (a mesma convenção do canvas acima)
