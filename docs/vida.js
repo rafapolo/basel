@@ -591,6 +591,14 @@ uniform float uVidaT; uniform float uAnima;`)
       }
     }
   }
+  // Markthalle (Steinentorberg) e Centralbahnplatz (SBB): gente de pé na calçada, sobretudo em dia útil (a feira da Markthalle,
+  // quem espera o trem); conversando em rodinhas de 2 a 4. Tipo 1 na densidade (parados())
+  for (const [x0, x1, z0, z1, n] of [[-215, -135, 1047, 1055, leve ? 16 : 34], [-5, 65, 1148, 1165, leve ? 22 : 50]]) {
+    for (let k = 0; k < n; ) {
+      const cx = x0 + rnd() * (x1 - x0), cz = z0 + rnd() * (z1 - z0), m = 2 + Math.floor(rnd() * 3), a0 = rnd() * TAU, lim = rnd();
+      for (let j = 0; j < m && k < n; j++, k++) { const a = a0 + (TAU * j) / m, x = cx + Math.sin(a) * 0.6, z = cz + Math.cos(a) * 0.6; lugar(x, z, null, cx - x, cz - z, 1, 0.08, lim); }
+    }
+  }
   if (ponte) { // debruçados no parapeito da Mittlere, de frente para o rio (o mesmo quadro de marcos.js)
     const { A, B, larg } = ponte, L = Math.hypot(B[0] - A[0], B[1] - A[1]), ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, nx = -uz, nz = ux;
     for (let sP = 18; sP < L - 18; sP += 3.2) for (const sg of [-1, 1]) {
@@ -666,7 +674,7 @@ uniform float uVidaT; uniform float uAnima;`)
     const dParque = 0.8 * suave(9.5, 11.5, h) * (1 - suave(18.5, 20.5, h)) * ({ verao: 1, meia: 0.6, inverno: 0.15 })[S.estacao] * (S.dia === 'util' ? 0.5 : 1) * (0.4 + 0.6 * lim(f * 1.5, 0, 1));
     const dens = [
       0.6 * lim(0.12 + 0.95 * f, 0, 1),                                        // rodinhas
-      0,
+      0.75 * lim(0.2 + 0.9 * f, 0, 1) * (S.dia === 'util' ? 1 : 0.45) * suave(6.5, 8, h) * (1 - suave(20, 22.5, h)), // Markthalle e SBB
       0.6 * lim(0.15 + 0.9 * f, 0, 1),                                         // parapeito da ponte
       0.5 * lim(0.1 + 0.9 * f, 0, 1),                                          // paradas de bonde
       dParque,                                                                 // famílias nos parques
