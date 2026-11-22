@@ -11,6 +11,9 @@ on:
       - 'script/*.py'
       - 'script/*.sh'
       - 'tasks/**'
+      - 'script/smoke.mjs'
+      - '.gitignore'
+      - 'LICENSE*'
   workflow_dispatch:
 
 permissions:
@@ -66,13 +69,14 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-pw-${{ hashFiles('bun.lock') }}
 
+      # só o modo normal (SMOKE_RAPIDO): o leve testo à mão quando mexo nele
       - name: Smoke test
         run: |
           # sem --with-deps: o apt das dependências levava ~40 s por deploy, e o runner do Ubuntu já traz as bibliotecas do Chrome
           bunx playwright install chromium
           python3 -m http.server -d dist 8000 >/dev/null 2>&1 &
           sleep 1
-          bun script/smoke.mjs http://localhost:8000/
+          SMOKE_RAPIDO=1 bun script/smoke.mjs http://localhost:8000/
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

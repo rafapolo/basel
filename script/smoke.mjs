@@ -10,7 +10,9 @@ const erros = [];
 const b = process.argv[3] === 'webkit' ? await webkit.launch() : await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
 try {
   // uma página por consulta: navegar com tiles ainda chegando faz o WebKit rejeitar os downloads abortados ("Load failed")
-  for (const q of ['?hora=15&data=2026-06-21', '?lang=de&leve=1']) {
+  // SMOKE_RAPIDO=1 (CI): só o modo normal; o leve em alemão custava ~1 min a mais no swiftshader e roda à mão quando muda
+  const casos = process.env.SMOKE_RAPIDO ? ['?hora=15&data=2026-06-21'] : ['?hora=15&data=2026-06-21', '?lang=de&leve=1'];
+  for (const q of casos) {
     const pg = await b.newPage({ viewport: { width: 1280, height: 800 } });
     // serviços de fora (tempo, radar, fontes, mapas) ficam bloqueados: o teste é do site, e um 429 deles não pode barrar o
     // deploy (2026-11-22: o Open-Meteo respondeu 429 na CI). A página segue sem eles, como sem rede
